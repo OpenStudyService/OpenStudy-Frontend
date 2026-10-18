@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenOffice Login</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#f5f6fb;--panel:#fff;--line:#e3e6ed;--text:#1e2633;--muted:#737b89;
+  --primary:#4f46e5;--primary-dark:#4338ca;--soft:#eef2ff;--danger:#d94b4b;
+  --shadow:0 24px 70px rgba(25,31,50,.12)
+}
+html,body{margin:0;min-height:100%}
+body{
+  font-family:Pretendard,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 10% 10%,rgba(99,102,241,.12),transparent 28%),
+    radial-gradient(circle at 90% 80%,rgba(139,92,246,.12),transparent 28%),
+    var(--bg);
+}
+button,input{font:inherit}
+.page{min-height:100vh;display:grid;grid-template-columns:minmax(420px,1.05fr) minmax(460px,.95fr)}
+.visual{
+  position:relative;overflow:hidden;padding:48px;
+  background:linear-gradient(145deg,#171a27 0%,#252b49 52%,#3b3571 100%);
+  color:#fff;display:flex;flex-direction:column;justify-content:space-between
+}
+.visual:before,.visual:after{content:"";position:absolute;border-radius:50%;filter:blur(1px)}
+.visual:before{width:380px;height:380px;background:#7371ff1f;right:-120px;top:-90px}
+.visual:after{width:320px;height:320px;background:#c084fc16;left:-100px;bottom:-100px}
+.brand{position:relative;z-index:2;display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:grid;place-items:center;font-weight:900;font-size:18px;box-shadow:0 8px 28px #0003}
+.brand b{display:block;font-size:17px}.brand small{display:block;color:#aeb5c8;font-size:11px;margin-top:3px}
+.copy{position:relative;z-index:2;max-width:650px;margin:80px 0}
+.copy .eyebrow{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#ffffff10;border:1px solid #ffffff1c;color:#cbd1df;font-size:10px}
+.copy h1{font-size:42px;line-height:1.15;letter-spacing:-.045em;margin:20px 0 14px}
+.copy p{max-width:560px;font-size:14px;line-height:1.75;color:#c2c8d7;margin:0}
+.feature-grid{position:relative;z-index:2;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.feature{padding:14px;border:1px solid #ffffff18;background:#ffffff0c;border-radius:14px}
+.feature .icon{width:30px;height:30px;border-radius:9px;background:#ffffff10;display:grid;place-items:center;margin-bottom:9px}
+.feature b{display:block;font-size:11px}.feature small{display:block;color:#aeb5c8;font-size:9px;line-height:1.5;margin-top:4px}
+
+.login-side{display:flex;align-items:center;justify-content:center;padding:38px}
+.login-wrap{width:100%;max-width:430px}
+.mobile-brand{display:none;align-items:center;gap:10px;margin-bottom:32px}
+.mobile-brand .logo{width:38px;height:38px;color:#fff}
+.mobile-brand b{font-size:16px}
+.login-wrap h2{font-size:28px;letter-spacing:-.035em;margin:0 0 8px}
+.login-wrap>p{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 28px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:11px;font-weight:750;color:#4c5565;margin-bottom:7px}
+.input-wrap{position:relative}
+.input-wrap input{
+  width:100%;height:48px;border:1px solid var(--line);border-radius:11px;background:#fff;
+  padding:0 42px 0 13px;outline:0;color:var(--text);transition:.15s
+}
+.input-wrap input:focus{border-color:#9ba1ff;box-shadow:0 0 0 3px #6366f114}
+.input-icon{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:#9aa1ae;font-size:13px}
+.password-toggle{border:0;background:transparent;cursor:pointer}
+.form-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:3px 0 22px;font-size:10px}
+.check{display:flex;align-items:center;gap:7px;color:#606979}.check input{accent-color:var(--primary)}
+.form-meta a{color:var(--primary);text-decoration:none;font-weight:700}
+.login-btn{
+  width:100%;height:48px;border:0;border-radius:11px;background:var(--primary);color:#fff;
+  font-weight:800;cursor:pointer;transition:.15s;box-shadow:0 8px 20px #4f46e52c
+}
+.login-btn:hover{background:var(--primary-dark);transform:translateY(-1px)}
+.divider{display:flex;align-items:center;gap:10px;color:#9aa1ad;font-size:9px;margin:24px 0}
+.divider:before,.divider:after{content:"";height:1px;background:var(--line);flex:1}
+.demo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.demo{
+  border:1px solid var(--line);background:#fff;border-radius:11px;padding:12px;text-align:left;
+  cursor:pointer;transition:.15s
+}
+.demo:hover{border-color:#c8cbff;background:#fafaff}
+.demo b{display:block;font-size:11px}.demo small{display:block;color:var(--muted);font-size:9px;margin-top:4px;line-height:1.4}
+.info{
+  margin-top:20px;padding:12px 13px;border-radius:11px;background:#f8f9fc;border:1px solid #edf0f4;
+  color:#6b7280;font-size:9px;line-height:1.6
+}
+.info b{color:#4f46e5}
+.footer{margin-top:26px;text-align:center;color:#9aa1ad;font-size:9px}
+.error{display:none;margin:-4px 0 14px;padding:9px 11px;border-radius:9px;background:#fff1f1;color:#bb3e3e;font-size:10px}
+.error.show{display:block}
+.toast{
+  position:fixed;right:20px;bottom:20px;background:#171923;color:#fff;padding:11px 14px;border-radius:10px;
+  font-size:10px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none;z-index:50
+}
+.toast.show{opacity:1;transform:none}
+
+@media(max-width:900px){
+  .page{grid-template-columns:1fr}.visual{display:none}.login-side{min-height:100vh;padding:28px 20px}.mobile-brand{display:flex}
+}
+@media(max-width:700px){.demo-grid{grid-template-columns:1fr}}
+@media(max-width:460px){
+  .login-wrap h2{font-size:24px}.form-meta{align-items:flex-start;flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="visual">
+    <div class="brand">
+      <div class="logo">O</div>
+      <div><b>OpenOffice</b><small>Shared Office Platform</small></div>
+    </div>
+
+    <div class="copy">
+      <span class="eyebrow">● 하나의 계정으로 연결되는 공유 오피스</span>
+      <h1>필요한 공간을,<br>필요한 방식으로.</h1>
+      <p>
+        개인부터 기업까지 OpenOffice에서 공간을 예약하고 이용하며,
+        다양한 오피스 서비스를 한곳에서 편리하게 관리할 수 있습니다.
+      </p>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature"><div class="icon">▦</div><b>공간 예약</b><small>좌석과 회의실을 간편하게 예약</small></div>
+      <div class="feature"><div class="icon">◇</div><b>이용 관리</b><small>출입과 구독, 결제 내역 관리</small></div>
+      <div class="feature"><div class="icon">#</div><b>운영 협업</b><small>직원 업무와 내부 커뮤니케이션</small></div>
+    </div>
+  </section>
+
+  <section class="login-side">
+    <div class="login-wrap">
+      <div class="mobile-brand"><div class="logo">O</div><b>OpenOffice</b></div>
+
+      <h2>로그인</h2>
+      <p>OpenOffice 계정으로 로그인하면 계정 유형에 맞는 서비스로 자동 연결됩니다.</p>
+
+      <div class="error" id="error">이메일과 비밀번호를 모두 입력해주세요.</div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="email">이메일</label>
+          <div class="input-wrap">
+            <input id="email" type="email" placeholder="name@example.com" autocomplete="username">
+            <span class="input-icon">@</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">비밀번호</label>
+          <div class="input-wrap">
+            <input id="password" type="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password">
+            <button type="button" class="input-icon password-toggle" id="pwToggle">보기</button>
+          </div>
+        </div>
+
+        <div class="form-meta">
+          <label class="check"><input type="checkbox"> 로그인 상태 유지</label>
+          <a href="#" id="forgot">비밀번호를 잊으셨나요?</a>
+        </div>
+
+        <button class="login-btn" type="submit">로그인</button>
+      </form>
+
+      <div class="divider">목업용 빠른 로그인</div>
+
+      <div class="demo-grid">
+        <button class="demo" id="memberDemo">
+          <b>회원으로 로그인</b>
+          <small>개인 회원용 서비스 화면으로 이동</small>
+        </button>
+        <button class="demo" id="corporateDemo">
+          <b>기업 회원으로 로그인</b>
+          <small>기업 MEMBER / OWNER 통합 화면으로 이동</small>
+        </button>
+        <button class="demo" id="staffDemo">
+          <b>직원으로 로그인</b>
+          <small>지점 운영·고객지원·직원 업무 화면으로 이동</small>
+        </button>
+      </div>
+
+      <div class="info">
+        실제 서비스에서는 로그인 성공 후 <b>ACCOUNT.account_type</b>을 확인하여
+        <b>USER</b> 계정은 회원용 서비스로, <b>EMPLOYEE</b> 계정은 직원용 업무 서비스로 분기합니다.
+      </div>
+
+      <div class="footer">© 2026 OpenOffice. All rights reserved.</div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const email=document.getElementById("email");
+const password=document.getElementById("password");
+const error=document.getElementById("error");
+const toast=document.getElementById("toast");
+
+function showToast(msg){
+  toast.textContent=msg;
+  toast.classList.add("show");
+  clearTimeout(window.__t);
+  window.__t=setTimeout(()=>toast.classList.remove("show"),1700);
+}
+
+function moveTo(role){
+  showToast(role==="USER" ? "회원용 서비스로 이동합니다." : "직원용 업무 서비스로 이동합니다.");
+  setTimeout(()=>{
+    window.location.href = role==="USER"
+      ? "openoffice-member-personal-mockup.html"
+      : "openoffice-staff-mockup.html";
+  },650);
+}
+
+function moveToCorporate(){
+  showToast("기업 회원용 서비스로 이동합니다.");
+  setTimeout(()=>{
+    window.location.href = "openoffice-member-corporate-mockup.html";
+  },650);
+}
+
+document.getElementById("pwToggle").addEventListener("click",()=>{
+  const visible=password.type==="text";
+  password.type=visible?"password":"text";
+  document.getElementById("pwToggle").textContent=visible?"보기":"숨김";
+});
+
+document.getElementById("loginForm").addEventListener("submit",(e)=>{
+  e.preventDefault();
+  if(!email.value.trim() || !password.value.trim()){
+    error.classList.add("show");
+    return;
+  }
+  error.classList.remove("show");
+
+  // 목업용 분기:
+  // 이메일에 "staff"가 포함되면 EMPLOYEE, 그 외에는 USER로 가정합니다.
+  const role=email.value.toLowerCase().includes("staff") ? "EMPLOYEE" : "USER";
+  moveTo(role);
+});
+
+document.getElementById("memberDemo").addEventListener("click",()=>moveTo("USER"));
+document.getElementById("corporateDemo").addEventListener("click",()=>moveToCorporate());
+document.getElementById("staffDemo").addEventListener("click",()=>moveTo("EMPLOYEE"));
+
+document.getElementById("forgot").addEventListener("click",(e)=>{
+  e.preventDefault();
+  showToast("비밀번호 재설정 화면은 추후 연결할 수 있습니다.");
+});
+</script>
+</body>
+</html>
