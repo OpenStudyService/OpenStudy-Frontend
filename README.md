@@ -30,6 +30,13 @@ npm run dev
 | `npm run test:builds` | live·demo 빌드 후 두 배포 결과의 동작·모드 분리 검증 |
 | `npm run api:generate` | Zod·폼 정의 → OpenAPI → TypeScript 타입 재생성 |
 
+## S3 자동 배포
+
+GitHub Actions가 검사·live 빌드 후 비공개 Amazon S3에 게시한다. Amazon CloudFront가 HTTPS로 제공한다.
+인프라는 OpenStudy-Infra의 `terraform/frontend`가 관리한다.
+처음 생성, Actions 변수 등록과 전체 삭제는 [자동 배포 순서](docs/deployment.md)를 따른다.
+실제 API는 Backend 연결 후 사용할 수 있다.
+
 ## 체험
 
 로그인 화면의 **사장님으로 체험 / 직원으로 체험** 버튼으로 시작합니다. 설정 → 데모·검증 도구에서 사장님, 지점 관리자, 직원과 API 시나리오를 선택할 수 있습니다.
