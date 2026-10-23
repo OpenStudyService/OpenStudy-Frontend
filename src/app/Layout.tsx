@@ -71,6 +71,7 @@ export const navigation = [
     icon: "members",
     group: "우리 팀",
     admin: true,
+    permission: "people:manage" as const,
   },
   {
     path: "sales",
@@ -103,10 +104,14 @@ export function Layout() {
       normalizeLookups(
         await api<unknown>(`/lookups?scope=${scope}`, { signal }),
       ),
-    enabled: !!user && can(user, scope),
+    enabled:
+      !!user &&
+      session.data?.sessionMode !== "APPROVAL_ONLY" &&
+      can(user, scope),
     retry: false,
   });
   const permissionKey = JSON.stringify([
+    session.data?.sessionMode,
     user?.owner,
     user?.status,
     user?.memberships,
@@ -133,6 +138,7 @@ export function Layout() {
   useEffect(() => {
     if (
       !user ||
+      session.data?.sessionMode === "APPROVAL_ONLY" ||
       !can(user, scope) ||
       !lookups.isSuccess ||
       lookups.data?.preview
@@ -192,6 +198,7 @@ export function Layout() {
     };
   }, [
     user,
+    session.data?.sessionMode,
     scope,
     permissionKey,
     query,
@@ -212,7 +219,10 @@ export function Layout() {
         state={{ from: location.pathname + location.search }}
       />
     );
-  if (session.data.user.status === "승인 대기")
+  if (
+    session.data.sessionMode === "APPROVAL_ONLY" ||
+    session.data.user.status === "승인 대기"
+  )
     return <Navigate to="/pending-approval" replace />;
   if (session.data.user.status !== "활성")
     return (

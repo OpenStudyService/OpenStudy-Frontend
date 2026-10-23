@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { api, queryString } from "../../shared/api/client";
@@ -49,8 +50,16 @@ export function EmployeeManagement() {
 function EmployeeManagementContent() {
   const { session, scope } = useApp();
   const { page, search, setPage, setSearch } = useListSearch("employee");
-  const [tab, setTab] = useState("employees"),
-    [selected, setSelected] = useState<Employee | null>(null);
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "invitations" ? "invitations" : "employees";
+  const [selected, setSelected] = useState<Employee | null>(null);
+  function setTab(next: string) {
+    setParams((current) => {
+      const updated = new URLSearchParams(current);
+      updated.set("tab", next);
+      return updated;
+    });
+  }
   const allowed =
     session.user.owner ||
     session.user.memberships.some(

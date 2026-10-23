@@ -11,8 +11,14 @@ import {
 } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, MOCK } from "../../shared/api/client";
+import { closeStreams } from "../../shared/api/stream";
 import type { CurrentUser } from "../../shared/domain/schema";
-import { Button, FieldError, State } from "../../shared/ui/primitives";
+import {
+  Button,
+  ErrorState,
+  FieldError,
+  State,
+} from "../../shared/ui/primitives";
 import { Icon } from "../../shared/ui/Icon";
 import { RoomArt } from "../../shared/ui/RoomArt";
 import { useSession } from "../../app/context";
@@ -69,6 +75,7 @@ export function Login() {
     return (
       <Navigate
         to={
+          session.data.sessionMode === "APPROVAL_ONLY" ||
           session.data.user.status === "승인 대기"
             ? "/pending-approval"
             : `/app/${session.data.user.owner ? "all" : session.data.branches[0]?.id || "all"}/home`
@@ -83,7 +90,7 @@ export function Login() {
     const from = (location.state as { from?: string } | null)?.from;
     const safe = from?.startsWith("/app/") ? from : undefined;
     navigate(
-      data.user.status === "승인 대기"
+      data.sessionMode === "APPROVAL_ONLY" || data.user.status === "승인 대기"
         ? "/pending-approval"
         : safe ||
             `/app/${data.user.owner ? "all" : data.branches[0]?.id || "all"}/home`,
@@ -365,40 +372,64 @@ export function InvitationAccept() {
 export function PendingApproval() {
   const session = useSession(),
     query = useQueryClient(),
-    navigate = useNavigate();
+    navigate = useNavigate(),
+    clearPrivate = useUi((state) => state.clearPrivate);
+  const [error, setError] = useState<Error | null>(null),
+    [leaving, setLeaving] = useState(false);
+  async function leave() {
+    setLeaving(true);
+    setError(null);
+    try {
+      await api("/auth/logout", { method: "POST", body: {} });
+      closeStreams();
+      clearPrivate();
+      await query.cancelQueries();
+      query.clear();
+      navigate("/login", { replace: true });
+    } catch (failure) {
+      setError(failure as Error);
+    } finally {
+      setLeaving(false);
+    }
+  }
   if (session.isPending) return <State loading />;
+  if (session.error)
+    return (
+      <ErrorState error={session.error} retry={() => void session.refetch()} />
+    );
   if (!session.data) return <Navigate to="/login" replace />;
-  if (session.data?.user.status === "활성")
+  if (
+    session.data.user.status === "활성" &&
+    session.data.sessionMode !== "APPROVAL_ONLY"
+  )
     return (
       <Navigate
         to={`/app/${session.data.branches[0]?.id || "all"}/home`}
         replace
       />
     );
+  const approved = session.data.user.status === "활성";
   return (
     <main className="grid min-h-dvh place-items-center p-6">
       <section className="card max-w-md p-7">
         <Icon name="clock" size={36} />
-        <h1 className="mt-5">최종 승인을 기다리고 있어요</h1>
+        <h1 className="mt-5">
+          {approved ? "승인이 완료됐어요" : "최종 승인을 기다리고 있어요"}
+        </h1>
         <p className="help my-5">
-          초대 수락이 완료되었습니다. 관리자가 승인하면 해당 지점의 업무 공간을
-          사용할 수 있어요.
+          {approved
+            ? "업무 공간에 들어가려면 다시 로그인해 주세요."
+            : "초대 수락이 완료되었습니다. 관리자가 승인하면 해당 지점의 업무 공간을 사용할 수 있어요."}
         </p>
+        {error && <FieldError>{error.message}</FieldError>}
         <div className="flex gap-2">
-          <Button onClick={() => void session.refetch()}>
-            승인 상태 새로고침
-          </Button>
-          <Button
-            onClick={() =>
-              void api("/auth/logout", { method: "POST", body: {} }).then(
-                () => {
-                  query.clear();
-                  navigate("/login");
-                },
-              )
-            }
-          >
-            로그아웃
+          {!approved && (
+            <Button onClick={() => void session.refetch()}>
+              승인 상태 새로고침
+            </Button>
+          )}
+          <Button disabled={leaving} onClick={() => void leave()}>
+            {approved ? "다시 로그인" : "로그아웃"}
           </Button>
         </div>
         {MOCK && (
