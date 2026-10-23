@@ -19,6 +19,11 @@ import {
   update,
 } from "./domain";
 import { assert, DomainError, store } from "./store";
+import {
+  organizationHandlers,
+  organizationEmployee,
+  organizationBranch,
+} from "./organization";
 
 type Args = {
   request: Request;
@@ -126,14 +131,22 @@ async function scenario() {
     );
 }
 function current() {
-  const user = store.user();
+  const account = organizationEmployee(store.user());
+  const user = {
+    ...account,
+    memberships:
+      account.status === "승인 대기"
+        ? []
+        : account.memberships.filter((m) => m.status === "활성"),
+  };
   return {
     user,
-    branches: store.db.branches.filter(
-      (b) => can(user, b.id) || user.status === "승인 대기",
-    ),
+    branches: store.db.branches
+      .filter((b) => user.status !== "승인 대기" && can(user, b.id))
+      .map(organizationBranch),
     asOf: store.now(),
     snapshotVersion: "mock-v1",
+    sessionMode: user.status === "승인 대기" ? "APPROVAL_ONLY" : "WORKSPACE",
   };
 }
 const allowedChannel = (id: string) => {
@@ -308,6 +321,7 @@ function executeAi(r: AiRequest) {
 }
 
 export const handlers = [
+  ...organizationHandlers,
   http.get(
     "/api/auth/csrf",
     response(() => ({ token: csrf }), false),

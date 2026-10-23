@@ -14,6 +14,7 @@ import {
 import { Chat } from "../features/chat/Chat";
 import { ResourceGroup, ResourcePage } from "../features/records/ResourcePage";
 import { ErrorState, State } from "../shared/ui/primitives";
+import { EmployeeManagement } from "../features/organization/Organization";
 function RouteError() {
   const error = useRouteError();
   return (
@@ -104,16 +105,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "employees",
-        element: (
-          <ResourceGroup
-            title="직원 관리"
-            description="지점별 소속·권한과 초대·승인을 관리해요."
-            tabs={[
-              { resource: "employees", label: "직원 목록", admin: true },
-              { resource: "invitations", label: "초대·승인", admin: true },
-            ]}
-          />
-        ),
+        element: <EmployeeManagement />,
       },
       {
         path: "sales",
