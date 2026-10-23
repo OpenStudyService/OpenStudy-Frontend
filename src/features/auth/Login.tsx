@@ -19,7 +19,13 @@ import { useSession } from "../../app/context";
 import { useUi } from "../../app/store";
 const schema = z.object({
   email: z.email("이메일 형식을 확인해 주세요."),
-  password: z.string().min(8, "비밀번호는 8자 이상 입력해 주세요."),
+  password: z
+    .string()
+    .min(1, "비밀번호를 입력해 주세요.")
+    .refine(
+      (value) => new TextEncoder().encode(value).length <= 72,
+      "비밀번호는 UTF-8 기준 72바이트 이하로 입력해 주세요.",
+    ),
 });
 export function ThemePicker() {
   const { theme, setTheme } = useUi();

@@ -27,7 +27,12 @@ export function DataNotice({
       role="status"
       aria-live="polite"
     >
-      <span>{message}</span>
+      <span>
+        {message}
+        {error instanceof ApiError && error.detail.requestId && (
+          <small className="block">요청 ID: {error.detail.requestId}</small>
+        )}
+      </span>
       {error && retry && (
         <Button onClick={retry} aria-label={`${label} 다시 불러오기`}>
           다시 불러오기

@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "test:builds": "npm run build && npm run build:demo -- --outDir dist-demo && playwright test --config playwright.build.config.ts",
     "check": "npm run typecheck && npm run lint && npm test",
-    "api:generate": "tsx scripts/generate-contract.ts && openapi-typescript docs/api/openapi.json -o src/shared/api/generated.ts && prettier --write src/shared/api/generated.ts"
+    "api:generate": "tsx scripts/generate-contract.ts && openapi-typescript docs/api/openapi.json -o src/shared/api/generated.ts && prettier --write src/shared/api/generated.ts",
+    "api:foundation": "openapi-typescript ../openstudy-backend/docs/design/foundation/openapi.json -o src/shared/api/foundation.generated.ts && prettier --write src/shared/api/foundation.generated.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

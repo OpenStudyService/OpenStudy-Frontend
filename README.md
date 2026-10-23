@@ -18,17 +18,18 @@ npm run dev
 
 공개 실행 설정인 `.env.mock`과 `.env.live`는 Git에 포함합니다. 개인별 API 주소나 환경 설정은 `.env.local`, `.env.mock.local`, `.env.live.local`에 작성합니다. 로컬 환경 파일과 비밀 값은 커밋하지 않습니다. 사용할 설정은 `.env.example`을 참고하세요.
 
-| 명령 | 동작 |
-|---|---|
-| `npm run dev` | mock 모드, MSW HTTP·SSE 사용 |
-| `npm run dev:live` | live 모드, 실제 `/api` 서버 사용 |
-| `npm run build` | 실제 API를 사용하는 배포 빌드 |
-| `npm run build:demo` | 데모 데이터 표시와 MSW를 포함하는 시연 빌드 |
-| `npm run preview` | 마지막 빌드 결과 미리보기 |
-| `npm run check` | strict 타입 검사, ESLint, Vitest·Testing Library |
-| `npm run test:e2e` | Chrome에서 사용자 흐름과 반응형 검증 |
-| `npm run test:builds` | live·demo 빌드 후 두 배포 결과의 동작·모드 분리 검증 |
-| `npm run api:generate` | Zod·폼 정의 → OpenAPI → TypeScript 타입 재생성 |
+| 명령                     | 동작                                                                      |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `npm run dev`            | mock 모드, MSW HTTP·SSE 사용                                              |
+| `npm run dev:live`       | live 모드, 실제 `/api` 서버 사용                                          |
+| `npm run build`          | 실제 API를 사용하는 배포 빌드                                             |
+| `npm run build:demo`     | 데모 데이터 표시와 MSW를 포함하는 시연 빌드                               |
+| `npm run preview`        | 마지막 빌드 결과 미리보기                                                 |
+| `npm run check`          | strict 타입 검사, ESLint, Vitest·Testing Library                          |
+| `npm run test:e2e`       | Chrome에서 사용자 흐름과 반응형 검증                                      |
+| `npm run test:builds`    | live·demo 빌드 후 두 배포 결과의 동작·모드 분리 검증                      |
+| `npm run api:foundation` | 인접 `openstudy-backend`의 정본 foundation OpenAPI에서 기반 API 타입 생성 |
+| `npm run api:generate`   | Zod·폼 정의 → OpenAPI → TypeScript 타입 재생성                            |
 
 ## 체험
 
@@ -79,3 +80,5 @@ docs/api/            OpenAPI와 API 인계 계약
 환경 변수는 `.env.example`, 상세 계약은 [API 인계 문서](docs/api/README.md), 요구사항 연결은 [화면 추적표](docs/traceability.md), 실제 수행 결과는 [검증 기록](docs/verification.md)에 있습니다.
 
 `live` 모드는 API 실패를 데모 데이터로 대체하지 않습니다. **실제 HttpOnly 세션·CSRF 보안, 서버 권한·동시 트랜잭션, 실제 초대 메일, 두 브라우저 사이 실시간 전달, DomainLens 실엔진·DB 값은 이 프로젝트의 모킹 테스트로 보장하지 않습니다.** 서버 연결 뒤 별도 통합 검증합니다.
+
+기반 API 타입은 `src/shared/api/foundation.generated.ts`를 사용합니다. 정본은 backend의 `docs/design/foundation/openapi.json`이며 프론트에 복제하지 않습니다. 기존 전체 업무 데모 계약(`generated.ts`)은 아직 전환하지 않은 화면용으로 유지하며, 지점·직원·초대·상품 화면 전환은 후속 이슈에서 진행합니다.

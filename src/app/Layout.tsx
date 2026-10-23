@@ -11,7 +11,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu } from "radix-ui";
 import { api, API_BASE, MOCK } from "../shared/api/client";
-import { openStream } from "../shared/api/stream";
+import { closeStreams, openStream } from "../shared/api/stream";
 import { can, admin } from "../shared/domain/schema";
 import type { CurrentUser, WorkspaceEvent } from "../shared/domain/schema";
 import {
@@ -106,14 +106,30 @@ export function Layout() {
     enabled: !!user && can(user, scope),
     retry: false,
   });
-  const previous = useRef({ scope, userId: user?.id });
+  const permissionKey = JSON.stringify([
+    user?.owner,
+    user?.status,
+    user?.memberships,
+  ]);
+  const previous = useRef({ scope, userId: user?.id, permissionKey });
   useEffect(() => {
     const old = previous.current;
     if (old.scope !== scope || old.userId !== user?.id) {
-      void query.cancelQueries({ queryKey: ["data", old.userId, old.scope] });
-      previous.current = { scope, userId: user?.id };
+      const oldKey =
+        old.userId !== user?.id
+          ? ["data", old.userId]
+          : ["data", old.userId, old.scope];
+      void query.cancelQueries({ queryKey: oldKey });
+      query.removeQueries({ queryKey: oldKey });
+      clearPrivate();
+      previous.current = { scope, userId: user?.id, permissionKey };
+    } else if (old.permissionKey !== permissionKey) {
+      closeStreams();
+      clearPrivate();
+      void query.resetQueries({ queryKey: ["data", user?.id] });
+      previous.current = { scope, userId: user?.id, permissionKey };
     }
-  }, [scope, user?.id, query]);
+  }, [scope, user?.id, permissionKey, query, clearPrivate]);
   useEffect(() => {
     if (
       !user ||
@@ -122,9 +138,27 @@ export function Layout() {
       lookups.data?.preview
     )
       return;
+    const invalidate = () => {
+      void query.invalidateQueries({ queryKey: ["data", user.id, scope] });
+    };
+    const resync = () => {
+      invalidate();
+      void query.invalidateQueries({ queryKey: ["session"] });
+    };
+    const authorizationChanged = () => {
+      closeStreams();
+      clearPrivate();
+      void query.cancelQueries({ queryKey: ["data", user.id] });
+      query.removeQueries({ queryKey: ["data", user.id] });
+      void query.invalidateQueries({ queryKey: ["session"] });
+    };
+    const controller = new AbortController();
     const stop = openStream(
       `${API_BASE}/workspace/events?scope=${encodeURIComponent(scope)}`,
       {
+        invalidate,
+        resync,
+        "authorization.changed": authorizationChanged,
         connected: () => {
           setStreamState("연결됨");
           void query.invalidateQueries({ queryKey: ["data", user.id, scope] });
@@ -135,8 +169,7 @@ export function Layout() {
               (event as MessageEvent).data,
             ) as WorkspaceEvent;
             void query.invalidateQueries({ queryKey: ["data"] });
-            if (e.type === "permissions")
-              void query.invalidateQueries({ queryKey: ["session"] });
+            if (e.type === "permissions") authorizationChanged();
           } catch {
             setStreamState("데이터 확인 필요");
           }
@@ -148,13 +181,24 @@ export function Layout() {
           return;
         }
         setStreamState("재연결 중");
-        void api<CurrentUser>("/me")
+        void api<CurrentUser>("/me", { signal: controller.signal })
           .then(() => query.invalidateQueries({ queryKey: ["session"] }))
           .catch(() => undefined);
       },
     );
-    return stop;
-  }, [user, scope, query, lookups.isSuccess, lookups.data?.preview]);
+    return () => {
+      controller.abort();
+      stop();
+    };
+  }, [
+    user,
+    scope,
+    permissionKey,
+    query,
+    lookups.isSuccess,
+    lookups.data?.preview,
+    clearPrivate,
+  ]);
   if (session.isPending) return <State loading />;
   if (session.error)
     return (
@@ -217,13 +261,14 @@ export function Layout() {
         : navigation.find((n) => n.path === section)?.title || "OpenStudy";
   async function logout() {
     await api("/auth/logout", { method: "POST", body: {} });
+    closeStreams();
     clearPrivate();
     query.clear();
     navigate("/login", { replace: true });
   }
   function changeScope(next: string) {
     setNav(false);
-    navigate(`/app/${next}/${section}`);
+    navigate(`/app/${next}/${section}${location.search}`);
   }
   const sidebar = (
     <aside className="sidebar">

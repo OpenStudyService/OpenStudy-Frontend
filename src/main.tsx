@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { router } from "./app/Router";
+import { closeStreams } from "./shared/api/stream";
 import { useUi } from "./app/store";
 import "./app/styles.css";
 const query = new QueryClient({
@@ -20,6 +21,7 @@ function App() {
   }, [theme]);
   useEffect(() => {
     const expire = () => {
+      closeStreams();
       clear();
       void query.cancelQueries({ queryKey: ["data"] });
       query.removeQueries({ queryKey: ["data"] });
