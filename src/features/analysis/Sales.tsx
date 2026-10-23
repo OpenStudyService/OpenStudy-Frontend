@@ -6,6 +6,8 @@ import { useApp } from "../../app/context";
 import { ErrorState, Heading, State } from "../../shared/ui/primitives";
 import { SalesChart, SalesTable } from "./Charts";
 import type { SalesRow } from "./Charts";
+import { asCollections, isAccessError } from "../../shared/api/read-model";
+import { DataNotice } from "../../shared/ui/DataNotice";
 export function Sales() {
   const { session, scope } = useApp(),
     [params, setParams] = useSearchParams(),
@@ -14,10 +16,13 @@ export function Sales() {
     basis = params.get("basis") || "processed";
   const data = useQuery({
     queryKey: ["data", session.user.id, scope, "sales", start, end, basis],
-    queryFn: ({ signal }) =>
-      api<{ rows: SalesRow[]; asOf: string }>(
-        `/sales?${queryString({ scope, start, end, basis })}`,
-        { signal },
+    queryFn: async ({ signal }) =>
+      asCollections(
+        { rows: [] as SalesRow[] },
+        await api<unknown>(
+          `/sales?${queryString({ scope, start, end, basis })}`,
+          { signal },
+        ),
       ),
     enabled: can(session.user, scope, "sales:read"),
     retry: false,
@@ -33,6 +38,8 @@ export function Sales() {
   }
   if (!can(session.user, scope, "sales:read"))
     return <State title="매출 조회 권한이 필요해요" />;
+  const rows = data.data?.rows || [];
+  const unavailable = !data.data && (data.isPending || !!data.error);
   return (
     <div className="page">
       <Heading
@@ -71,56 +78,71 @@ export function Sales() {
       </div>
       {start >= end ? (
         <State title="조회 기간을 확인해 주세요" />
-      ) : data.isPending ? (
-        <State loading />
-      ) : data.error ? (
-        <ErrorState error={data.error} retry={() => void data.refetch()} />
+      ) : isAccessError(data.error) ? (
+        <ErrorState error={data.error!} retry={() => void data.refetch()} />
       ) : (
-        data.data && (
-          <>
-            <div className="stat-grid grid-cols-3">
-              {[
-                ["승인 결제액", "approved"],
-                ["환불액", "refunds"],
-                ["순매출", "net"],
-              ].map(([label, key]) => (
-                <div className="card p-5" key={key}>
-                  <small>{label}</small>
-                  <p className="stat-value text-2xl">
-                    {won(
-                      data.data.rows.reduce(
-                        (s, r) => s + r[key as "approved" | "refunds" | "net"],
-                        0,
-                      ),
-                    )}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <section className="card">
-              <header className="card-header">
-                <h2>지점별 순매출</h2>
-                <Link
-                  className="text-xs text-primary"
-                  to={`/app/${scope}/payments`}
-                >
-                  원거래 확인 →
-                </Link>
-              </header>
-              <div className="p-5">
-                <SalesChart rows={data.data.rows} />
+        <>
+          <DataNotice
+            label="매출 데이터"
+            loading={data.isPending}
+            error={data.error}
+            retry={() => void data.refetch()}
+          />
+          <div className="stat-grid grid-cols-3">
+            {[
+              ["승인 결제액", "approved"],
+              ["환불액", "refunds"],
+              ["순매출", "net"],
+            ].map(([label, key]) => (
+              <div className="card p-5" key={key}>
+                <small>{label}</small>
+                <p className="stat-value text-2xl">
+                  {unavailable
+                    ? "—"
+                    : won(
+                        rows.reduce(
+                          (s, r) =>
+                            s + r[key as "approved" | "refunds" | "net"],
+                          0,
+                        ),
+                      )}
+                </p>
               </div>
-              <SalesTable rows={data.data.rows} />
-              <p className="help border-t border-line p-5">
-                기간 {start} 이상 ~ {end} 미만 · Asia/Seoul · KRW ·{" "}
-                {basis === "processed"
-                  ? "환불 처리일 기준"
-                  : "원결제일 차감 기준"}{" "}
-                · 이용 실적의 지점과 매출 귀속 지점은 구분합니다.
-              </p>
-            </section>
-          </>
-        )
+            ))}
+          </div>
+          <section className="card">
+            <header className="card-header">
+              <h2>지점별 순매출</h2>
+              <Link
+                className="text-xs text-primary"
+                to={`/app/${scope}/payments`}
+              >
+                원거래 확인 →
+              </Link>
+            </header>
+            <div className="p-5">
+              {rows.length ? (
+                <SalesChart rows={rows} />
+              ) : (
+                <State
+                  title={
+                    unavailable
+                      ? "매출 데이터를 기다리고 있어요"
+                      : "조회 기간에 매출 내역이 없어요"
+                  }
+                />
+              )}
+            </div>
+            <SalesTable rows={rows} />
+            <p className="help border-t border-line p-5">
+              기간 {start} 이상 ~ {end} 미만 · Asia/Seoul · KRW ·{" "}
+              {basis === "processed"
+                ? "환불 처리일 기준"
+                : "원결제일 차감 기준"}{" "}
+              · 이용 실적의 지점과 매출 귀속 지점은 구분합니다.
+            </p>
+          </section>
+        </>
       )}
     </div>
   );

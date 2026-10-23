@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useOutletContext } from "react-router";
 import { api, ApiError } from "../shared/api/client";
 import type { CurrentUser, LookupData } from "../shared/domain/schema";
+import { asCollections } from "../shared/api/read-model";
 export function useSession() {
   return useQuery({
     queryKey: ["session"],
@@ -20,7 +21,7 @@ export interface AppContext {
   lookups: LookupData;
 }
 export const useApp = () => useOutletContext<AppContext>();
-export const emptyLookups: LookupData = {
+const lookupCollections: Omit<LookupData, "preview"> = {
   branches: [],
   employees: [],
   members: [],
@@ -32,3 +33,15 @@ export const emptyLookups: LookupData = {
   attendance: [],
   channels: [],
 };
+export const emptyLookups: LookupData = lookupCollections;
+
+export function normalizeLookups(value: unknown): LookupData {
+  return {
+    ...asCollections(lookupCollections, value),
+    preview:
+      !!value &&
+      typeof value === "object" &&
+      "preview" in value &&
+      value.preview === true,
+  };
+}

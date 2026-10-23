@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { api } from "../../shared/api/client";
+import { asPage, isAccessError } from "../../shared/api/read-model";
+import { DataNotice } from "../../shared/ui/DataNotice";
 import { businessDate, displayDate } from "../../shared/domain/schema";
-import type { Page, ResourceMap } from "../../shared/domain/schema";
+import type { ResourceMap } from "../../shared/domain/schema";
 import { Badge, ErrorState, State } from "../../shared/ui/primitives";
 
 export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
@@ -17,11 +19,14 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
   );
   const shifts = useQuery({
     queryKey: ["data", session.user.id, scope, "shifts", "week", days[0]],
-    queryFn: ({ signal }) =>
-      api<Page<ResourceMap["shifts"]>>(
-        `/shifts?scope=${scope}&pageSize=100&from=${days[0]}&to=${days[6]}`,
-        { signal },
+    queryFn: async ({ signal }) =>
+      asPage<ResourceMap["shifts"]>(
+        await api<unknown>(
+          `/shifts?scope=${scope}&pageSize=100&from=${days[0]}&to=${days[6]}`,
+          { signal },
+        ),
       ),
+    retry: false,
   });
   const leave = useQuery({
     queryKey: [
@@ -32,11 +37,14 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
       "week",
       days[0],
     ],
-    queryFn: ({ signal }) =>
-      api<Page<ResourceMap["leaveRequests"]>>(
-        `/leaveRequests?scope=${scope}&pageSize=100&status=승인&from=${days[0]}&to=${days[6]}`,
-        { signal },
+    queryFn: async ({ signal }) =>
+      asPage<ResourceMap["leaveRequests"]>(
+        await api<unknown>(
+          `/leaveRequests?scope=${scope}&pageSize=100&status=승인&from=${days[0]}&to=${days[6]}`,
+          { signal },
+        ),
       ),
+    retry: false,
   });
   const people = lookups.employees.filter(
     (e) =>
@@ -63,10 +71,19 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
           {days[0]} ~ {days[6]} · 휴가는 승인 기록 기준
         </small>
       </div>
-      {shifts.isPending ? (
-        <State loading />
-      ) : shifts.error ? (
-        <ErrorState error={shifts.error} />
+      <DataNotice
+        label="근무표 데이터"
+        loading={shifts.isPending}
+        error={shifts.error}
+        retry={() => void shifts.refetch()}
+      />
+      <DataNotice
+        label="휴가 일정"
+        error={leave.error}
+        retry={() => void leave.refetch()}
+      />
+      {isAccessError(shifts.error) ? (
+        <ErrorState error={shifts.error!} />
       ) : (
         <div className="data-scroll">
           <table className="data-table min-w-[980px]">
@@ -81,6 +98,21 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
               </tr>
             </thead>
             <tbody>
+              {!people.length && (
+                <tr>
+                  <td colSpan={8}>
+                    <State
+                      title={
+                        shifts.error
+                          ? "근무표를 확인할 수 없어요"
+                          : shifts.isPending
+                            ? "근무표를 불러오고 있어요"
+                            : "등록된 근무 직원이 없어요"
+                      }
+                    />
+                  </td>
+                </tr>
+              )}
               {people.map((person) => (
                 <tr key={person.id}>
                   <th scope="row">{person.name}</th>

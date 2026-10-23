@@ -283,6 +283,7 @@ export interface WorkspaceEvent {
   branchId: string;
 }
 export interface LookupData {
+  preview?: boolean;
   branches: ResourceMap["branches"][];
   employees: Employee[];
   members: ResourceMap["members"][];
