@@ -22,16 +22,21 @@ export function asPage<T>(value: unknown): Page<T> {
   const source =
     value && typeof value === "object" ? (value as Partial<Page<T>>) : {};
   const items = asArray<T>(source.items);
+  // Foundation endpoints use meta; legacy demo domains still return flat pages.
+  const meta =
+    "meta" in source && source.meta && typeof source.meta === "object"
+      ? (source.meta as Partial<Page<T>>)
+      : source;
   return {
     items,
-    page: typeof source.page === "number" && source.page > 0 ? source.page : 1,
+    page: typeof meta.page === "number" && meta.page > 0 ? meta.page : 1,
     pageSize:
-      typeof source.pageSize === "number" && source.pageSize > 0
-        ? source.pageSize
+      typeof meta.pageSize === "number" && meta.pageSize > 0
+        ? meta.pageSize
         : 20,
     total:
-      typeof source.total === "number" && source.total >= 0
-        ? source.total
+      typeof meta.total === "number" && meta.total >= 0
+        ? meta.total
         : items.length,
     ...(source.nextCursor ? { nextCursor: source.nextCursor } : {}),
   };

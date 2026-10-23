@@ -193,12 +193,18 @@ test("branch switch discards late results and restores URL filters", async ({
   ).toHaveCount(0);
   await demo(page, { scenario: "normal" });
   await page.getByRole("searchbox", { name: "업무 검색" }).fill("없는 업무");
-  await expect(page.getByText("조건에 맞는 항목이 없어요")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "등록된 항목이 없어요" }),
+  ).toBeVisible();
+  await expect(page.getByText("총 0건 · 1페이지")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("searchbox", { name: "업무 검색" })).toHaveValue(
     "없는 업무",
   );
-  await expect(page.getByText("조건에 맞는 항목이 없어요")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "등록된 항목이 없어요" }),
+  ).toBeVisible();
+  await expect(page.getByText("총 0건 · 1페이지")).toBeVisible();
 });
 
 test("AI clarification, unsupported request, empty data, failure and safe view fallback", async ({

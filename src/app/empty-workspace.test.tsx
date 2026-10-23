@@ -5,6 +5,7 @@ import {
   screen,
   within,
   waitFor,
+  act,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -15,8 +16,12 @@ import { ResourcePage } from "../features/records/ResourcePage";
 import { Sales } from "../features/analysis/Sales";
 import { Chat } from "../features/chat/Chat";
 import type { CurrentUser } from "../shared/domain/schema";
+import { closeStreams, openStream } from "../shared/api/stream";
 
-vi.mock("../shared/api/stream", () => ({ openStream: vi.fn(() => vi.fn()) }));
+vi.mock("../shared/api/stream", () => ({
+  openStream: vi.fn(() => vi.fn()),
+  closeStreams: vi.fn(),
+}));
 
 const session: CurrentUser = {
   user: {
@@ -277,4 +282,103 @@ it("shows a channel empty state when chat returns no data", async () => {
     }),
   ).toBeVisible();
   expect(screen.getByRole("heading", { name: "팀 채팅" })).toBeVisible();
+});
+
+it("clears every former user's scope cache on account changes", async () => {
+  renderWorkspace(() => Response.json({}));
+  await screen.findByRole("heading", { name: "안녕하세요, 관리자님 ☀" });
+  const client = clients[0];
+  client.setQueryData(["data", "owner", "other-branch", "sensitive"], {
+    secret: true,
+  });
+  client.setQueryData(["session"], {
+    ...session,
+    user: {
+      ...session.user,
+      id: "next-owner",
+      name: "새 관리자",
+      nickname: "새 관리자",
+    },
+  });
+  await screen.findByRole("heading", { name: "안녕하세요, 새 관리자님 ☀" });
+  await waitFor(() =>
+    expect(
+      client.getQueryCache().findAll({ queryKey: ["data", "owner"] }),
+    ).toHaveLength(0),
+  );
+});
+it("handles canonical invalidation, resync and authorization events", async () => {
+  renderWorkspace(() => Response.json({}));
+  await screen.findByRole("heading", { name: "안녕하세요, 관리자님 ☀" });
+  await waitFor(() => expect(openStream).toHaveBeenCalled());
+  const client = clients[0];
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  const listeners = vi.mocked(openStream).mock.calls.at(-1)![1];
+  act(() => listeners.invalidate(new MessageEvent("invalidate")));
+  expect(invalidate).toHaveBeenCalledWith({
+    queryKey: ["data", "owner", "all"],
+  });
+  act(() => listeners.resync(new MessageEvent("resync")));
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ["session"] });
+  client.setQueryData(["data", "owner", "other-branch", "secret"], {
+    secret: true,
+  });
+  act(() =>
+    listeners["authorization.changed"](
+      new MessageEvent("authorization.changed"),
+    ),
+  );
+  expect(closeStreams).toHaveBeenCalled();
+  expect(
+    client.getQueryData(["data", "owner", "other-branch", "secret"]),
+  ).toBeUndefined();
+});
+it("preserves search and pagination conditions when switching branch", async () => {
+  const current: CurrentUser = {
+    ...session,
+    branches: [
+      {
+        id: "1",
+        branchId: "1",
+        version: 1,
+        createdAt: session.asOf,
+        updatedAt: session.asOf,
+        name: "첫 지점",
+        address: "주소",
+        phone: "010",
+        hours: "24시간",
+        status: "운영 중",
+      },
+      {
+        id: "2",
+        branchId: "2",
+        version: 1,
+        createdAt: session.asOf,
+        updatedAt: session.asOf,
+        name: "둘째 지점",
+        address: "주소",
+        phone: "010",
+        hours: "24시간",
+        status: "운영 중",
+      },
+    ],
+  };
+  renderWorkspace(() => Response.json({}), "tasks?q=검색&page=3", current);
+  await screen.findByRole("heading", { name: "업무 관리" });
+  const client = clients[0];
+  client.setQueryData(["data", "owner", "all", "sensitive"], { secret: true });
+  const user = userEvent.setup();
+  await user.selectOptions(screen.getByLabelText("현재 지점"), "2");
+  await waitFor(() =>
+    expect(
+      client.getQueryCache().findAll({ queryKey: ["data", "owner", "all"] }),
+    ).toHaveLength(0),
+  );
+  expect(screen.getByDisplayValue("검색")).toBeVisible();
+  expect(
+    client
+      .getQueryCache()
+      .findAll({ queryKey: ["data", "owner", "2", "tasks"] })[0]
+      ?.queryKey.at(-1),
+  ).toContain("page=3");
 });

@@ -1,3 +1,10 @@
+const connections = new Set<() => void>();
+
+/** End private streams synchronously when credentials are revoked. */
+export function closeStreams() {
+  for (const stop of connections) stop();
+}
+
 /** A single connection with bounded backoff and an event cursor across reconnects. */
 export function openStream(
   url: string,
@@ -13,28 +20,35 @@ export function openStream(
     if (stopped) return;
     const target = new URL(url, window.location.origin);
     if (cursor) target.searchParams.set("cursor", cursor);
-    source = new EventSource(target, { withCredentials: true });
+    const current = new EventSource(target, { withCredentials: true });
+    source = current;
     source.onopen = () => {
+      if (stopped || source !== current) return;
       attempt = 0;
       status(true);
     };
     for (const [type, listener] of Object.entries(listeners))
       source.addEventListener(type, (event) => {
+        if (stopped || source !== current) return;
         const message = event as MessageEvent;
         if (message.lastEventId) cursor = message.lastEventId;
         listener(message);
       });
     source.onerror = () => {
-      source?.close();
+      current.close();
+      if (stopped || source !== current) return;
       status(false);
       if (!stopped)
         timer = setTimeout(connect, Math.min(1000 * 2 ** attempt++, 10000));
     };
   }
   connect();
-  return () => {
+  const stop = () => {
     stopped = true;
     clearTimeout(timer);
     source?.close();
+    connections.delete(stop);
   };
+  connections.add(stop);
+  return stop;
 }

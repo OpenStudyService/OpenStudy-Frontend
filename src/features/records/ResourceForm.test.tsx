@@ -41,3 +41,28 @@ it("rejects invalid input and preserves a failed write for correction and retry"
   expect(submit).toHaveBeenCalledTimes(2);
   expect(submit.mock.calls[1][0]).toEqual(submit.mock.calls[0][0]);
 });
+
+it("keeps entered values on 422 and displays field errors with request ID", async () => {
+  const submit = vi.fn().mockRejectedValue(
+    new ApiError(422, {
+      code: "VALIDATION_FAILED",
+      message: "입력을 확인해 주세요.",
+      requestId: "req-validation",
+      fieldErrors: { name: "이미 사용한 이름입니다." },
+    }),
+  );
+  const user = userEvent.setup();
+  render(
+    <ResourceForm
+      fields={[{ key: "name", label: "이름", required: true }]}
+      scope="1"
+      lookups={emptyLookups}
+      onSubmit={submit}
+    />,
+  );
+  await user.type(screen.getByLabelText("이름"), "새 지점");
+  await user.click(screen.getByRole("button", { name: "저장하기" }));
+  expect(await screen.findByText("이미 사용한 이름입니다.")).toBeVisible();
+  expect(screen.getByText(/req-validation/)).toBeVisible();
+  expect(screen.getByLabelText("이름")).toHaveValue("새 지점");
+});

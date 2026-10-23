@@ -37,7 +37,10 @@ export const useUi = create<UiState>((set) => ({
   setNav: (navOpen) => set({ navOpen }),
   setDraft: (key, text) =>
     set((s) => ({ drafts: { ...s.drafts, [key]: text } })),
-  clearPrivate: () => set({ drafts: {}, navOpen: false }),
+  clearPrivate: () => {
+    clearTimeout(timer);
+    set({ drafts: {}, navOpen: false, notice: "" });
+  },
   toast: (notice) => {
     clearTimeout(timer);
     set({ notice });
