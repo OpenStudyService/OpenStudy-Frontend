@@ -5,6 +5,8 @@ import { useSearchParams } from "react-router";
 import { Tabs } from "radix-ui";
 import { api, MOCK, queryString } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
+import { asPage, isAccessError } from "../../shared/api/read-model";
+import { DataNotice } from "../../shared/ui/DataNotice";
 import {
   admin,
   businessDate,
@@ -19,7 +21,6 @@ import type {
   Entity,
   LookupData,
   Membership,
-  Page,
   Resource,
   ResourceMap,
 } from "../../shared/domain/schema";
@@ -239,8 +240,10 @@ export function ResourcePage({
   requestParams.set("scope", scope);
   const data = useQuery({
     queryKey: ["data", user.id, scope, resource, requestParams.toString()],
-    queryFn: ({ signal }) =>
-      api<Page<Entity>>(`/${resource}?${requestParams}`, { signal }),
+    queryFn: async ({ signal }) =>
+      asPage<Entity>(
+        await api<unknown>(`/${resource}?${requestParams}`, { signal }),
+      ),
     retry: false,
   });
   const selection = useQuery({
@@ -475,21 +478,12 @@ export function ResourcePage({
             </div>
           )}
         </div>
-        {data.isPending ? (
-          <State loading />
-        ) : data.error ? (
-          <ErrorState error={data.error} retry={() => void data.refetch()} />
-        ) : resource === "seats" && view === "map" ? (
+        {resource === "seats" && view === "map" ? (
           <SeatMap scope={scope} onSelect={show} />
         ) : resource === "reservations" && view === "calendar" ? (
           <ReservationCalendar onSelect={show} />
         ) : resource === "shifts" && view === "week" ? (
           <WeekSchedule onSelect={show} />
-        ) : !data.data?.items.length ? (
-          <State
-            title="조건에 맞는 항목이 없어요"
-            message="검색 조건을 바꾸거나 새로운 항목을 등록해 주세요."
-          />
         ) : (
           <div className="data-scroll">
             <table className="data-table">
@@ -503,33 +497,66 @@ export function ResourcePage({
                 </tr>
               </thead>
               <tbody>
-                {data.data.items.map((row) => (
-                  <tr key={row.id}>
-                    {def.columns.map((c, i) => (
-                      <td key={c}>
-                        {i === 0 ? (
-                          <button
-                            className="cell-link"
-                            onClick={() => show(row.id)}
-                          >
-                            {format(row, c, lookups, session.asOf)}
-                          </button>
-                        ) : ["status", "priority", "condition"].includes(c) ? (
-                          <Badge>{format(row, c, lookups, session.asOf)}</Badge>
-                        ) : (
-                          format(row, c, lookups, session.asOf)
-                        )}
-                      </td>
-                    ))}
+                {data.isPending || data.error || !data.data?.items.length ? (
+                  <tr>
+                    <td colSpan={def.columns.length}>
+                      {isAccessError(data.error) ? (
+                        <ErrorState error={data.error!} />
+                      ) : (
+                        <>
+                          <DataNotice
+                            label={`${def.title} 데이터`}
+                            loading={data.isPending}
+                            error={data.error}
+                            retry={() => void data.refetch()}
+                          />
+                          {!data.isPending && !data.error && (
+                            <State
+                              title="등록된 항목이 없어요"
+                              message="검색 조건을 바꾸거나 새로운 항목을 등록해 주세요."
+                            />
+                          )}
+                        </>
+                      )}
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  data.data.items.map((row) => (
+                    <tr key={row.id}>
+                      {def.columns.map((c, i) => (
+                        <td key={c}>
+                          {i === 0 ? (
+                            <button
+                              className="cell-link"
+                              onClick={() => show(row.id)}
+                            >
+                              {format(row, c, lookups, session.asOf)}
+                            </button>
+                          ) : ["status", "priority", "condition"].includes(
+                              c,
+                            ) ? (
+                            <Badge>
+                              {format(row, c, lookups, session.asOf)}
+                            </Badge>
+                          ) : (
+                            format(row, c, lookups, session.asOf)
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         )}
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-xs text-muted">
           <span>
-            총 {total}건 · {page}페이지
+            {data.error
+              ? "항목 수 확인 불가"
+              : data.isPending
+                ? "항목 수 확인 중"
+                : `총 ${total}건 · ${page}페이지`}
           </span>
           <div className="flex gap-2">
             <Button
@@ -1128,15 +1155,24 @@ function SeatMap({
     [zone, setZone] = useState("전체");
   const data = useQuery({
     queryKey: ["data", session.user.id, scope, "seats", "map"],
-    queryFn: ({ signal }) =>
-      api<Page<ResourceMap["seats"]>>(
-        `/seats?${queryString({ scope, pageSize: 100 })}`,
-        { signal },
+    queryFn: async ({ signal }) =>
+      asPage<ResourceMap["seats"]>(
+        await api<unknown>(`/seats?${queryString({ scope, pageSize: 100 })}`, {
+          signal,
+        }),
       ),
+    retry: false,
   });
-  if (!data.data) return <State loading />;
+  if (isAccessError(data.error)) return <ErrorState error={data.error!} />;
+  const seats = data.data?.items || [];
   return (
     <>
+      <DataNotice
+        label="좌석 정보"
+        loading={data.isPending}
+        error={data.error}
+        retry={() => void data.refetch()}
+      />
       <div className="flex gap-2 px-5 pt-4">
         {["전체", "집중존", "라운지"].map((z) => (
           <Button
@@ -1148,6 +1184,9 @@ function SeatMap({
           </Button>
         ))}
       </div>
+      {!data.isPending && !data.error && !seats.length && (
+        <State title="등록된 좌석이 없어요" />
+      )}
       {lookups.branches
         .filter((b) => scope === "all" || b.id === scope)
         .map((b) => (
@@ -1155,7 +1194,7 @@ function SeatMap({
             <h3 className="px-5 pt-5">{b.name}</h3>
             <div className="data-scroll">
               <div className="seat-grid">
-                {data.data.items
+                {seats
                   .filter(
                     (s) =>
                       s.branchId === b.id &&
@@ -1191,11 +1230,14 @@ function ReservationCalendar({ onSelect }: { onSelect: (id: string) => void }) {
       "calendar",
       month,
     ],
-    queryFn: ({ signal }) =>
-      api<Page<ResourceMap["reservations"]>>(
-        `/reservations?${queryString({ scope, pageSize: 100, from: month + "-01", to: month + "-31" })}`,
-        { signal },
+    queryFn: async ({ signal }) =>
+      asPage<ResourceMap["reservations"]>(
+        await api<unknown>(
+          `/reservations?${queryString({ scope, pageSize: 100, from: month + "-01", to: month + "-31" })}`,
+          { signal },
+        ),
       ),
+    retry: false,
   });
   const [year, mon] = month.split("-").map(Number),
     offset = new Date(Date.UTC(year, mon - 1, 1)).getUTCDay(),
@@ -1256,7 +1298,15 @@ function ReservationCalendar({ onSelect }: { onSelect: (id: string) => void }) {
           })}
         </div>
       </div>
-      {data.error && <FieldError>{data.error.message}</FieldError>}
+      <DataNotice
+        label="예약 정보"
+        loading={data.isPending}
+        error={data.error}
+        retry={() => void data.refetch()}
+      />
+      {!data.isPending && !data.error && !data.data?.items.length && (
+        <State title="등록된 예약이 없어요" />
+      )}
     </>
   );
 }

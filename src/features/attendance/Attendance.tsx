@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../shared/api/client";
+import { asArray } from "../../shared/api/read-model";
+import { DataNotice } from "../../shared/ui/DataNotice";
 import { useApp } from "../../app/context";
 import { useUi } from "../../app/store";
 import { Badge, Button, FieldError } from "../../shared/ui/primitives";
@@ -31,10 +33,11 @@ function AttendanceSummary() {
     [busy, setBusy] = useState(false);
   const balances = useQuery({
     queryKey: ["data", session.user.id, scope, "leave-balances"],
-    queryFn: () =>
-      api<{ employeeId: string; name: string; balance: number }[]>(
-        `/leave-balances?scope=${scope}`,
+    queryFn: async () =>
+      asArray<{ employeeId: string; name: string; balance: number }>(
+        await api<unknown>(`/leave-balances?scope=${scope}`),
       ),
+    retry: false,
   });
   const current = lookups.attendance.find(
     (a) => a.employeeId === session.user.id && a.status !== "퇴근",
@@ -131,6 +134,15 @@ function AttendanceSummary() {
       </section>
       <section className="card p-5">
         <h2>휴가 잔여량</h2>
+        <DataNotice
+          label="휴가 정보"
+          loading={balances.isPending}
+          error={balances.error}
+          retry={() => void balances.refetch()}
+        />
+        {!balances.isPending && !balances.error && !balances.data?.length && (
+          <p className="help mt-3">등록된 휴가 정보가 없어요.</p>
+        )}
         <div className="mt-3 flex flex-wrap gap-4">
           {balances.data?.map((b) => (
             <div key={b.employeeId}>

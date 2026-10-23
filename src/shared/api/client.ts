@@ -79,7 +79,8 @@ export async function api<T>(
   if (["/auth/login", "/auth/logout", "/invitations/accept"].includes(path))
     clearCsrf();
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  const body = await response.text();
+  return body.trim() ? (JSON.parse(body) as T) : (undefined as T);
 }
 export const queryString = (
   values: Record<string, string | number | undefined>,

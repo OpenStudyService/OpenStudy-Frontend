@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { api } from "../../shared/api/client";
+import { asArray, asPage } from "../../shared/api/read-model";
 import type { Message, ResourceMap, Task } from "../../shared/domain/schema";
 import { displayDate } from "../../shared/domain/schema";
 import { useApp } from "../../app/context";
@@ -21,7 +22,6 @@ import {
 import { Icon } from "../../shared/ui/Icon";
 import { RecordPanel } from "../records/ResourcePage";
 type Channel = ResourceMap["channels"] & { unread: number };
-type Messages = { items: Message[]; nextCursor?: string; total: number };
 interface Outgoing {
   clientMessageId: string;
   channelId: string;
@@ -48,18 +48,22 @@ export function Chat() {
     scroll = useRef<HTMLDivElement>(null);
   const channels = useQuery({
     queryKey: ["data", user.id, scope, "chat", "channels"],
-    queryFn: ({ signal }) =>
-      api<Channel[]>(`/chat/channels?scope=${scope}`, { signal }),
+    queryFn: async ({ signal }) =>
+      asArray<Channel>(
+        await api<unknown>(`/chat/channels?scope=${scope}`, { signal }),
+      ),
     retry: false,
   });
   const channel = channels.data?.find((c) => c.id === channelId),
     enabled = !!channel;
   const history = useInfiniteQuery({
     queryKey: ["data", user.id, scope, "chat", "messages", channelId],
-    queryFn: ({ signal, pageParam }) =>
-      api<Messages>(
-        `/chat/${channelId}/messages${pageParam ? `?before=${pageParam}` : ""}`,
-        { signal },
+    queryFn: async ({ signal, pageParam }) =>
+      asPage<Message>(
+        await api<unknown>(
+          `/chat/${channelId}/messages${pageParam ? `?before=${pageParam}` : ""}`,
+          { signal },
+        ),
       ),
     initialPageParam: "",
     getNextPageParam: (last) => last.nextCursor,
@@ -84,10 +88,12 @@ export function Chat() {
   });
   const threadHistory = useInfiniteQuery({
     queryKey: ["data", user.id, scope, "chat", "replies", channelId, threadId],
-    queryFn: ({ signal, pageParam }) =>
-      api<Messages>(
-        `/chat/${channelId}/messages?parent=${encodeURIComponent(threadId)}${pageParam ? `&before=${pageParam}` : ""}`,
-        { signal },
+    queryFn: async ({ signal, pageParam }) =>
+      asPage<Message>(
+        await api<unknown>(
+          `/chat/${channelId}/messages?parent=${encodeURIComponent(threadId)}${pageParam ? `&before=${pageParam}` : ""}`,
+          { signal },
+        ),
       ),
     initialPageParam: "",
     getNextPageParam: (last) => last.nextCursor,
@@ -319,6 +325,9 @@ export function Chat() {
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <p className="nav-label">채널</p>
+          {channels.isSuccess && !channels.data.length && (
+            <State title="아직 참여 중인 대화가 없어요" />
+          )}
           {channels.isPending ? (
             <State loading />
           ) : channels.error ? (

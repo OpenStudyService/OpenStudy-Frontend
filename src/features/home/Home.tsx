@@ -13,6 +13,8 @@ import {
   State,
 } from "../../shared/ui/primitives";
 import { Icon } from "../../shared/ui/Icon";
+import { asCollections, isAccessError } from "../../shared/api/read-model";
+import { DataNotice } from "../../shared/ui/DataNotice";
 interface HomeData {
   tasks: ResourceMap["tasks"][];
   seats: ResourceMap["seats"][];
@@ -22,24 +24,50 @@ interface HomeData {
   shifts: ResourceMap["shifts"][];
   messages: ResourceMap["messages"][];
 }
+const emptyHome: HomeData = {
+  tasks: [],
+  seats: [],
+  facilities: [],
+  inquiries: [],
+  notices: [],
+  shifts: [],
+  messages: [],
+};
 export function Home() {
   const { session, scope, lookups } = useApp(),
     [mine, setMine] = useState(!session.user.owner);
   const data = useQuery({
     queryKey: ["data", session.user.id, scope, "home"],
-    queryFn: ({ signal }) => api<HomeData>(`/home?scope=${scope}`, { signal }),
+    queryFn: async ({ signal }) =>
+      asCollections(
+        emptyHome,
+        await api<unknown>(`/home?scope=${scope}`, { signal }),
+      ),
     retry: false,
   });
-  if (data.isPending) return <State loading />;
-  if (data.error)
-    return <ErrorState error={data.error} retry={() => void data.refetch()} />;
-  const d = data.data!;
+  if (isAccessError(data.error))
+    return <ErrorState error={data.error!} retry={() => void data.refetch()} />;
+  const d = data.data || emptyHome;
+  const unavailable = !data.data && (data.isPending || !!data.error);
+  const emptyTitle = (title: string) =>
+    data.isPending
+      ? "데이터를 불러오고 있어요"
+      : data.error
+        ? "데이터를 확인할 수 없어요"
+        : title;
   const name = session.user.nickname || session.user.name,
     tasks = d.tasks.filter((t) => !mine || t.assigneeId === session.user.id),
     used = d.seats.filter((s) => s.status === "이용 중").length,
     free = d.seats.filter((s) => s.status === "이용 가능").length,
     rate = d.seats.length ? Math.round((used / d.seats.length) * 100) : 0,
     completed = tasks.filter((t) => t.status === "완료").length;
+  const facilities = d.facilities.filter((f) => f.status !== "완료"),
+    notices = d.notices.filter((n) => n.status === "게시 중"),
+    shifts = d.shifts.filter(
+      (s) =>
+        businessDate(s.startsAt) === businessDate(session.asOf) &&
+        s.status !== "취소",
+    );
   const href = (page: string, id?: string) =>
     `/app/${scope}/${page}${id ? `?detail=${id}` : ""}`;
   const person = (id: string) =>
@@ -55,6 +83,12 @@ export function Home() {
           {businessDate(session.asOf)} · KST
         </small>
       </Heading>
+      <DataNotice
+        label="홈 데이터"
+        loading={data.isPending}
+        error={data.error}
+        retry={() => void data.refetch()}
+      />
       <section className="hero">
         <div className="relative z-10 flex items-center justify-between gap-6">
           <div>
@@ -67,13 +101,19 @@ export function Home() {
               오늘도 함께 만들어요.
             </h2>
             <p className="text-xs">
-              지금 허용된{" "}
-              {
-                lookups.branches.filter(
-                  (b) => scope === "all" || b.id === scope,
-                ).length
-              }
-              개 지점의 하루를 함께 살펴보고 있어요.
+              {lookups.branches.length ? (
+                <>
+                  지금 허용된{" "}
+                  {
+                    lookups.branches.filter(
+                      (b) => scope === "all" || b.id === scope,
+                    ).length
+                  }
+                  개 지점의 하루를 함께 살펴보고 있어요.
+                </>
+              ) : (
+                "등록된 지점이 없어요. 지점 등록 후 운영 현황을 확인할 수 있어요."
+              )}
             </p>
           </div>
           <Link
@@ -129,10 +169,14 @@ export function Home() {
               <Icon name={s.icon} size={17} />
             </div>
             <p className="stat-value">
-              {s.number}
-              <small className="ml-1 font-normal">{s.unit}</small>
+              {unavailable ? "—" : s.number}
+              {!unavailable && (
+                <small className="ml-1 font-normal">{s.unit}</small>
+              )}
             </p>
-            <small className="text-[10px] text-primary">{s.note}</small>
+            <small className="text-[10px] text-primary">
+              {unavailable ? "데이터 확인 대기" : s.note}
+            </small>
           </Link>
         ))}
       </div>
@@ -185,14 +229,16 @@ export function Home() {
                 </Link>
               ))
             ) : (
-              <State title="오늘 배정된 업무가 없어요" />
+              <State title={emptyTitle("오늘 배정된 업무가 없어요")} />
             )}
             <div className="flex justify-between px-5 py-3 text-[10px] text-muted">
               <span>하나씩 완료하며 오늘을 채워가요.</span>
               <span>
-                {tasks.length
-                  ? Math.round((completed / tasks.length) * 100)
-                  : 0}
+                {unavailable
+                  ? "—"
+                  : tasks.length
+                    ? Math.round((completed / tasks.length) * 100)
+                    : 0}
                 % 완료
               </span>
             </div>
@@ -211,26 +257,27 @@ export function Home() {
                 점검 보기 →
               </Link>
             </header>
-            {d.facilities
-              .filter((f) => f.status !== "완료")
-              .map((f) => (
-                <Link
-                  className="task-line"
-                  key={f.id}
-                  to={href("facilities", f.id)}
-                >
-                  <span className="rounded-xl bg-soft p-3 text-primary">
-                    <Icon name="facility" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <b className="block truncate text-xs">{f.title}</b>
-                    <small className="block text-[10px]">
-                      {person(f.assigneeId)} 담당 · 다음 점검 {f.nextCheck}
-                    </small>
-                  </span>
-                  <Badge>{f.condition}</Badge>
-                </Link>
-              ))}
+            {!facilities.length && (
+              <State title={emptyTitle("등록된 점검 항목이 없어요")} />
+            )}
+            {facilities.map((f) => (
+              <Link
+                className="task-line"
+                key={f.id}
+                to={href("facilities", f.id)}
+              >
+                <span className="rounded-xl bg-soft p-3 text-primary">
+                  <Icon name="facility" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <b className="block truncate text-xs">{f.title}</b>
+                  <small className="block text-[10px]">
+                    {person(f.assigneeId)} 담당 · 다음 점검 {f.nextCheck}
+                  </small>
+                </span>
+                <Badge>{f.condition}</Badge>
+              </Link>
+            ))}
           </section>
           <section className="card">
             <header className="card-header">
@@ -239,6 +286,9 @@ export function Home() {
                 채팅 열기 →
               </Link>
             </header>
+            {!d.messages.length && (
+              <State title={emptyTitle("아직 공유된 업무가 없어요")} />
+            )}
             {d.messages
               .slice(-3)
               .reverse()
@@ -266,21 +316,17 @@ export function Home() {
                 전체 공지 →
               </Link>
             </header>
-            {d.notices
-              .filter((n) => n.status === "게시 중")
-              .slice(0, 3)
-              .map((n) => (
-                <Link
-                  className="task-line"
-                  key={n.id}
-                  to={href("notices", n.id)}
-                >
-                  {n.pinned && <Badge>중요</Badge>}
-                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">
-                    {n.title}
-                  </span>
-                </Link>
-              ))}
+            {!notices.length && (
+              <State title={emptyTitle("등록된 공지사항이 없어요")} />
+            )}
+            {notices.slice(0, 3).map((n) => (
+              <Link className="task-line" key={n.id} to={href("notices", n.id)}>
+                {n.pinned && <Badge>중요</Badge>}
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                  {n.title}
+                </span>
+              </Link>
+            ))}
           </section>
         </div>
         <aside className="home-aside grid content-start gap-5">
@@ -299,21 +345,28 @@ export function Home() {
                 >
                   <div className="grid h-28 w-28 place-content-center rounded-full bg-surface text-center">
                     <strong className="text-[29px]">
-                      {rate}
-                      <small>%</small>
+                      {unavailable ? "—" : rate}
+                      {!unavailable && <small>%</small>}
                     </strong>
                     <small className="text-[10px]">좌석 이용률</small>
                   </div>
                 </div>
                 <div className="grid flex-1 gap-4 text-[11px]">
                   <span>
-                    이용 중 <b className="float-right">{used}</b>
+                    이용 중{" "}
+                    <b className="float-right">{unavailable ? "—" : used}</b>
                   </span>
                   <span>
-                    이용 가능 <b className="float-right">{free}</b>
+                    이용 가능{" "}
+                    <b className="float-right">{unavailable ? "—" : free}</b>
                   </span>
                 </div>
               </div>
+              {!d.seats.length && (
+                <p className="help mt-4">
+                  {emptyTitle("등록된 좌석이 없어요")}
+                </p>
+              )}
               {lookups.branches
                 .filter((b) => scope === "all" || b.id === scope)
                 .map((b) => {
@@ -348,25 +401,22 @@ export function Home() {
               <Icon name="clock" />
             </header>
             <div className="grid gap-5 p-5">
-              {d.shifts
-                .filter(
-                  (s) =>
-                    businessDate(s.startsAt) === businessDate(session.asOf) &&
-                    s.status !== "취소",
-                )
-                .map((s) => (
-                  <div className="flex items-center gap-3" key={s.id}>
-                    <Avatar name={person(s.employeeId)} />
-                    <div className="min-w-0 flex-1">
-                      <b className="text-xs">{person(s.employeeId)}</b>
-                      <small className="block text-[10px]">
-                        {displayDate(s.startsAt)} –{" "}
-                        {displayDate(s.endsAt).split(" ").at(-1)}
-                      </small>
-                    </div>
-                    <Badge>예정</Badge>
+              {!shifts.length && (
+                <State title={emptyTitle("오늘 예정된 근무가 없어요")} />
+              )}
+              {shifts.map((s) => (
+                <div className="flex items-center gap-3" key={s.id}>
+                  <Avatar name={person(s.employeeId)} />
+                  <div className="min-w-0 flex-1">
+                    <b className="text-xs">{person(s.employeeId)}</b>
+                    <small className="block text-[10px]">
+                      {displayDate(s.startsAt)} –{" "}
+                      {displayDate(s.endsAt).split(" ").at(-1)}
+                    </small>
                   </div>
-                ))}
+                  <Badge>예정</Badge>
+                </div>
+              ))}
             </div>
           </section>
           <section className="card p-5">

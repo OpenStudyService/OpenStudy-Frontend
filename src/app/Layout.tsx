@@ -13,11 +13,7 @@ import { DropdownMenu } from "radix-ui";
 import { api, API_BASE, MOCK } from "../shared/api/client";
 import { openStream } from "../shared/api/stream";
 import { can, admin } from "../shared/domain/schema";
-import type {
-  CurrentUser,
-  LookupData,
-  WorkspaceEvent,
-} from "../shared/domain/schema";
+import type { CurrentUser, WorkspaceEvent } from "../shared/domain/schema";
 import {
   Avatar,
   Badge,
@@ -27,7 +23,9 @@ import {
   State,
 } from "../shared/ui/primitives";
 import { Icon } from "../shared/ui/Icon";
-import { emptyLookups, useSession } from "./context";
+import { emptyLookups, normalizeLookups, useSession } from "./context";
+import { isAccessError } from "../shared/api/read-model";
+import { DataNotice } from "../shared/ui/DataNotice";
 import { useUi } from "./store";
 export const navigation = [
   { path: "home", title: "대시보드", icon: "home", group: "워크스페이스" },
@@ -101,8 +99,10 @@ export function Layout() {
   const user = session.data?.user;
   const lookups = useQuery({
     queryKey: ["data", user?.id, scope, "lookups"],
-    queryFn: ({ signal }) =>
-      api<LookupData>(`/lookups?scope=${scope}`, { signal }),
+    queryFn: async ({ signal }) =>
+      normalizeLookups(
+        await api<unknown>(`/lookups?scope=${scope}`, { signal }),
+      ),
     enabled: !!user && can(user, scope),
     retry: false,
   });
@@ -115,7 +115,13 @@ export function Layout() {
     }
   }, [scope, user?.id, query]);
   useEffect(() => {
-    if (!user || !can(user, scope)) return;
+    if (
+      !user ||
+      !can(user, scope) ||
+      !lookups.isSuccess ||
+      lookups.data?.preview
+    )
+      return;
     const stop = openStream(
       `${API_BASE}/workspace/events?scope=${encodeURIComponent(scope)}`,
       {
@@ -148,7 +154,7 @@ export function Layout() {
       },
     );
     return stop;
-  }, [user, scope, query]);
+  }, [user, scope, query, lookups.isSuccess, lookups.data?.preview]);
   if (session.isPending) return <State loading />;
   if (session.error)
     return (
@@ -190,6 +196,15 @@ export function Layout() {
     );
   const current = session.data,
     activeUser = current.user;
+  const workspaceLookups = {
+    ...(lookups.data || emptyLookups),
+    branches: lookups.data?.branches.length
+      ? lookups.data.branches
+      : current.branches,
+    employees: lookups.data?.employees.length
+      ? lookups.data.employees
+      : [activeUser],
+  };
   const menu = navigation.filter(
     (n) =>
       (!n.admin || admin(activeUser, scope)) &&
@@ -225,10 +240,15 @@ export function Layout() {
           className="scope-select"
           value={scope}
           onChange={(e) => changeScope(e.target.value)}
+          disabled={current.branches.length === 0}
         >
-          {current.branches.length > 1 && (
-            <option value="all">전체 허용 지점</option>
+          {current.branches.length === 0 && (
+            <option value={scope}>등록된 지점 없음</option>
           )}
+          {current.branches.length > 0 &&
+            (scope === "all" || current.branches.length > 1) && (
+              <option value="all">전체 허용 지점</option>
+            )}
           {current.branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -312,12 +332,18 @@ export function Layout() {
             <strong className="truncate text-xs">{title}</strong>
           </div>
           <div className="flex items-center gap-3">
-            {MOCK && <Badge>데모 데이터</Badge>}
+            {(MOCK || lookups.data?.preview) && (
+              <Badge>{MOCK ? "데모 데이터" : "로컬 샘플"}</Badge>
+            )}
             <span
               className="hidden text-[10px] text-muted lg:inline"
               role="status"
             >
-              {streamState}
+              {lookups.data?.preview
+                ? "샘플 조회 모드"
+                : !lookups.isSuccess
+                  ? "데이터 연결 대기"
+                  : streamState}
             </span>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
@@ -358,20 +384,37 @@ export function Layout() {
           </div>
         </header>
         <main id="main" className="content" tabIndex={-1}>
-          {lookups.error ? (
+          {lookups.data?.preview && (
+            <p
+              className="mb-4 rounded-xl border border-line bg-soft px-4 py-3 text-xs text-primary"
+              role="status"
+            >
+              화면 확인용 샘플 데이터입니다. 업무 데이터의 추가·수정·삭제는
+              지원하지 않습니다.
+            </p>
+          )}
+          {isAccessError(lookups.error) ? (
             <ErrorState
-              error={lookups.error}
+              error={lookups.error!}
               retry={() => void lookups.refetch()}
             />
           ) : (
-            <Outlet
-              key={`${activeUser.id}:${scope}`}
-              context={{
-                session: current,
-                scope,
-                lookups: lookups.data || emptyLookups,
-              }}
-            />
+            <>
+              <DataNotice
+                label="공통 정보"
+                loading={lookups.isPending}
+                error={lookups.error}
+                retry={() => void lookups.refetch()}
+              />
+              <Outlet
+                key={`${activeUser.id}:${scope}`}
+                context={{
+                  session: current,
+                  scope,
+                  lookups: workspaceLookups,
+                }}
+              />
+            </>
           )}
         </main>
       </div>
