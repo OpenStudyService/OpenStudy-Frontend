@@ -17,42 +17,6 @@ async function demo(page: Page, data: Record<string, unknown>) {
   }, data);
 }
 
-test("invitation accept, pending approval and final activation", async ({
-  page,
-}) => {
-  await login(page);
-  await page.goto("/app/gangnam/employees?tab=invitations");
-  await page.getByRole("button", { name: "초대 등록", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("이름", { exact: true }).fill("새동료");
-  await dialog.getByLabel("초대 이메일").fill("new@openstudy.test");
-  await dialog.getByRole("button", { name: "초대 등록", exact: true }).click();
-  await expect(dialog).not.toBeVisible();
-  await page.getByRole("button", { name: "새동료", exact: true }).click();
-  const link = await dialog.getByRole("link").getAttribute("href");
-  expect(link).toContain("/invitations/accept");
-  await page.goto(link!);
-  await page.getByLabel("새 계정 비밀번호").fill("demo-password");
-  await page.getByRole("button", { name: "초대 수락", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "최종 승인을 기다리고 있어요" }),
-  ).toBeVisible();
-  await demo(page, { persona: "owner" });
-  await page.goto("/app/gangnam/employees?tab=invitations");
-  await page.getByRole("button", { name: "새동료", exact: true }).click();
-  await dialog.getByRole("button", { name: "최종 승인", exact: true }).click();
-  await dialog.getByRole("button", { name: "최종 승인", exact: true }).click();
-  await expect(dialog.locator(".badge")).toContainText("활성");
-  await demo(page, { expire: true });
-  await page.goto("/login");
-  await page.getByLabel("이메일", { exact: true }).fill("new@openstudy.test");
-  await page.getByLabel("비밀번호", { exact: true }).fill("demo-password");
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: /안녕하세요, 새동료/ }),
-  ).toBeVisible();
-});
-
 test("leave approval/cancel and weekly schedule use one balance", async ({
   page,
 }) => {

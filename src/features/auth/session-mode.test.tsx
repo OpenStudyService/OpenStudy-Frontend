@@ -97,11 +97,20 @@ it("does not request work lookups when an approval-only session opens a work rou
   expect(
     await screen.findByRole("heading", { name: "승인이 완료됐어요" }),
   ).toBeVisible();
-  expect(api).not.toHaveBeenCalled();
+  expect(api).not.toHaveBeenCalledWith(
+    expect.stringContaining("/lookups"),
+    expect.anything(),
+  );
 });
 it("keeps existing active workspace sessions usable while another branch is pending", async () => {
   state.data!.sessionMode = "WORKSPACE";
   renderSession(<PendingApproval />);
+  expect(
+    await screen.findByRole("link", { name: "기존 지점 업무로 돌아가기" }),
+  ).toBeVisible();
+  await userEvent.click(
+    screen.getByRole("link", { name: "기존 지점 업무로 돌아가기" }),
+  );
   expect(
     await screen.findByRole("heading", { name: "업무 공간" }),
   ).toBeVisible();

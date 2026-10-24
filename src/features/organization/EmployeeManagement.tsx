@@ -13,7 +13,7 @@ import {
   Panel,
   State,
 } from "../../shared/ui/primitives";
-import { ResourcePage } from "../records/ResourcePage";
+import { InvitationManagement } from "../invitations/Management";
 import { organizationRead } from "./api";
 import {
   canManageMembership,
@@ -118,7 +118,7 @@ function EmployeeManagementContent() {
         </Button>
       </div>
       {tab === "invitations" ? (
-        <ResourcePage resource="invitations" />
+        <InvitationManagement />
       ) : (
         <>
           <ContractNotice />
