@@ -81,4 +81,6 @@ docs/api/            OpenAPI와 API 인계 계약
 
 `live` 모드는 API 실패를 데모 데이터로 대체하지 않습니다. **실제 HttpOnly 세션·CSRF 보안, 서버 권한·동시 트랜잭션, 실제 초대 메일, 두 브라우저 사이 실시간 전달, DomainLens 실엔진·DB 값은 이 프로젝트의 모킹 테스트로 보장하지 않습니다.** 서버 연결 뒤 별도 통합 검증합니다.
 
-기반 API 타입은 `src/shared/api/foundation.generated.ts`를 사용합니다. 정본은 backend의 `docs/design/foundation/openapi.json`이며 프론트에 복제하지 않습니다. 기존 전체 업무 데모 계약(`generated.ts`)은 아직 전환하지 않은 화면용으로 유지하며, 지점·직원·초대·상품 화면 전환은 후속 이슈에서 진행합니다.
+기반 API 타입은 `src/shared/api/foundation.generated.ts`를 사용합니다. 정본은 [backend 기반 OpenAPI](https://github.com/OpenStudyService/OpenStudy-Backend/blob/main/docs/design/foundation/openapi.json)이며 프론트에 복제하지 않습니다. 설정의 지점 관리와 직원 목록·지점 소속·권한 프리셋은 이 계약을 사용합니다. 초대·상품 등 아직 전환하지 않은 전체 업무 데모 화면은 기존 계약(`generated.ts`)을 유지합니다.
+
+조직 관리는 `src/features/organization/`에서 정본 DTO와 별도 폼을 관리합니다. 지점 운영시간은 월~일 7개 구조화 값, 직원 소속 저장은 한 지점의 PUT과 계정·소속 두 버전을 사용합니다. 409에서는 입력을 보존하고 최신 서버 내용을 확인한 후 저장할 수 있습니다. 지점·직원 API가 아직 기존 미리보기 응답을 반환하면 부족한 운영시간·버전을 만들어 편집하지 않고 계약 미지원 오류를 표시합니다. MSW 검증은 실제 서버 권한·DB 동시 수정·세션 폐기 검증을 대신하지 않습니다.

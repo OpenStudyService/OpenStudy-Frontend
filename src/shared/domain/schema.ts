@@ -16,6 +16,9 @@ export const membershipSchema = z.object({
   branchId: z.string(),
   role: z.enum(["admin", "staff"]),
   permissions: z.array(z.enum(permissions)),
+  // Older demo/read-only servers omit these fields. Canonical organization responses require both.
+  status: z.enum(["승인 대기", "활성", "회수"]).optional(),
+  version: z.number().int().positive().optional(),
 });
 export type Membership = z.infer<typeof membershipSchema>;
 const str = z.string().trim().min(1, "필수 항목입니다.");
@@ -267,6 +270,7 @@ export interface CurrentUser {
   branches: ResourceMap["branches"][];
   asOf: string;
   snapshotVersion: string;
+  sessionMode?: "WORKSPACE" | "APPROVAL_ONLY";
 }
 export interface Page<T> {
   items: T[];
@@ -331,11 +335,12 @@ export function can(
   if (user.owner) return true;
   const memberships =
     branchId === "all"
-      ? user.memberships
-      : user.memberships.filter((m) => m.branchId === branchId);
+      ? user.memberships.filter((m) => !m.status || m.status === "활성")
+      : user.memberships.filter(
+          (m) => m.branchId === branchId && (!m.status || m.status === "활성"),
+        );
   return memberships.some(
-    (m) =>
-      !permission || m.role === "admin" || m.permissions.includes(permission),
+    (m) => !permission || m.permissions.includes(permission),
   );
 }
 export function admin(user: Employee, branchId: string) {
@@ -344,7 +349,9 @@ export function admin(user: Employee, branchId: string) {
     (user.owner ||
       user.memberships.some(
         (m) =>
-          (branchId === "all" || m.branchId === branchId) && m.role === "admin",
+          (branchId === "all" || m.branchId === branchId) &&
+          m.role === "admin" &&
+          (!m.status || m.status === "활성"),
       ))
   );
 }

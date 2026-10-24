@@ -15,6 +15,7 @@ import {
 } from "../../shared/ui/primitives";
 import { ResourceForm } from "../records/ResourceForm";
 import { ResourceGroup } from "../records/ResourcePage";
+import { BranchManagement } from "../organization/Organization";
 export function Settings() {
   const { session, scope, lookups } = useApp(),
     query = useQueryClient(),
@@ -132,9 +133,7 @@ export function Settings() {
                 <p className="help">로그인 ID는 변경할 수 없습니다.</p>
               </div>
               <ResourceForm
-                fields={[
-                  { key: "nickname", label: "닉네임", required: true },
-                ]}
+                fields={[{ key: "nickname", label: "닉네임", required: true }]}
                 defaults={{
                   nickname: session.user.nickname,
                 }}
@@ -161,13 +160,13 @@ export function Settings() {
           </p>
         </section>
         {MOCK && <DemoControls />}
+        <BranchManagement key={`${session.user.id}:${scope}`} />
       </div>
       {admin(session.user, scope) && (
         <ResourceGroup
           title="공간·운영 환경"
           description="담당 지점의 공간과 변경 이력을 관리해요."
           tabs={[
-            { resource: "branches", label: "지점 설정" },
             { resource: "rooms", label: "스터디룸" },
             { resource: "channels", label: "채널 관리", admin: true },
             { resource: "audit", label: "변경 이력", admin: true },

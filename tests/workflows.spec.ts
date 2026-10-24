@@ -178,7 +178,9 @@ test("staff cannot open owner menus or read another branch through HTTP", async 
 }) => {
   await login(page, "직원");
   await page.goto("/app/gangnam/employees");
-  await expect(page.getByText("이 메뉴에 접근할 권한이 없어요")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "직원 관리 권한이 없어요" }),
+  ).toBeVisible();
   await page.goto("/app/seongsu/tasks");
   await expect(page.getByText("이 지점에 접근할 수 없어요")).toBeVisible();
   const statuses = await page.evaluate(async () => {
