@@ -31,6 +31,13 @@ npm run dev
 | `npm run api:foundation` | 인접 `openstudy-backend`의 정본 foundation OpenAPI에서 기반 API 타입 생성 |
 | `npm run api:generate`   | Zod·폼 정의 → OpenAPI → TypeScript 타입 재생성                            |
 
+## S3 자동 배포
+
+GitHub Actions가 검사·live 빌드 후 비공개 Amazon S3에 게시한다. Amazon CloudFront가 HTTPS로 제공한다.
+인프라는 OpenStudy-Infra의 `terraform/frontend`가 관리한다.
+처음 생성, Actions 변수 등록과 전체 삭제는 [자동 배포 순서](docs/deployment.md)를 따른다.
+실제 API는 Backend 연결 후 사용할 수 있다.
+
 ## 체험
 
 실서버 모드에서도 업무 데이터가 없어도 메뉴·홈 카드·목록의 열과 필터·예약 달력 등의 화면 구조를 유지합니다. 빈 배열, 빈 객체, `null`, 204 및 비어 있는 성공 응답은 빈 상태로 표시합니다. `/lookups`가 없거나 일시적으로 실패해도 현재 로그인 정보의 지점·본인 정보를 사용하여 본문을 표시합니다. API 미구현(404/501)과 연결 오류는 안내와 재시도 버튼으로 표시하고, 확인하지 못한 홈·매출 수치는 `—`로 구분합니다. 인증·권한 오류(401/403)는 빈 데이터로 처리하지 않습니다.
