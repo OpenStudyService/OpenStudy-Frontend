@@ -1,3 +1,8 @@
+import {
+  invitationHandlers,
+  setInvitationSessionMode,
+  invitationSessionMode,
+} from "./invitations";
 import { http, HttpResponse } from "msw/http";
 import { delay } from "msw";
 import { sse } from "msw/sse";
@@ -135,18 +140,26 @@ function current() {
   const user = {
     ...account,
     memberships:
-      account.status === "승인 대기"
+      invitationSessionMode() || account.status === "승인 대기"
         ? []
         : account.memberships.filter((m) => m.status === "활성"),
   };
   return {
     user,
     branches: store.db.branches
-      .filter((b) => user.status !== "승인 대기" && can(user, b.id))
+      .filter(
+        (b) =>
+          !invitationSessionMode() &&
+          user.status !== "승인 대기" &&
+          can(user, b.id),
+      )
       .map(organizationBranch),
     asOf: store.now(),
     snapshotVersion: "mock-v1",
-    sessionMode: user.status === "승인 대기" ? "APPROVAL_ONLY" : "WORKSPACE",
+    sessionMode:
+      invitationSessionMode() || user.status === "승인 대기"
+        ? "APPROVAL_ONLY"
+        : "WORKSPACE",
   };
 }
 const allowedChannel = (id: string) => {
@@ -321,6 +334,7 @@ function executeAi(r: AiRequest) {
 }
 
 export const handlers = [
+  ...invitationHandlers,
   ...organizationHandlers,
   http.get(
     "/api/auth/csrf",
@@ -356,6 +370,7 @@ export const handlers = [
         403,
         "ACCOUNT_INACTIVE",
       );
+      setInvitationSessionMode(user.status === "승인 대기");
       store.persona = user.id;
       store.persist();
       return current();
@@ -364,6 +379,7 @@ export const handlers = [
   http.post(
     "/api/auth/logout",
     response(() => {
+      setInvitationSessionMode(false);
       store.persona = null;
       store.persist();
       return { ok: true };
@@ -427,84 +443,6 @@ export const handlers = [
       store.persist();
       store.emit("employees", "", "all", "permissions");
       return { ok: true };
-    }, false),
-  ),
-  http.get(
-    "/api/invitations/preview",
-    response((a) => {
-      const token = new URL(a.request.url).searchParams.get("token");
-      const i = store.db.invitations.find((i) => i.token === token);
-      assert(
-        i &&
-          i.status === "초대 대기" &&
-          i.delivery !== "발송 실패" &&
-          Date.parse(i.expiresAt) > Date.parse(store.now()),
-        "만료·취소·재발급되었거나 사용할 수 없는 초대입니다.",
-        410,
-        "INVITATION_EXPIRED",
-      );
-      return {
-        name: i.name,
-        email: i.email,
-        branchId: i.branchId,
-        expiresAt: i.expiresAt,
-      };
-    }, false),
-  ),
-  http.post(
-    "/api/invitations/accept",
-    response(async (a) => {
-      const p = await json(a);
-      assert(
-        a.request.headers.get("X-CSRF-Token") === csrf,
-        "인증 요청을 다시 시도해 주세요.",
-        403,
-        "CSRF_INVALID",
-      );
-      const i = store.db.invitations.find((i) => i.token === p.token);
-      assert(
-        i &&
-          i.status === "초대 대기" &&
-          i.delivery !== "발송 실패" &&
-          Date.parse(i.expiresAt) > Date.parse(store.now()),
-        "사용할 수 없는 초대입니다.",
-        410,
-        "INVITATION_EXPIRED",
-      );
-      assert(
-        p.email === i.email,
-        "초대 이메일을 확인해 주세요.",
-        403,
-        "INVITATION_IDENTITY_MISMATCH",
-      );
-      let e = store.db.employees.find((e) => e.email === i.email);
-      if (e)
-        assert(
-          store.persona === e.id,
-          "기존 직원 계정으로 먼저 로그인해 주세요.",
-          403,
-          "INVITATION_IDENTITY_MISMATCH",
-        );
-      else {
-        z.string()
-          .min(8, "비밀번호는 8자 이상 입력해 주세요.")
-          .parse(p.password);
-        e = store.add("employees", i.branchId, {
-          name: i.name,
-          nickname: i.name,
-          email: i.email,
-          avatar: "",
-          owner: false,
-          status: "승인 대기",
-          memberships: [],
-        });
-      }
-      i.status = "승인 대기";
-      i.employeeId = e.id;
-      i.token = crypto.randomUUID();
-      store.persona = e.id;
-      store.persist();
-      return current();
     }, false),
   ),
   http.get(
