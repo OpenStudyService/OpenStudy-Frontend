@@ -22,7 +22,7 @@ vite.config.*.timestamp-*
 .eslintcache
 .stylelintcache
 
-# Automated test output (keep test sources and approved mockup previews)
+# Automated test output (keep test sources)
 coverage/
 *.lcov
 .nyc_output/
@@ -59,3 +59,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Previous design references and static preview captures (local archive)
+/docs/mockup/openoffice(참고용)/
+/docs/mockup/openstudy/previews/
