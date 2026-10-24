@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { components } from "../../shared/api/foundation.generated";
 import type {
@@ -18,7 +24,13 @@ import {
   membershipBody,
   rolePermissions,
 } from "./model";
-import type { Branch, Employee, Membership, Preset } from "./model";
+import type {
+  Branch,
+  Employee,
+  Membership,
+  MembershipInput,
+  Preset,
+} from "./model";
 import { validateOrganization } from "./api";
 
 const context = vi.hoisted(() => ({
@@ -364,4 +376,217 @@ it("sends seven structured days including a closed day and separate status comma
     { method: "POST", body: { version: 2, status: "운영 중지" } },
   ]);
   expect(onSaved).toHaveBeenCalledOnce();
+});
+
+describe("employee detail version baselines", () => {
+  function setupDetail() {
+    const server = { employee: structuredClone(employee) };
+    vi.mocked(api).mockImplementation(
+      async <T,>(path: string, options: Parameters<typeof api>[1] = {}) => {
+        const current = server.employee;
+        function conflict(): never {
+          throw new ApiError(409, {
+            code: "VERSION_CONFLICT",
+            message: "다른 사용자가 수정했습니다.",
+            requestId: "external-change",
+          });
+        }
+        if (options.method === "PATCH") {
+          const body = options.body as components["schemas"]["EmployeeUpdate"];
+          if (body.version !== current.version) conflict();
+          server.employee = {
+            ...current,
+            ...body,
+            version: current.version + 1,
+          };
+          return structuredClone(server.employee) as T;
+        }
+        if (options.method === "PUT") {
+          const body = options.body as MembershipInput;
+          const branchId = path.match(/memberships\/(\d+)/)![1];
+          const membership = current.memberships.find(
+            (m) => m.branchId === branchId,
+          )!;
+          if (
+            body.employeeVersion !== current.version ||
+            body.version !== membership.version
+          )
+            conflict();
+          const updated = {
+            ...membership,
+            role: body.role,
+            status: body.status,
+            permissions: [...body.permissions],
+            version: membership.version + 1,
+          };
+          server.employee = {
+            ...current,
+            version: current.version + 1,
+            memberships: current.memberships.map((m) =>
+              m.branchId === branchId ? updated : m,
+            ),
+          };
+          return {
+            employeeVersion: server.employee.version,
+            membership: structuredClone(updated),
+          } as T;
+        }
+        return structuredClone(current) as T;
+      },
+    );
+    render(
+      <EmployeeDetail
+        employee={employee}
+        presets={presets}
+        definitions={definitions}
+        onSaved={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    const profile = within(
+      screen.getByRole("button", { name: "계정 정보 저장" }).closest("form")!,
+    );
+    const memberships = screen
+      .getAllByRole("button", { name: "이 지점 소속 저장" })
+      .map((button) => within(button.closest("form")!));
+    return { server, profile, memberships, user: userEvent.setup() };
+  }
+  async function save(
+    user: ReturnType<typeof userEvent.setup>,
+    form: ReturnType<typeof within>,
+    name: string,
+  ) {
+    const button = form.getByRole("button", { name });
+    await user.click(button);
+    await waitFor(() => expect(button).toBeEnabled());
+  }
+  function writes(method: string) {
+    return vi
+      .mocked(api)
+      .mock.calls.filter(([, options]) => options?.method === method);
+  }
+  it("shares repeated membership saves with a dirty profile without replacing its inputs", async () => {
+    const { server, profile, memberships, user } = setupDetail();
+    await user.clear(profile.getByLabelText("직원 이름"));
+    await user.type(profile.getByLabelText("직원 이름"), "작성 중 이름");
+    await user.selectOptions(
+      profile.getByLabelText("계정 전체 상태"),
+      "이용 제한",
+    );
+    await save(user, memberships[0], "이 지점 소속 저장");
+    await save(user, memberships[0], "이 지점 소속 저장");
+    expect(profile.getByLabelText("직원 이름")).toHaveValue("작성 중 이름");
+    expect(profile.getByLabelText("계정 전체 상태")).toHaveValue("이용 제한");
+    await save(user, profile, "계정 정보 저장");
+    expect(writes("PATCH")[0][1]?.body).toMatchObject({
+      version: 6,
+      name: "작성 중 이름",
+      status: "이용 제한",
+    });
+    expect(server.employee.version).toBe(7);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+  it("shares the employee version between branches while retaining each branch version and draft", async () => {
+    const { server, memberships, user } = setupDetail();
+    await user.click(memberships[1].getByLabelText("sales:read"));
+    await save(user, memberships[0], "이 지점 소속 저장");
+    expect(memberships[1].getByLabelText("sales:read")).toBeChecked();
+    await save(user, memberships[1], "이 지점 소속 저장");
+    expect(writes("PUT")[1][1]?.body).toMatchObject({
+      employeeVersion: 5,
+      version: 8,
+      permissions: ["sales:read"],
+    });
+    expect(server.employee.version).toBe(6);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+  it("shares a successful profile save with dirty membership forms", async () => {
+    const { server, profile, memberships, user } = setupDetail();
+    await user.click(memberships[0].getByLabelText("operations:write"));
+    await user.clear(profile.getByLabelText("직원 이름"));
+    await user.type(profile.getByLabelText("직원 이름"), "새 이름");
+    await save(user, profile, "계정 정보 저장");
+    expect(memberships[0].getByLabelText("operations:write")).toBeChecked();
+    await save(user, memberships[0], "이 지점 소속 저장");
+    expect(writes("PUT")[0][1]?.body).toMatchObject({
+      employeeVersion: 5,
+      version: 3,
+      permissions: ["operations:write"],
+    });
+    expect(server.employee.version).toBe(6);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+  it("keeps a real external conflict and dirty profile even after another form explicitly refreshes and saves", async () => {
+    const { server, profile, memberships, user } = setupDetail();
+    await user.clear(profile.getByLabelText("직원 이름"));
+    await user.type(profile.getByLabelText("직원 이름"), "내 입력");
+    await user.click(memberships[0].getByLabelText("members:write"));
+    server.employee = { ...server.employee, version: 5, name: "외부 이름" };
+    await save(user, memberships[0], "이 지점 소속 저장");
+    expect(memberships[0].getByRole("alert")).toHaveTextContent(
+      "external-change",
+    );
+    expect(memberships[0].getByLabelText("members:write")).toBeChecked();
+    await user.click(
+      memberships[0].getByRole("button", {
+        name: "최신 버전 확인 (입력 유지)",
+      }),
+    );
+    await save(user, memberships[0], "이 지점 소속 저장");
+    expect(server.employee.version).toBe(6);
+    await save(user, profile, "계정 정보 저장");
+    expect(profile.getByRole("alert")).toHaveTextContent("external-change");
+    expect(writes("PATCH")[0][1]?.body).toMatchObject({
+      version: 4,
+      name: "내 입력",
+    });
+    expect(profile.getByLabelText("직원 이름")).toHaveValue("내 입력");
+    expect(server.employee.name).toBe("외부 이름");
+    await user.click(
+      profile.getByRole("button", { name: "최신 버전 확인 (입력 유지)" }),
+    );
+    expect(profile.getByLabelText("직원 이름")).toHaveValue("내 입력");
+    await save(user, profile, "계정 정보 저장");
+    expect(server.employee.name).toBe("내 입력");
+    expect(writes("PATCH")[1][1]?.body).toMatchObject({ version: 6 });
+  });
+  it("initializes a newly discovered membership without rebasing existing stale forms", async () => {
+    const { server, profile, memberships, user } = setupDetail();
+    server.employee = {
+      ...server.employee,
+      version: 5,
+      memberships: [
+        ...server.employee.memberships,
+        { ...membership, branchId: "3", version: 1 },
+      ],
+    };
+    await save(user, memberships[0], "이 지점 소속 저장");
+    await user.click(
+      memberships[0].getByRole("button", {
+        name: "최신 버전 확인 (입력 유지)",
+      }),
+    );
+    const third = within(
+      screen
+        .getAllByRole("button", { name: "이 지점 소속 저장" })[2]
+        .closest("form")!,
+    );
+    await save(user, third, "이 지점 소속 저장");
+    expect(writes("PUT")[1]).toEqual([
+      "/employees/20/memberships/3?scope=all",
+      {
+        method: "PUT",
+        body: {
+          employeeVersion: 5,
+          version: 1,
+          role: "staff",
+          status: "활성",
+          permissions: [],
+        },
+      },
+    ]);
+    await save(user, profile, "계정 정보 저장");
+    expect(profile.getByRole("alert")).toHaveTextContent("external-change");
+    expect(writes("PATCH")[0][1]?.body).toMatchObject({ version: 4 });
+    expect(server.employee.version).toBe(6);
+  });
 });
