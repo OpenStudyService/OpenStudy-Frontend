@@ -224,6 +224,32 @@ export function EmployeeDetail({
 }) {
   const { session, scope } = useApp();
   const [employee, setEmployee] = useState(initial);
+  const [profileVersion, setProfileVersion] = useState(initial.version);
+  const [membershipVersions, setMembershipVersions] = useState(() =>
+    Object.fromEntries(
+      initial.memberships.map((m) => [
+        m.branchId,
+        { employeeVersion: initial.version, version: m.version },
+      ]),
+    ),
+  );
+  // Advance only baselines covered by this successful command. A form that
+  // explicitly refreshed an external conflict must not rebase its stale siblings.
+  function committed(previousVersion: number, nextVersion: number) {
+    setProfileVersion((version) =>
+      version === previousVersion ? nextVersion : version,
+    );
+    setMembershipVersions((versions) =>
+      Object.fromEntries(
+        Object.entries(versions).map(([branchId, value]) => [
+          branchId,
+          value.employeeVersion === previousVersion
+            ? { ...value, employeeVersion: nextVersion }
+            : value,
+        ]),
+      ),
+    );
+  }
   async function refresh() {
     const current = await organizationRead<Employee>(
       `/employees/${employee.id}?${queryString({ scope })}`,
@@ -248,8 +274,11 @@ export function EmployeeDetail({
       {session.user.owner && (
         <EmployeeProfile
           employee={employee}
+          version={profileVersion}
+          setVersion={setProfileVersion}
           refresh={refresh}
-          onSaved={async () => {
+          onSaved={async (updated, previousVersion) => {
+            committed(previousVersion, updated.version);
             await refresh();
             await onSaved();
           }}
@@ -266,6 +295,16 @@ export function EmployeeDetail({
             <MembershipForm
               employee={employee}
               membership={m}
+              versions={membershipVersions[m.branchId]}
+              onVersionsChange={(versions) =>
+                setMembershipVersions((current) => ({
+                  ...current,
+                  [m.branchId]: versions,
+                }))
+              }
+              onCommitted={(previousVersion, nextVersion) =>
+                committed(previousVersion, nextVersion)
+              }
               presets={presets}
               definitions={definitions}
               refresh={refresh}
@@ -294,16 +333,19 @@ export function EmployeeDetail({
 }
 function EmployeeProfile({
   employee,
+  version,
+  setVersion,
   refresh,
   onSaved,
 }: {
   employee: Employee;
+  version: number;
+  setVersion: (version: number) => void;
   refresh: () => Promise<Employee>;
-  onSaved: () => Promise<void>;
+  onSaved: (updated: Employee, previousVersion: number) => Promise<void>;
 }) {
   const [name, setName] = useState(employee.name),
     [status, setStatus] = useState(employee.status),
-    [version, setVersion] = useState(employee.version),
     [error, setError] = useState<Error | null>(null),
     [latest, setLatest] = useState(""),
     [busy, setBusy] = useState(false);
@@ -324,7 +366,7 @@ function EmployeeProfile({
             } satisfies components["schemas"]["EmployeeUpdate"],
           });
           setVersion(updated.version);
-          await onSaved();
+          await onSaved(updated, version);
         } catch (e) {
           setError(e as Error);
         } finally {
@@ -380,6 +422,9 @@ function EmployeeProfile({
 export function MembershipForm({
   employee,
   membership,
+  versions: sharedVersions,
+  onVersionsChange,
+  onCommitted,
   presets,
   definitions,
   refresh,
@@ -387,6 +432,12 @@ export function MembershipForm({
 }: {
   employee: Employee;
   membership: Membership;
+  versions?: { employeeVersion: number; version: number };
+  onVersionsChange?: (versions: {
+    employeeVersion: number;
+    version: number;
+  }) => void;
+  onCommitted?: (previousVersion: number, nextVersion: number) => void;
   presets: Preset[];
   definitions: components["schemas"]["PermissionDefinition"][];
   refresh: () => Promise<Employee>;
@@ -400,7 +451,7 @@ export function MembershipForm({
     permissions: [...membership.permissions],
     status: "활성",
   });
-  const [versions, setVersions] = useState({
+  const [localVersions, setLocalVersions] = useState({
       employeeVersion: employee.version,
       version: membership.version,
     }),
@@ -408,6 +459,8 @@ export function MembershipForm({
     [latest, setLatest] = useState(""),
     [busy, setBusy] = useState(false),
     [blocked, setBlocked] = useState(false);
+  const versions = sharedVersions ?? localVersions;
+  const setVersions = onVersionsChange ?? setLocalVersions;
   const adminOnly = [
     "people:manage",
     ...definitions.filter((p) => p.adminOnly).map((p) => p.code),
@@ -434,6 +487,7 @@ export function MembershipForm({
             employeeVersion: updated.employeeVersion,
             version: updated.membership.version,
           });
+          onCommitted?.(versions.employeeVersion, updated.employeeVersion);
           await onSaved();
         } catch (e) {
           setError(e as Error);
