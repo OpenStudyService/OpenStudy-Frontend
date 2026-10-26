@@ -30,10 +30,12 @@ export function SaveError({
   error,
   refresh,
   latest,
+  fieldLabels = {},
 }: {
   error: Error | null;
   refresh: () => Promise<void>;
   latest?: string;
+  fieldLabels?: Record<string, string>;
 }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -45,7 +47,7 @@ export function SaveError({
             error.detail.fieldErrors &&
             Object.entries(error.detail.fieldErrors).map(([field, message]) => (
               <span className="block" key={field}>
-                {field}: {message}
+                {fieldLabels[field] || field}: {message}
               </span>
             ))}
         </FieldError>

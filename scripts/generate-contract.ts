@@ -327,8 +327,8 @@ setBody(
   "/me/profile",
   "patch",
   object({
-    nickname: string,
-    avatar: string,
+    nickname: { type: "string", minLength: 1, maxLength: 100 },
+    version: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
   }),
 );
 setResponse("/me/profile", "patch", ref("CurrentUser"));

@@ -7,23 +7,14 @@ import type { CurrentUser } from "../../shared/domain/schema";
 import { admin } from "../../shared/domain/schema";
 import { useUi } from "../../app/store";
 import { ThemePicker } from "../auth/Login";
-import {
-  Avatar,
-  Button,
-  FieldError,
-  Heading,
-} from "../../shared/ui/primitives";
-import { ResourceForm } from "../records/ResourceForm";
+import { Button, FieldError, Heading } from "../../shared/ui/primitives";
+import { ProfileForm } from "./ProfileForm";
 import { ResourceGroup } from "../records/ResourcePage";
 import { BranchManagement } from "../organization/Organization";
 export function Settings() {
-  const { session, scope, lookups } = useApp(),
-    query = useQueryClient(),
-    toast = useUi((s) => s.toast),
+  const { session, scope } = useApp(),
     theme = useUi((s) => s.theme),
-    setTheme = useUi((s) => s.setTheme),
-    [avatar, setAvatar] = useState(session.user.avatar),
-    [error, setError] = useState("");
+    setTheme = useUi((s) => s.setTheme);
   return (
     <div>
       <div className="page pb-0">
@@ -79,79 +70,7 @@ export function Settings() {
             ))}
           </div>
         </section>
-        <section className="card mb-5">
-          <header className="card-header">
-            <h2>내 프로필</h2>
-          </header>
-          <div className="grid gap-6 p-5 sm:grid-cols-[120px_minmax(0,500px)]">
-            <div>
-              {avatar ? (
-                <img
-                  className="mb-3 h-20 w-20 rounded-2xl object-cover"
-                  src={avatar}
-                  alt={`${session.user.name} 프로필`}
-                />
-              ) : (
-                <Avatar name={session.user.name} size="large" />
-              )}
-              <label className="field mt-3">
-                <span>프로필 사진</span>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  aria-label="프로필 사진"
-                  className="max-w-full text-[10px]"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (
-                      !["image/png", "image/jpeg", "image/webp"].includes(
-                        file.type,
-                      ) ||
-                      file.size > 5 * 1024 * 1024
-                    ) {
-                      setError(
-                        "JPG·PNG·WebP 이미지, 최대 5MB를 선택해 주세요.",
-                      );
-                      return;
-                    }
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      setAvatar(String(reader.result));
-                      setError("");
-                    };
-                    reader.readAsDataURL(file);
-                  }}
-                />
-              </label>
-            </div>
-            <div>
-              {error && <FieldError>{error}</FieldError>}
-              <div className="field mb-4">
-                <span>로그인 이메일 (ID)</span>
-                <p>{session.user.email}</p>
-                <p className="help">로그인 ID는 변경할 수 없습니다.</p>
-              </div>
-              <ResourceForm
-                fields={[{ key: "nickname", label: "닉네임", required: true }]}
-                defaults={{
-                  nickname: session.user.nickname,
-                }}
-                scope={scope}
-                lookups={lookups}
-                label="프로필 저장"
-                onSubmit={async (values) => {
-                  await api("/me/profile", {
-                    method: "PATCH",
-                    body: { ...values, avatar },
-                  });
-                  await query.invalidateQueries({ queryKey: ["session"] });
-                  toast("프로필을 저장했어요.");
-                }}
-              />
-            </div>
-          </div>
-        </section>
+        <ProfileForm key={session.user.id} />
         <section className="card mb-5 p-5">
           <h2>알림 범위</h2>
           <p className="help mt-3">

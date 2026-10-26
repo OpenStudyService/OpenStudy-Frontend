@@ -90,6 +90,9 @@ const response =
           code: e.code,
           message: e.message,
           fieldErrors: e.fieldErrors,
+          ...(e.latestVersion === undefined
+            ? {}
+            : { latestVersion: e.latestVersion, reloadUrl: e.reloadUrl }),
           requestId: crypto.randomUUID(),
         },
         { status: e.status },
@@ -394,22 +397,58 @@ export const handlers = [
     response(async (a) => {
       const p = await json(a),
         user = store.user();
-      const profile = z
+      assert(
+        !invitationSessionMode(),
+        "관리자 승인이 필요합니다.",
+        403,
+        "FORBIDDEN",
+      );
+      const queryField = new URL(a.request.url).searchParams
+        .keys()
+        .next().value;
+      if (queryField)
+        throw new DomainError(
+          422,
+          "VALIDATION_FAILED",
+          "입력 형식을 확인해 주세요.",
+          { [queryField]: "허용되지 않은 쿼리입니다." },
+        );
+      const parsed = z
         .object({
-          nickname: z.string().trim().min(1),
-          avatar: z
+          nickname: z
             .string()
-            .max(7500000)
-            .refine(
-              (v) =>
-                !v ||
-                /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v),
-              "허용된 프로필 이미지 형식이 아닙니다.",
-            ),
+            .min(1)
+            .max(100)
+            .refine((value) => !!value.trim(), "닉네임을 입력해 주세요."),
+          version: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
         })
         .strict()
-        .parse(p);
-      Object.assign(user, profile);
+        .safeParse(p);
+      if (!parsed.success)
+        throw new DomainError(
+          422,
+          "VALIDATION_FAILED",
+          "입력 형식을 확인해 주세요.",
+          Object.fromEntries(
+            parsed.error.issues.flatMap((issue) =>
+              issue.code === "unrecognized_keys"
+                ? issue.keys.map((key) => [key, "허용되지 않은 필드입니다."])
+                : [[issue.path.join(".") || "$body", issue.message]],
+            ),
+          ),
+        );
+      if (parsed.data.version !== user.version)
+        throw new DomainError(
+          409,
+          "VERSION_CONFLICT",
+          "최신 정보를 확인한 뒤 다시 저장해 주세요.",
+          undefined,
+          user.version,
+          "/api/me",
+        );
+      user.nickname = parsed.data.nickname.trim();
+      user.version += 1;
+      user.updatedAt = store.now();
       store.persist();
       return current();
     }),

@@ -565,6 +565,9 @@ export interface paths {
                 | "people:manage"
                 | "ai:read"
               )[];
+              /** @enum {string} */
+              status?: "승인 대기" | "활성" | "회수";
+              version?: number;
             }[];
           };
         };
@@ -9451,7 +9454,7 @@ export interface paths {
         content: {
           "application/json": {
             nickname: string;
-            avatar: string;
+            version: number;
           };
         };
       };
@@ -10632,6 +10635,9 @@ export interface components {
           | "people:manage"
           | "ai:read"
         )[];
+        /** @enum {string} */
+        status?: "승인 대기" | "활성" | "회수";
+        version?: number;
       }[];
       owner: boolean;
     };

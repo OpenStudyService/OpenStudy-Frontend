@@ -15,6 +15,8 @@ export class DomainError extends Error {
     public code: string,
     message: string,
     public fieldErrors?: Record<string, string>,
+    public latestVersion?: number,
+    public reloadUrl?: string,
   ) {
     super(message);
   }
