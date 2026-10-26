@@ -289,7 +289,7 @@ export interface WorkspaceEvent {
 export interface LookupData {
   preview?: boolean;
   branches: ResourceMap["branches"][];
-  employees: Employee[];
+  employees: LookupEmployee[];
   members: ResourceMap["members"][];
   products: ResourceMap["products"][];
   passes: ResourceMap["passes"][];
@@ -299,6 +299,10 @@ export interface LookupData {
   attendance: ResourceMap["attendance"][];
   channels: ResourceMap["channels"][];
 }
+// Canonical lookups contain only id/name. Older demo responses may also supply
+// membership metadata, but a selection row is never an authorization record.
+export type LookupEmployee = Pick<Employee, "id" | "name"> &
+  Partial<Pick<Employee, "owner" | "memberships">>;
 export const resources = Object.keys(schemas) as Resource[];
 export const AS_OF = "2026-10-17T02:00:00.000Z";
 export const businessDate = (iso: string) =>

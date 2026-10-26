@@ -546,11 +546,7 @@ export interface paths {
     get: operations["getProduct"];
     put?: never;
     post?: never;
-    /**
-     * 거래 이력 없는 상품 물리 삭제
-     * @description 구매·결제·발급 참조0건일 때만 삭제. 실패·환불 결제도 이력에 포함하며 참조 존재409 PRODUCT_IN_USE. version 필수·불일치409. 현재 판매 지점 연결 제거와 상품 삭제, DELETED revision·감사·이벤트를 한 트랜잭션으로 처리. 변경 이력의 원래 상품 ID와 snapshot은 보존. 삭제 후 일반 상세404, history는 기존 지점 인가로 조회 가능. 반복 삭제404이며 감사 중복 없음.
-     */
-    delete: operations["deleteProduct"];
+    delete?: never;
     options?: never;
     head?: never;
     /**
@@ -571,7 +567,7 @@ export interface paths {
     put?: never;
     /**
      * 상품 판매 중지·재개
-     * @description 판매 중지는 기존 구매·발급 이력을 삭제하지 않는다. 거래 이력 없는 상품만 별도 DELETE 허용(Q8). DB FK로 구매 참조 삭제도 제한.
+     * @description 판매 중지는 기존 구매·발급 이력을 삭제하지 않는다. SRS v1.1 정책상 거래 유무와 무관하게 상품 물리 삭제 API는 없다. 판매 상태 변경은 상품과 기존 구매·발급 이력을 보존한다.
      */
     post: operations["changeProductStatus"];
     delete?: never;
@@ -609,7 +605,7 @@ export interface paths {
     };
     /**
      * 상품 가격·구성 변경 이력
-     * @description before/after에 당시 분류·조건·지점 snapshot. 이력은 immutable. 일부 지점 사용자에게 타 지점 이력 노출 금지. 삭제된 상품도 원래 상품 ID의 보존 이력으로 조회. 삭제 직전/과거 snapshot의 모든 지점 인가를 검사. DELETED 행의 after=null.
+     * @description before/after에 당시 분류·조건·지점 snapshot. 상품 변경 이력은 immutable이고 판매 중지·재개 후에도 원래 상품 ID를 유지한다. 일부 지점 사용자에게 타 지점 이력을 노출하지 않으며 이전 snapshot의 권한도 검사한다. 이전 스키마의 DELETED 기록은 과거 데이터 호환 목적으로만 해석한다.
      */
     get: operations["listProductHistory"];
     put?: never;
@@ -629,7 +625,7 @@ export interface paths {
     };
     /**
      * 허용된 기반 선택 데이터
-     * @description 빈 데이터는 빈 배열. 직원은 허용 지점의 활성 업무 대상 최소 ID/이름만. 초대/PENDING·타지점 정보 미포함. 선택 데이터가 크면 별도 페이지 조회로 전환; 전체 관리 목록의 total/인가를 대신하지 않는다.
+     * @description 빈 데이터는 빈 배열. 직원은 허용 지점의 활성 업무 대상 최소 ID/이름만. 초대/PENDING·타지점 정보 미포함. 선택 데이터가 크면 별도 페이지 조회로 전환; 전체 관리 목록의 total/인가를 대신하지 않는다. 현재 구현은 지점·최소 직원·권한 사전·관리 권한별 프리셋이다. 상품/분류는 미구현 업무 데이터를 운영 선택지로 노출하지 않고 빈 배열을 반환한다. 중지 지점은 이력/설정 조회를 위해 status와 함께 반환하며 신규 거래 허용을 뜻하지 않는다.
      */
     get: operations["getLookups"];
     put?: never;
@@ -649,7 +645,7 @@ export interface paths {
     };
     /**
      * 권한별 화면 갱신 SSE
-     * @description event: invalidate/authorization.changed/resync. data는 WorkspaceEvent JSON. 커밋 후 전달 직전 현재 권한 재검사. heartbeat는 유효 활동 아님. 재연결 즉시 resync 후 현재 화면 재조회. 재생 보장 없음. 권한 회수·만료면 연결 종료. logout 시 클라이언트가 연결/캐시 정리.
+     * @description event: invalidate/authorization.changed/resync. data는 WorkspaceEvent JSON. 커밋 후 전달 직전 현재 권한 재검사. heartbeat는 유효 활동 아님. 재연결 즉시 resync 후 현재 화면 재조회. 재생 보장 없음. 권한 회수·만료면 연결 종료. logout 시 클라이언트가 연결/캐시 정리. 기본 500ms마다 현재 JDBC 세션·계정·소속/권한을 재확인한다. 기본 15초 heartbeat는 SSE comment이고 세션 활동/만료를 연장하지 않는다. 권한 변경은 식별자 없는 authorization.changed 후 종료한다. 세션 만료·로그아웃·계정 제한은 payload 없이 종료한다. 모든 연결/재연결에 resync를 보내며 cursor/Last-Event-ID 재생은 제공하지 않는다. 이벤트 ID는 연결별 논리 힌트이며 outbox 전역 순서를 노출하지 않는다. 개인정보 없는 본인 프로필 신호도 resync를 사용한다.
      */
     get: operations["subscribeWorkspaceEvents"];
     put?: never;
@@ -1159,7 +1155,7 @@ export interface components {
       categoryName: string;
       branchIds: components["schemas"]["Id"][];
     };
-    /** @description productId는 원래 상품 ID로 삭제 후에도 유지. 최초 이력 before=null, DELETED 이력 after=null. 모든 관련 지점 관리 권한 확인. */
+    /** @description productId는 불변 상품 ID다. 최초 이력 before=null. SRS v1.1에서는 신규 상품 물리 삭제를 제공하지 않는다. 이전 스키마에서 남은 DELETED 이력이 있는 경우에만 과거 이벤트로 해석하고 새로 생성하지 않는다. 관련 지점 관리 권한을 확인한다. */
     ProductRevision: {
       id: components["schemas"]["Id"];
       productId: components["schemas"]["Id"];
@@ -1237,7 +1233,7 @@ export interface components {
       asOf: string;
       snapshotVersion: string;
     };
-    /** @description 변경 본문·타 지점 목록·개인정보는 보내지 않는다. 수신 후 현재 권한으로 재조회. */
+    /** @description 변경 본문·타 지점 목록·개인정보는 보내지 않는다. 수신 후 현재 권한으로 재조회. 개인·전역 선택 데이터 알림은 entityId/branchId를 null로 보낸다. 일반 직원이 타 지점/타 직원의 식별자를 받지 않는다. heartbeat는 이 모델이 아닌 comment다. */
     WorkspaceEvent: {
       /** @enum {string} */
       type: "invalidate" | "authorization.changed" | "resync";
@@ -2666,46 +2662,6 @@ export interface operations {
       500: components["responses"]["Error500"];
     };
   };
-  deleteProduct: {
-    parameters: {
-      query: {
-        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
-        scope?: components["parameters"]["Scope"];
-        /** @description 조회한 상품 version. DELETE는 JSON 본문 없이 이 query 값을 사용. */
-        version: components["schemas"]["Version"];
-      };
-      header: {
-        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
-        "X-CSRF-Token": components["parameters"]["Csrf"];
-      };
-      path: {
-        id: components["schemas"]["Id"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
-      200: {
-        headers: {
-          "X-Request-ID"?: string;
-          /** @description no-store */
-          "Cache-Control"?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Success"];
-        };
-      };
-      401: components["responses"]["Error401"];
-      403: components["responses"]["Error403"];
-      404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
-      422: components["responses"]["Error422"];
-      429: components["responses"]["Error429"];
-      500: components["responses"]["Error500"];
-    };
-  };
   updateProduct: {
     parameters: {
       query?: {
@@ -2913,6 +2869,8 @@ export interface operations {
       query?: {
         /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
         scope?: components["parameters"]["Scope"];
+        /** @description 호환용 연결 힌트. 이 구현은 값을 재생 cursor로 사용하지 않고 항상 resync로 현재 데이터를 다시 조회한다. */
+        cursor?: string;
       };
       header?: never;
       path?: never;

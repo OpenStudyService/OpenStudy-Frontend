@@ -49,7 +49,8 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
   const people = lookups.employees.filter(
     (e) =>
       !e.owner &&
-      e.memberships.some((m) => scope === "all" || m.branchId === scope),
+      (!e.memberships ||
+        e.memberships.some((m) => scope === "all" || m.branchId === scope)),
   );
   return (
     <section>
