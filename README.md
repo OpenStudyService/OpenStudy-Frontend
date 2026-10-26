@@ -91,3 +91,7 @@ docs/api/            OpenAPI와 API 인계 계약
 기반 API 타입은 `src/shared/api/foundation.generated.ts`를 사용합니다. 정본은 [backend 기반 OpenAPI](https://github.com/OpenStudyService/OpenStudy-Backend/blob/main/docs/design/foundation/openapi.json)이며 프론트에 복제하지 않습니다. 설정의 지점 관리와 직원 목록·지점 소속·권한 프리셋은 이 계약을 사용합니다. 초대·상품 등 아직 전환하지 않은 전체 업무 데모 화면은 기존 계약(`generated.ts`)을 유지합니다.
 
 조직 관리는 `src/features/organization/`에서 정본 DTO와 별도 폼을 관리합니다. 지점 운영시간은 월~일 7개 구조화 값, 직원 소속 저장은 한 지점의 PUT과 계정·소속 두 버전을 사용합니다. 409에서는 입력을 보존하고 최신 서버 내용을 확인한 후 저장할 수 있습니다. 지점·직원 API가 아직 기존 미리보기 응답을 반환하면 부족한 운영시간·버전을 만들어 편집하지 않고 계약 미지원 오류를 표시합니다. MSW 검증은 실제 서버 권한·DB 동시 수정·세션 폐기 검증을 대신하지 않습니다.
+
+## GitHub 이슈 관리 규칙
+
+이슈 제목은 `[F01]`, `[B01]`, `[M1]` 같은 작업·마일스톤 접두사 없이 작업명을 그대로 사용합니다. 고유 식별은 GitHub 이슈 번호, 개발 단계는 Milestone, 작업 유형·진행 상태는 Label과 Projects에서 관리합니다. 의존성은 같은 저장소의 `#번호` 또는 다른 저장소의 `owner/repo#번호`·링크로 연결합니다. 과거 검증 문서의 개발 단위 ID는 역사적 기록으로 보존할 수 있습니다.
