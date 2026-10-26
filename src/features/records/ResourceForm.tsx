@@ -5,6 +5,10 @@ import { z } from "zod";
 import { ApiError } from "../../shared/api/client";
 import type { Entity, LookupData } from "../../shared/domain/schema";
 import { text, value } from "../../shared/domain/schema";
+import {
+  employeeLookupInBranch,
+  employeeLookupNeedsScope,
+} from "../../shared/domain/lookup-employees";
 import type { Field } from "../../shared/domain/catalog";
 import { Button, FieldError } from "../../shared/ui/primitives";
 
@@ -109,24 +113,35 @@ export function ResourceForm({
     control: form.control,
     name: "memberId",
   }) as string;
+  const employeeFields = fields.filter((field) => field.ref === "employees");
+  const employeeValues = useWatch({
+    control: form.control,
+    name: employeeFields.map((field) => field.key),
+  });
+  const employeeScopeUnavailable = employeeLookupNeedsScope(
+    lookups.employees,
+    selectedBranch,
+    scope,
+  );
+  const employeeScopeMessage =
+    "이 지점의 직원을 선택하려면 해당 지점으로 이동해 주세요.";
   function options(f: Field) {
     if (!f.ref)
       return (f.options || []).map((v) => ({
         id: v,
         label: v === "admin" ? "지점 관리자" : v === "staff" ? "일반 직원" : v,
       }));
+    if (f.ref === "employees")
+      return employeeScopeUnavailable
+        ? []
+        : lookups.employees
+            .filter((employee) =>
+              employeeLookupInBranch(employee, selectedBranch, scope),
+            )
+            .map((employee) => ({ id: employee.id, label: employee.name }));
     const rows = (lookups[f.ref as keyof LookupData] || []) as Entity[];
     return rows
       .filter((r) => {
-        if (f.ref === "employees") {
-          const employee = r as LookupData["employees"][number];
-          return (
-            selectedBranch === "all" ||
-            !selectedBranch ||
-            employee.owner ||
-            employee.memberships.some((m) => m.branchId === selectedBranch)
-          );
-        }
         if (f.ref === "passes" && selectedMember)
           return (
             text(r, "memberId") === selectedMember &&
@@ -151,6 +166,12 @@ export function ResourceForm({
   }
   async function submit(data: Record<string, unknown>) {
     setError("");
+    if (employeeScopeUnavailable) {
+      const unavailable = fields.filter((field) => field.ref === "employees");
+      for (const field of unavailable)
+        form.setError(field.key, { message: employeeScopeMessage });
+      if (unavailable.length) return;
+    }
     const payload = { ...data };
     for (const f of fields) {
       if (f.type === "datetime-local" && payload[f.key])
@@ -205,11 +226,29 @@ export function ResourceForm({
                     id={key}
                     aria-label={f.label}
                     aria-required={f.required}
-                    aria-describedby={error ? `${key}-error` : undefined}
+                    aria-describedby={
+                      error
+                        ? `${key}-error`
+                        : f.ref === "employees" && employeeScopeUnavailable
+                          ? `${key}-scope`
+                          : undefined
+                    }
                     multiple={f.type === "multiselect"}
                     {...form.register(f.key)}
+                    value={
+                      f.ref === "employees"
+                        ? (employeeValues[
+                            employeeFields.findIndex(
+                              (field) => field.key === f.key,
+                            )
+                          ] as string | string[])
+                        : undefined
+                    }
                     aria-invalid={!!error}
-                    disabled={!!row && f.key === "branchId"}
+                    disabled={
+                      (!!row && f.key === "branchId") ||
+                      (f.ref === "employees" && employeeScopeUnavailable)
+                    }
                   >
                     {f.type !== "multiselect" && (
                       <option value="">선택해 주세요</option>
@@ -253,6 +292,11 @@ export function ResourceForm({
                   />
                 )}
               </>
+            )}
+            {f.ref === "employees" && employeeScopeUnavailable && (
+              <p className="help" id={`${key}-scope`}>
+                {employeeScopeMessage}
+              </p>
             )}
             {error && (
               <FieldError id={`${key}-error`}>
