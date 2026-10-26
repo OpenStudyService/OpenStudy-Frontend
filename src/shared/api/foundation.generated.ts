@@ -660,6 +660,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/me/profile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 본인 닉네임 저장
+     * @description 확정 M1 계약. ACTIVE WORKSPACE 세션의 본인 ID만 사용하며 쿼리 매개변수와 nickname/version 이외의 본문 필드는 422로 거부한다. 이메일·이름·owner·상태·소속·권한·사진·비밀번호·테마는 변경하지 않는다. 계정 version(DB+1)은 직원·소속 관리자 편집과 공유하며 성공 시 정확히 1 증가한다. 충돌은 VERSION_CONFLICT와 latestVersion, reloadUrl=/api/me를 반환한다. 입력을 보존하고 GET /me로 최신 계정을 확인한 뒤 명시적으로 다시 저장한다. 자동 덮어쓰기는 하지 않는다. 닉네임·updated_by·updated_at·감사 actor/requestId와 전후 snapshot·INVALIDATE outbox를 같은 트랜잭션에 기록한다. SSE 전달 완료를 보장하는 계약은 아니다.
+     */
+    patch: operations["updateMyProfile"];
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -813,8 +833,8 @@ export interface components {
     };
     /** @description 확정 정책 Q1: APPROVAL_ONLY의 branches/memberships는 빈 배열이며 업무 정보를 반환하지 않는다. */
     CurrentUser: {
-      user: components["schemas"]["Employee"];
-      branches: components["schemas"]["Branch"][];
+      user: components["schemas"]["SessionUser"];
+      branches: components["schemas"]["SessionBranch"][];
       /** Format: date-time */
       asOf: string;
       snapshotVersion: string;
@@ -1233,6 +1253,54 @@ export interface components {
       branchId: string | null;
       /** Format: date-time */
       at: string;
+    };
+    /** @description 현재 사용자에 반환하는 활성 소속. 직원 관리 Membership의 status/version 편집 계약과 구분한다. */
+    SessionMembership: {
+      branchId: components["schemas"]["Id"];
+      /** @enum {string} */
+      role: "admin" | "staff";
+      permissions: components["schemas"]["Permissions"];
+    };
+    /** @description 실제 로그인·GET /me·PATCH /me/profile의 사용자 응답. version은 직원 관리와 같은 계정 version(DB+1)이다. 자격증명과 세션 비밀값을 포함하지 않는다. */
+    SessionUser: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** @description 기존 화면 호환값. 인가 근거가 아니며 허용된 첫 지점 ID 또는 all. */
+      branchId: string;
+      name: string;
+      /** Format: email */
+      email: string;
+      /** @enum {string} */
+      status: "활성" | "승인 대기" | "이용 제한" | "비활성";
+      nickname: string;
+      avatar: string;
+      owner: boolean;
+      memberships: components["schemas"]["SessionMembership"][];
+    };
+    SessionBranch: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      branchId: components["schemas"]["Id"];
+      name: string;
+      address: string;
+      phone: string;
+      /** @description weeklyHours로 만든 표시용 문자열 */
+      hours: string;
+      /** @enum {string} */
+      status: "운영 중" | "운영 중지";
+    };
+    ProfileUpdate: {
+      /** @description 공백만 있는 값은 422. 원문 길이를 검사한 후 앞뒤 공백을 제거해 저장한다. 기존 VARCHAR(100)에 맞춰 Java UTF-16 길이 100 이하로 검증한다. */
+      nickname: string;
+      version: components["schemas"]["Version"];
     };
   };
   responses: {
@@ -2875,6 +2943,41 @@ export interface operations {
       409: components["responses"]["Error409"];
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateMyProfile: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProfileUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CurrentUser"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
       500: components["responses"]["Error500"];
     };
   };
