@@ -110,6 +110,28 @@ function InvitationAcceptance() {
   const needsLogin =
     preview?.acceptanceMode === "EXISTING_ACCOUNT" &&
     session.data?.user.email !== preview.email;
+  const needsLogout =
+    preview?.acceptanceMode === "NEW_ACCOUNT" && !!session.data;
+  const awaitingFirstApproval =
+    preview?.acceptanceMode === "EXISTING_ACCOUNT" &&
+    session.data?.user.email === preview.email &&
+    session.data.sessionMode === "APPROVAL_ONLY";
+  async function logoutForNewAccount() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/auth/logout", { method: "POST", body: {} });
+      closeStreams();
+      useUi.getState().clearPrivate();
+      await query.cancelQueries();
+      query.clear();
+      query.setQueryData(["session"], null);
+    } catch (e) {
+      setError(e as Error);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <main className="grid min-h-dvh place-items-center p-6">
       <section className="card w-full max-w-md p-7">
@@ -126,7 +148,22 @@ function InvitationAcceptance() {
         ) : !preview && !error ? (
           <State loading />
         ) : (
-          preview && (
+          preview &&
+          (needsLogout ? (
+            <div className="form-grid mt-6">
+              <p>
+                {preview.email}의 새 계정 초대입니다. 현재 계정에서 로그아웃한
+                뒤 비밀번호를 설정해 주세요. 이 화면에서 계속 수락할 수
+                있습니다.
+              </p>
+              <Button
+                disabled={busy}
+                onClick={() => void logoutForNewAccount()}
+              >
+                로그아웃하고 계속
+              </Button>
+            </div>
+          ) : (
             <form className="form-grid mt-6" onSubmit={submit}>
               <p>
                 {preview.name}님, {preview.branch.name}의{" "}
@@ -162,7 +199,17 @@ function InvitationAcceptance() {
                   유지됩니다.
                 </p>
               )}
-              <Button type="submit" variant="primary" disabled={busy}>
+              {awaitingFirstApproval && (
+                <p className="help">
+                  첫 지점의 최종 승인 후 다시 로그인해야 다른 지점 초대를 수락할
+                  수 있습니다. 승인 뒤 이메일의 초대 링크를 다시 열어 주세요.
+                </p>
+              )}
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={busy || awaitingFirstApproval}
+              >
                 {busy
                   ? "처리 중…"
                   : needsLogin
@@ -170,7 +217,7 @@ function InvitationAcceptance() {
                     : "초대 수락"}
               </Button>
             </form>
-          )
+          ))
         )}
         {error && <ErrorState error={error} />}
         <Link
