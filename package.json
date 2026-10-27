@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "test:builds": "npm run build && npm run build:demo -- --outDir dist-demo && playwright test --config playwright.build.config.ts",
     "check": "npm run typecheck && npm run lint && npm test",
     "api:generate": "tsx scripts/generate-contract.ts && openapi-typescript docs/api/openapi.json -o src/shared/api/generated.ts && prettier --write src/shared/api/generated.ts",

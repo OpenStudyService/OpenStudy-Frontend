@@ -82,6 +82,28 @@ it("does not read token from query parameters or call preview for missing fragme
   expect(api).not.toHaveBeenCalled();
 });
 
+it("requires logout before accepting a new account from an existing session", async () => {
+  session.data = { user: { email: "owner@example.test" } } as CurrentUser;
+  const query = mount();
+  await screen.findByRole("button", { name: "로그아웃하고 계속" });
+  expect(screen.queryByLabelText("새 계정 비밀번호")).not.toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("button", { name: "로그아웃하고 계속" }),
+  );
+  await waitFor(() => expect(query.getQueryData(["session"])).toBeNull());
+  expect(api).toHaveBeenCalledWith("/auth/logout", {
+    method: "POST",
+    body: {},
+  });
+  expect(api).not.toHaveBeenCalledWith(
+    "/invitations/accept",
+    expect.anything(),
+  );
+  expect(JSON.stringify(query.getQueryCache().getAll())).not.toContain(
+    "secret-link",
+  );
+});
+
 it("accepts an existing account without sending a password or changing other branch sessions", async () => {
   session.data = { user: { email: preview.email } } as CurrentUser;
   vi.mocked(api).mockImplementation(async (path) =>
@@ -102,4 +124,22 @@ it("accepts an existing account without sending a password or changing other bra
     },
   });
   expect(api).not.toHaveBeenCalledWith("/auth/logout", expect.anything());
+});
+
+it("keeps another branch invitation blocked until the first approval and relogin", async () => {
+  session.data = {
+    user: { email: preview.email },
+    sessionMode: "APPROVAL_ONLY",
+  } as CurrentUser;
+  vi.mocked(api).mockImplementation(async () => ({
+    ...preview,
+    acceptanceMode: "EXISTING_ACCOUNT",
+  }));
+  mount();
+  await screen.findByText(/첫 지점의 최종 승인 후 다시 로그인해야/);
+  expect(screen.getByRole("button", { name: "초대 수락" })).toBeDisabled();
+  expect(api).not.toHaveBeenCalledWith(
+    "/invitations/accept",
+    expect.anything(),
+  );
 });
