@@ -87,7 +87,7 @@ export function format(
         ? `${Math.max(0, Math.ceil((Date.parse(text(row, "expiresAt")) - Date.parse(asOf)) / 86400000))}일`
         : won(Number(raw));
   }
-  if (["price", "hourlyRate", "amount"].includes(key) && !("employeeId" in row))
+  if (["hourlyRate", "amount"].includes(key) && !("employeeId" in row))
     return won(Number(raw));
   if (
     [
@@ -117,7 +117,7 @@ function editable(
     return (
       admin(user, branch) || (!!row && text(row, "assigneeId") === user.id)
     );
-  if (["products", "branches"].includes(resource) && !user.owner) return false;
+  if (resource === "branches" && !user.owner) return false;
   if (def.admin && !admin(user, branch)) return false;
   return !def.permission || can(user, branch, def.permission);
 }

@@ -16,6 +16,7 @@ import type {
 } from "../shared/domain/schema";
 import { catalog, readPermission } from "../shared/domain/catalog";
 import { assert, DomainError, MockStore } from "./store";
+import { expiresAfter, passValues } from "./terms";
 
 export const bodySchema = z.record(z.string(), z.unknown());
 const str = (p: Record<string, unknown>, k: string) => String(p[k] ?? "");
@@ -149,13 +150,6 @@ export function writable(
       403,
       "SCOPE_DENIED",
     );
-  if (resource === "products")
-    assert(
-      user.owner,
-      "전사 상품은 전체 관리자만 변경할 수 있습니다.",
-      403,
-      "SCOPE_DENIED",
-    );
   return user;
 }
 function activeBranch(store: MockStore, id: string) {
@@ -269,7 +263,6 @@ const defaults: Partial<Record<Resource, Record<string, unknown>>> = {
     history: [],
   },
   members: { email: "", status: "정상", note: "", branchIds: [] },
-  products: { kind: "시간권", status: "판매 중", hourlyRate: 0, days: 90 },
   seats: { memberId: "", status: "이용 가능" },
   lockers: {
     memberId: "",
@@ -293,7 +286,7 @@ export function create(
   resource: Resource,
   p: Record<string, unknown>,
 ): Entity {
-  const b = resource === "products" ? "all" : str(p, "branchId");
+  const b = str(p, "branchId");
   const user = writable(store, resource, b);
   const inputFields = new Set([
     ...(catalog[resource]?.fields.map((f) => f.key) || []),
@@ -380,11 +373,7 @@ export function create(
       403,
       "SCOPE_DENIED",
     );
-  } else if (
-    resource !== "products" &&
-    !(resource === "notices" && b === "all")
-  )
-    activeBranch(store, b);
+  } else if (!(resource === "notices" && b === "all")) activeBranch(store, b);
   if (resource === "notices" && b === "all")
     assert(
       user.owner,
@@ -633,11 +622,15 @@ function purchase(store: MockStore, p: Record<string, unknown>) {
   memberOk(store, str(p, "memberId"), b);
   const product = store.get("products", str(p, "productId"));
   assert(product.status === "판매 중", "판매 중지 상품입니다.");
+  assert(
+    product.branchIds.includes(b),
+    "이 지점에서 판매하지 않는 상품입니다.",
+  );
   const payment = store.add("payments", b, {
     memberId: str(p, "memberId"),
     productId: product.id,
     reservationId: "",
-    amount: product.price,
+    amount: product.priceKrw,
     method: z.enum(["Mock 카드", "Mock 현금"]).parse(p.method),
     status:
       p.simulateFailure || store.scenario === "payment-failure"
@@ -648,21 +641,21 @@ function purchase(store: MockStore, p: Record<string, unknown>) {
     reason: "",
     approvedAt: store.now(),
   });
-  if (payment.status === "승인")
+  if (payment.status === "승인") {
+    const values = passValues(product.terms);
     store.add("passes", b, {
       memberId: payment.memberId,
       productId: product.id,
       name: product.name,
-      kind: product.kind,
-      remaining: product.amount,
-      hourlyRate: product.hourlyRate,
-      expiresAt: new Date(
-        Date.parse(store.now()) + product.days * 86400000,
-      ).toISOString(),
+      kind: product.terms.kind,
+      remaining: values.remaining,
+      hourlyRate: values.hourlyRate,
+      expiresAt: expiresAfter(store.now(), values.days),
       used: false,
       paymentId: payment.id,
       status: "활성",
     });
+  }
   audit(store, "payments", payment.id, "Mock 결제", null, payment, b);
   return payment;
 }

@@ -39,6 +39,41 @@ const person = base.extend({
   memberships: z.array(membershipSchema),
   owner: z.boolean(),
 });
+const unit = z.number().int().min(1).max(4294967295);
+const productTerms = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("시간권"),
+    includedMinutes: unit,
+    validDays: unit.nullable(),
+  }),
+  z.object({ kind: z.literal("기간권"), periodDays: unit }),
+  z.object({
+    kind: z.literal("정액권"),
+    creditKrw: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+    hourlyRateKrw: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+    validDays: unit.nullable(),
+  }),
+]);
+const productSnapshot = z.object({
+  schemaVersion: z.literal(1),
+  code: str,
+  name: str,
+  priceKrw: money.positive(),
+  terms: productTerms,
+  status: z.enum(["판매 중", "판매 중지"]),
+  categoryCode: str,
+  categoryName: str,
+  branchIds: z.array(str).min(1),
+});
+const productRevision = z.object({
+  id: str,
+  version: z.number().int().positive(),
+  changedAt: str,
+  actorId: z.string().nullable(),
+  changeType: z.enum(["CREATED", "UPDATED", "BASELINE"]),
+  before: productSnapshot.nullable(),
+  after: productSnapshot,
+});
 export const schemas = {
   branches: base.extend({
     name: str,
@@ -67,14 +102,23 @@ export const schemas = {
     note: z.string(),
     branchIds: z.array(str),
   }),
+  // Canonical product contract (Backend #16). `branchId` is always "all": the
+  // sale branches live in `branchIds`, so a product is never one branch's row.
   products: base.extend({
+    code: str,
+    name: str,
+    priceKrw: money.positive(),
+    terms: productTerms,
+    status: z.enum(["판매 중", "판매 중지"]),
+    categoryId: str,
+    branchIds: z.array(str).min(1),
+    history: z.array(productRevision),
+  }),
+  productCategories: base.extend({
+    code: str,
     name: str,
     kind: z.enum(["시간권", "기간권", "정액권"]),
-    price: money.positive(),
-    amount: money.positive(),
-    hourlyRate: money,
-    days: money.positive(),
-    status: z.enum(["판매 중", "판매 중지"]),
+    status: z.enum(["활성", "비활성"]),
   }),
   passes: base.extend({
     memberId: str,

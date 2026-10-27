@@ -141,7 +141,8 @@ describe("shared ledger and idempotency", () => {
     );
     expect(again).toEqual(first);
     expect(s.db.passes.length).toBe(before + 1);
-    s.db.products.find((p) => p.id === "credit")!.hourlyRate = 9999;
+    const credit = s.db.products.find((p) => p.id === "credit")!;
+    if (credit.terms.kind === "정액권") credit.terms.hourlyRateKrw = 9999;
     expect(s.db.passes.at(-1)?.hourlyRate).toBe(1500);
     expect(() =>
       s.transaction("p1", { ...payment, memberId: "member-1" }, () => null),

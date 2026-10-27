@@ -29,6 +29,7 @@ import {
   organizationEmployee,
   organizationBranch,
 } from "./organization";
+import { productHandlers } from "./products";
 
 type Args = {
   request: Request;
@@ -339,6 +340,7 @@ function executeAi(r: AiRequest) {
 export const handlers = [
   ...invitationHandlers,
   ...organizationHandlers,
+  ...productHandlers,
   http.get(
     "/api/auth/csrf",
     response(() => ({ token: csrf }), false),

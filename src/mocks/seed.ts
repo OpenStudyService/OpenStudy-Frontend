@@ -1,5 +1,6 @@
 import { AS_OF, permissions, resources } from "../shared/domain/schema";
 import type { Database, ResourceMap, Resource } from "../shared/domain/schema";
+import { expiresAfter, passValues } from "./terms";
 
 export function seed(): Database {
   const db = Object.fromEntries(
@@ -82,37 +83,83 @@ export function seed(): Database {
       },
     ),
   );
-  add("products", "time100", "all", {
-    name: "집중 시간권 100시간",
-    kind: "시간권",
-    price: 120000,
-    amount: 6000,
-    hourlyRate: 0,
-    days: 90,
-    status: "판매 중",
-  });
-  add("products", "period28", "all", {
-    name: "루틴 기간권 4주",
-    kind: "기간권",
-    price: 180000,
-    amount: 28,
-    hourlyRate: 0,
-    days: 28,
-    status: "판매 중",
-  });
-  add("products", "credit", "all", {
-    name: "자유 정액권 10만원",
-    kind: "정액권",
-    price: 100000,
-    amount: 100000,
-    hourlyRate: 1500,
-    days: 180,
-    status: "판매 중",
-  });
+  const categories = [
+    ["cat-time", "TIME", "시간권", "시간권"],
+    ["cat-period", "PERIOD", "기간권", "기간권"],
+    ["cat-credit", "CREDIT", "정액권", "정액권"],
+  ] as const;
+  for (const [id, code, name, kind] of categories)
+    add("productCategories", id, "all", { code, name, kind, status: "활성" });
+  const sellingBranches = ["gangnam", "seongsu"];
+  const catalog = [
+    [
+      "time100",
+      "T100",
+      "집중 시간권 100시간",
+      120000,
+      { kind: "시간권", includedMinutes: 6000, validDays: 90 },
+      "cat-time",
+    ],
+    [
+      "period28",
+      "P28",
+      "루틴 기간권 4주",
+      180000,
+      { kind: "기간권", periodDays: 28 },
+      "cat-period",
+    ],
+    [
+      "credit",
+      "C100K",
+      "자유 정액권 10만원",
+      100000,
+      {
+        kind: "정액권",
+        creditKrw: 100000,
+        hourlyRateKrw: 1500,
+        validDays: 180,
+      },
+      "cat-credit",
+    ],
+  ] as const;
+  for (const [id, code, name, priceKrw, terms, categoryId] of catalog) {
+    const category = db.productCategories.find((c) => c.id === categoryId)!;
+    add("products", id, "all", {
+      code,
+      name,
+      priceKrw,
+      terms: structuredClone(terms) as ResourceMap["products"]["terms"],
+      status: "판매 중",
+      categoryId,
+      branchIds: [...sellingBranches],
+      history: [
+        {
+          id: `${id}-1`,
+          version: 1,
+          changedAt: AS_OF,
+          actorId: "owner",
+          changeType: "CREATED",
+          before: null,
+          after: {
+            schemaVersion: 1,
+            code,
+            name,
+            priceKrw,
+            terms: structuredClone(terms) as ResourceMap["products"]["terms"],
+            status: "판매 중",
+            categoryCode: category.code,
+            categoryName: category.name,
+            branchIds: [...sellingBranches],
+          },
+        },
+      ],
+    });
+  }
   for (let i = 0; i < 6; i++) {
     const p = db.products[i % 3],
       member = db.members[i],
-      at = i < 3 ? "2026-09-20T02:00:00.000Z" : "2026-10-16T02:00:00.000Z";
+      at = i < 3 ? "2026-09-20T02:00:00.000Z" : "2026-10-16T02:00:00.000Z",
+      values = passValues(p.terms);
     const payment = add(
       "payments",
       `pay-${i + 1}`,
@@ -121,7 +168,7 @@ export function seed(): Database {
         memberId: member.id,
         productId: p.id,
         reservationId: "",
-        amount: p.price,
+        amount: p.priceKrw,
         method: "Mock 카드",
         status: "승인",
         refundAt: "",
@@ -139,10 +186,10 @@ export function seed(): Database {
         memberId: member.id,
         productId: p.id,
         name: p.name,
-        kind: p.kind,
-        remaining: p.amount,
-        hourlyRate: p.hourlyRate,
-        expiresAt: new Date(Date.parse(at) + p.days * 86400000).toISOString(),
+        kind: p.terms.kind,
+        remaining: values.remaining,
+        hourlyRate: values.hourlyRate,
+        expiresAt: expiresAfter(at, values.days),
         used: false,
         paymentId: payment.id,
         status: "활성",
