@@ -15,6 +15,7 @@ import { Chat } from "../features/chat/Chat";
 import { ResourceGroup, ResourcePage } from "../features/records/ResourcePage";
 import { ErrorState, State } from "../shared/ui/primitives";
 import { EmployeeManagement } from "../features/organization/Organization";
+import { ProductManagement } from "../features/products/Products";
 function RouteError() {
   const error = useRouteError();
   return (
@@ -72,7 +73,7 @@ export const router = createBrowserRouter([
           />
         ),
       },
-      { path: "products", element: <ResourcePage resource="products" /> },
+      { path: "products", element: <ProductManagement /> },
       { path: "payments", element: <ResourcePage resource="payments" /> },
       {
         path: "reservations",
