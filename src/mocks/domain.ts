@@ -17,6 +17,11 @@ import type {
 import { catalog, readPermission } from "../shared/domain/catalog";
 import { assert, DomainError, MockStore } from "./store";
 import { expiresAfter, passValues } from "./terms";
+import {
+  canCreateTask,
+  canEditTask,
+  taskActions,
+} from "../features/tasks/model";
 
 export const bodySchema = z.record(z.string(), z.unknown());
 const str = (p: Record<string, unknown>, k: string) => String(p[k] ?? "");
@@ -136,7 +141,7 @@ export function writable(
   assert(can(user, branchId), "지점 권한이 없습니다.", 403, "SCOPE_DENIED");
   const def = catalog[resource];
   assert(def, "지원하지 않는 작업입니다.", 404, "NOT_FOUND");
-  if (def.admin || resource === "tasks")
+  if (def.admin)
     assert(
       admin(user, branchId),
       "관리자만 등록·배정할 수 있습니다.",
@@ -174,6 +179,16 @@ function staffOk(store: MockStore, id: string, branchId: string) {
     422,
     "VALIDATION_ERROR",
   );
+}
+function taskAssigneeOk(store: MockStore, id: string, branchId: string) {
+  const employee = store.db.employees.find((person) => person.id === id);
+  if (!employee || !canCreateTask(employee, branchId))
+    throw new DomainError(
+      422,
+      "VALIDATION_ERROR",
+      "해당 지점의 활성 직원을 선택해 주세요.",
+      { assigneeId: "해당 지점의 활성 직원을 선택해 주세요." },
+    );
 }
 function interval(start: string, end: string) {
   assert(
@@ -398,8 +413,9 @@ export function create(
     Object.assign(raw, { participantIds: [...new Set([...ids, user.id])] });
   }
   if (resource === "tasks") {
-    staffOk(store, str(p, "assigneeId"), b);
+    taskAssigneeOk(store, str(p, "assigneeId"), b);
     Object.assign(raw, {
+      createdById: user.id,
       history: [{ at, actorId: user.id, text: "업무 등록" }],
     });
   }
@@ -519,16 +535,10 @@ export function update(
     "VERSION_CONFLICT",
   );
   const before = structuredClone(row);
-  if (resource === "tasks" && !admin(user, row.branchId)) {
+  if (resource === "tasks") {
     assert(
-      store.get("tasks", id).assigneeId === user.id,
-      "본인 배정 업무만 처리할 수 있습니다.",
-      403,
-      "SCOPE_DENIED",
-    );
-    assert(
-      Object.keys(p).every((k) => ["version", "status", "checks"].includes(k)),
-      "담당 직원은 상태와 체크리스트만 변경할 수 있습니다.",
+      canEditTask(user, store.get("tasks", id)),
+      "등록자·담당자·지점 관리자만 수정할 수 있습니다.",
       403,
       "SCOPE_DENIED",
     );
@@ -576,11 +586,39 @@ export function update(
   }
   if (resource === "tasks") {
     const t = schemas.tasks.parse(merged);
-    staffOk(store, t.assigneeId, t.branchId);
+    taskAssigneeOk(store, t.assigneeId, t.branchId);
+    const previous = store.get("tasks", id);
+    if (t.status !== previous.status)
+      assert(
+        taskActions(previous).some(
+          (action) =>
+            ({ progress: "진행 중", complete: "완료", reopen: "할 일" })[
+              action as "progress" | "complete" | "reopen"
+            ] === t.status,
+        ),
+        "현재 상태에서는 변경할 수 없습니다.",
+        409,
+        "INVALID_TRANSITION",
+      );
+    const changes = Object.keys(p).filter(
+      (key) =>
+        key !== "version" &&
+        JSON.stringify(p[key]) !==
+          JSON.stringify((previous as unknown as Record<string, unknown>)[key]),
+    );
+    const labels = Object.fromEntries(
+      catalog.tasks!.fields.map((f) => [f.key, f.label]),
+    );
     t.history.push({
       at: store.now(),
       actorId: user.id,
-      text: `업무 변경 · ${t.status}`,
+      text:
+        changes
+          .map(
+            (key) =>
+              `${labels[key] || key}: ${JSON.stringify((previous as unknown as Record<string, unknown>)[key])} → ${JSON.stringify(p[key])}`,
+          )
+          .join(" / ") || "업무 확인",
     });
     Object.assign(merged, t);
   }
@@ -755,8 +793,8 @@ export function command(
   if (resource === "tasks") {
     const t = store.get("tasks", id);
     assert(
-      admin(user, t.branchId) || t.assigneeId === user.id,
-      "본인 배정 업무만 처리할 수 있습니다.",
+      canEditTask(user, t),
+      "등록자·담당자·지점 관리자만 처리할 수 있습니다.",
       403,
       "SCOPE_DENIED",
     );
@@ -780,8 +818,19 @@ export function command(
       action
     ];
     assert(next, "지원하지 않는 작업입니다.", 422, "VALIDATION_ERROR");
+    assert(
+      taskActions(t).includes(action as "progress" | "complete" | "reopen"),
+      "현재 상태에서는 변경할 수 없습니다.",
+      409,
+      "INVALID_TRANSITION",
+    );
+    const previousStatus = t.status;
     t.status = next as typeof t.status;
-    t.history.push({ at, actorId: user.id, text: `상태 변경 · ${next}` });
+    t.history.push({
+      at,
+      actorId: user.id,
+      text: `상태 변경 · ${previousStatus} → ${next}`,
+    });
   } else if (resource === "payments" && action === "refund") {
     const payment = store.get("payments", id);
     assert(
