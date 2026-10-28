@@ -19,6 +19,7 @@ import type { TaskAction } from "./model";
 import { taskApi } from "./api";
 import { useTaskDetail, useTaskWrite } from "./hooks";
 import { LatestTask, TaskForm } from "./TaskForm";
+import { TaskShare } from "../chat/TaskShare";
 
 export function TaskPanel(props: { id: string; onClose: () => void }) {
   const { session, scope } = useApp();
@@ -104,6 +105,14 @@ function TaskPanelSession({
               ) : (
                 <State title="이 업무를 수정할 권한이 없어요" />
               )
+            ) : action === "share" && MOCK ? (
+              <TaskShare
+                task={task}
+                onSaved={() => {
+                  toast("업무를 공유했어요.");
+                  mode("action", "");
+                }}
+              />
             ) : action &&
               Object.hasOwn(actionLabels, action) &&
               editable &&
@@ -150,14 +159,18 @@ function TaskPanelSession({
                 {editable && (
                   <div className="mt-6 flex flex-wrap gap-2">
                     <Button onClick={() => mode("edit", "1")}>수정하기</Button>
-                    {[
-                      ...taskActions(task),
-                      ...(MOCK ? ["share" as const] : []),
-                    ].map((key) => (
+                    {[...taskActions(task)].map((key) => (
                       <Button key={key} onClick={() => mode("action", key)}>
                         {actionLabels[key]}
                       </Button>
                     ))}
+                  </div>
+                )}
+                {MOCK && (
+                  <div className="mt-3">
+                    <Button onClick={() => mode("action", "share")}>
+                      운영 채널에 공유
+                    </Button>
                   </div>
                 )}
               </>

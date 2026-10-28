@@ -87,6 +87,7 @@ for (const width of [1440, 1024, 390])
         page.getByRole("textbox", { name: "메시지", exact: true }),
       ).toBeInViewport();
       await expect(page.locator("article").first()).toBeVisible();
+      await expect(page.locator(".task-card").first()).toBeEnabled();
       await page.screenshot({ path: "test-results/chat-mobile.png" });
       await page
         .locator("article")
@@ -96,6 +97,11 @@ for (const width of [1440, 1024, 390])
       await expect(
         page.getByRole("textbox", { name: "스레드 답글" }),
       ).toBeInViewport();
+      await expect(
+        page
+          .getByRole("complementary", { name: "스레드" })
+          .getByText(/불러온 답글/),
+      ).toBeVisible();
       await page.screenshot({ path: "test-results/thread-mobile.png" });
       await page.getByRole("button", { name: "스레드 닫기" }).click();
       await expect(

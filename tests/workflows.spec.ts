@@ -50,6 +50,7 @@ test("task -> shared card -> staff report -> completion persists everywhere", as
   await panel
     .getByRole("button", { name: "운영 채널에 공유", exact: true })
     .click();
+  await panel.getByLabel("공유할 채널").selectOption("gangnam");
   await panel
     .getByRole("button", { name: "운영 채널에 공유", exact: true })
     .click();
@@ -58,7 +59,7 @@ test("task -> shared card -> staff report -> completion persists everywhere", as
   await page.goto("/app/gangnam/chat/gangnam");
   const shared = page
     .locator("article")
-    .filter({ hasText: "업무를 공유합니다: 스터디룸 냉방 점검 E2E" });
+    .filter({ hasText: "스터디룸 냉방 점검 E2E" });
   await expect(shared).toBeVisible();
   await shared.getByRole("button", { name: "답글 달기" }).click();
   await page

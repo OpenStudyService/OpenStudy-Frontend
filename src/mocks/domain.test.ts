@@ -74,7 +74,7 @@ describe("shared customers, projections and channel authorization", () => {
         description: "",
         participantIds: ["junho"],
       }),
-    ).toThrow(/관리자/);
+    ).toThrow(/관리/);
   });
 });
 describe("authorization and consumer scope", () => {

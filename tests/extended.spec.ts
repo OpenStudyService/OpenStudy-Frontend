@@ -122,6 +122,11 @@ test("channel participants and session expiration", async ({ page }) => {
   await dialog.getByRole("button", { name: "채널 등록", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await page.goto("/app/gangnam/chat");
+  await expect(page.getByRole("link", { name: /교대 인수인계/ })).toHaveCount(
+    0,
+  );
+  await demo(page, { persona: "junho" });
+  await page.goto("/app/gangnam/chat");
   await expect(page.getByRole("link", { name: /교대 인수인계/ })).toBeVisible();
   await demo(page, { expire: true });
   await page.goto("/app/gangnam/home");

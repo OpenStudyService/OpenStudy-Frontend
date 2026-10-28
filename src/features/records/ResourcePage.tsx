@@ -42,6 +42,7 @@ import { ResourceForm } from "./ResourceForm";
 import { WeekSchedule } from "../attendance/WeekSchedule";
 import { Tasks } from "../tasks/Tasks";
 import { TaskPanel } from "../tasks/TaskPanel";
+import { ChannelManagement } from "../chat/ChannelManagement";
 
 export function format(
   row: Entity,
@@ -190,7 +191,9 @@ export function ResourcePage(props: {
   resource: Resource;
   embedded?: boolean;
 }) {
-  return props.resource === "tasks" ? (
+  return props.resource === "channels" ? (
+    <ChannelManagement embedded={props.embedded} />
+  ) : props.resource === "tasks" ? (
     <Tasks />
   ) : (
     <GenericResourcePage {...props} />
