@@ -30,6 +30,13 @@ import {
   organizationBranch,
 } from "./organization";
 import { productHandlers } from "./products";
+import {
+  allowedChatChannel,
+  markChatRead,
+  unreadMessages,
+  reconcileChannelParticipants,
+} from "./chat-policy";
+import { canManageChannel } from "../features/chat/model";
 
 type Args = {
   request: Request;
@@ -167,14 +174,7 @@ function current() {
   };
 }
 const allowedChannel = (id: string) => {
-  const c = store.get("channels", id);
-  assert(
-    c.participantIds.includes(store.activeUser().id),
-    "참여하지 않은 대화입니다.",
-    403,
-    "SCOPE_DENIED",
-  );
-  return c;
+  return allowedChatChannel(store, id);
 };
 
 type AiEventName =
@@ -482,7 +482,12 @@ export const handlers = [
       if (typeof p.scenario === "string") store.scenario = p.scenario;
       if (p.expire) store.persona = null;
       store.persist();
-      store.emit("employees", "", "all", "permissions");
+      store.emit(
+        "employees",
+        "",
+        "all",
+        p.reset || p.persona || p.expire ? "permissions" : "changed",
+      );
       return { ok: true };
     }, false),
   ),
@@ -597,17 +602,11 @@ export const handlers = [
   http.get(
     "/api/chat/channels",
     response((a) => {
-      const u = store.user();
       return rowsFor(store, "channels", scope(a)).map((row) => {
         const c = store.get("channels", row.id);
         return {
           ...c,
-          unread: store.db.messages.filter(
-            (m) =>
-              m.channelId === c.id &&
-              m.authorId !== u.id &&
-              m.sequence > (c.reads[u.id] || 0),
-          ).length,
+          unread: unreadMessages(store, c.id),
         };
       });
     }),
@@ -671,7 +670,9 @@ export const handlers = [
       );
       const items = all.slice(-30);
       return {
-        items,
+        items: items.map((m) =>
+          m.taskId ? { ...m, text: "업무를 공유했어요." } : m,
+        ),
         nextCursor: all.length > 30 ? String(items[0].sequence) : undefined,
         total: all.length,
       };
@@ -698,19 +699,10 @@ export const handlers = [
   http.post(
     "/api/chat/:channelId/read",
     response(async (a) => {
-      const c = allowedChannel(String(a.params.channelId)),
-        p = await json(a),
-        seq = z.number().int().nonnegative().parse(p.sequence),
-        max = Math.max(
-          0,
-          ...store.db.messages
-            .filter((m) => m.channelId === c.id)
-            .map((m) => m.sequence),
-        );
-      c.reads[store.user().id] = Math.max(
-        c.reads[store.user().id] || 0,
-        Math.min(seq, max),
-      );
+      const p = await json(a);
+      const seq = z.number().int().nonnegative().parse(p.sequence);
+      const parentId = typeof p.parentId === "string" ? p.parentId : "";
+      const c = markChatRead(store, String(a.params.channelId), parentId, seq);
       store.emit("channels", c.id, c.branchId, "read");
       return { ok: true };
     }),
@@ -909,6 +901,29 @@ export const handlers = [
       const r = resource(a),
         u = new URL(a.request.url);
       let rows = rowsFor(store, r, scope(a));
+      if (r === "channels") {
+        const user = store.activeUser();
+        assert(
+          canManageChannel(user, "all") ||
+            user.memberships.some(
+              (m) =>
+                canManageChannel(user, m.branchId) &&
+                (scope(a) === "all" || scope(a) === m.branchId),
+            ),
+          "채널 관리 권한이 없습니다.",
+          403,
+          "SCOPE_DENIED",
+        );
+        reconcileChannelParticipants(store);
+        rows = store.db.channels.filter(
+          (c) =>
+            c.kind === "channel" &&
+            canManageChannel(store.activeUser(), c.branchId) &&
+            (scope(a) === "all" ||
+              c.branchId === scope(a) ||
+              c.branchId === "all"),
+        );
+      }
       if (store.scenario === "empty") rows = [];
       const q = (u.searchParams.get("q") || "").toLowerCase(),
         status = u.searchParams.get("status"),
@@ -993,6 +1008,19 @@ export const handlers = [
     response((a) => {
       const r = resource(a),
         s = scope(a);
+      if (r === "channels") {
+        const channel = store.get("channels", String(a.params.id));
+        assert(
+          canManageChannel(store.activeUser(), channel.branchId) &&
+            (s === "all" ||
+              channel.branchId === "all" ||
+              s === channel.branchId),
+          "채널 관리 권한이 없습니다.",
+          403,
+          "SCOPE_DENIED",
+        );
+        return channel;
+      }
       const rows = rowsFor(store, r, s),
         row = rows.find((x) => x.id === a.params.id);
       assert(
@@ -1001,7 +1029,9 @@ export const handlers = [
         404,
         "NOT_FOUND",
       );
-      return row;
+      return r === "messages" && "taskId" in row && row.taskId
+        ? { ...row, text: "업무를 공유했어요." }
+        : row;
     }),
   ),
   http.post(

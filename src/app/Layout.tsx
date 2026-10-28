@@ -174,7 +174,11 @@ export function Layout() {
             const e = JSON.parse(
               (event as MessageEvent).data,
             ) as WorkspaceEvent;
-            void query.invalidateQueries({ queryKey: ["data"] });
+            if (e.type === "read") {
+              void query.invalidateQueries({
+                queryKey: ["data", user.id, scope, "chat", "channels"],
+              });
+            } else void query.invalidateQueries({ queryKey: ["data"] });
             if (e.type === "permissions") authorizationChanged();
           } catch {
             setStreamState("데이터 확인 필요");

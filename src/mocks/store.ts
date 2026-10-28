@@ -7,6 +7,7 @@ import type {
   WorkspaceEvent,
 } from "../shared/domain/schema";
 import { seed } from "./seed";
+import { reconcileChannels } from "../features/chat/model";
 
 const KEY = "openstudy-mock-v1";
 export class DomainError extends Error {
@@ -143,6 +144,8 @@ export class MockStore {
     branchId: string,
     type: WorkspaceEvent["type"] = "changed",
   ) {
+    if (resource === "employees" || type === "permissions")
+      reconcileChannels(this.db, this.now());
     const e = {
       id: String(++this.sequence),
       type,

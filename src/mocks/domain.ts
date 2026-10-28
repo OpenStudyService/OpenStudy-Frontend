@@ -17,6 +17,11 @@ import type {
 import { catalog, readPermission } from "../shared/domain/catalog";
 import { assert, DomainError, MockStore } from "./store";
 import { expiresAfter, passValues } from "./terms";
+import { canManageChannel, canUseChannel } from "../features/chat/model";
+import {
+  allowedChatChannel,
+  reconcileChannelParticipants,
+} from "./chat-policy";
 import {
   canCreateTask,
   canEditTask,
@@ -70,6 +75,8 @@ export function checkRead(store: MockStore, resource: Resource, scope: string) {
   return user;
 }
 export function rowsFor(store: MockStore, resource: Resource, scope: string) {
+  if (resource === "channels" || resource === "messages")
+    reconcileChannelParticipants(store);
   const user = checkRead(store, resource, scope);
   let rows: Entity[] = (store.db[resource] as Entity[]).filter((row) =>
     inScope(user, row, scope),
@@ -106,9 +113,7 @@ export function rowsFor(store: MockStore, resource: Resource, scope: string) {
   )
     rows = rows.filter((r) => text(r, "employeeId") === user.id);
   if (resource === "channels")
-    rows = rows.filter((r) =>
-      store.get("channels", r.id).participantIds.includes(user.id),
-    );
+    rows = rows.filter((r) => canUseChannel(user, store.get("channels", r.id)));
   if (resource === "messages")
     rows = rows.filter((r) =>
       store
@@ -141,6 +146,13 @@ export function writable(
   assert(can(user, branchId), "지점 권한이 없습니다.", 403, "SCOPE_DENIED");
   const def = catalog[resource];
   assert(def, "지원하지 않는 작업입니다.", 404, "NOT_FOUND");
+  if (resource === "channels")
+    assert(
+      canManageChannel(user, branchId),
+      "채널 관리 권한이 없습니다.",
+      403,
+      "SCOPE_DENIED",
+    );
   if (def.admin)
     assert(
       admin(user, branchId),
@@ -189,6 +201,15 @@ function taskAssigneeOk(store: MockStore, id: string, branchId: string) {
       "해당 지점의 활성 직원을 선택해 주세요.",
       { assigneeId: "해당 지점의 활성 직원을 선택해 주세요." },
     );
+}
+function channelParticipantOk(store: MockStore, id: string, branchId: string) {
+  const employee = store.db.employees.find((person) => person.id === id);
+  assert(
+    employee && can(employee, branchId),
+    "해당 지점의 활성 직원을 선택해 주세요.",
+    422,
+    "VALIDATION_ERROR",
+  );
 }
 function interval(start: string, end: string) {
   assert(
@@ -388,7 +409,8 @@ export function create(
       403,
       "SCOPE_DENIED",
     );
-  } else if (!(resource === "notices" && b === "all")) activeBranch(store, b);
+  } else if (!(["notices", "channels"].includes(resource) && b === "all"))
+    activeBranch(store, b);
   if (resource === "notices" && b === "all")
     assert(
       user.owner,
@@ -409,8 +431,8 @@ export function create(
   if (resource === "members") Object.assign(raw, { branchIds: [b] });
   if (resource === "channels") {
     const ids = z.array(z.string()).min(1).parse(p.participantIds);
-    ids.forEach((id) => staffOk(store, id, b));
-    Object.assign(raw, { participantIds: [...new Set([...ids, user.id])] });
+    ids.forEach((id) => channelParticipantOk(store, id, b));
+    Object.assign(raw, { participantIds: [...new Set(ids)] });
   }
   if (resource === "tasks") {
     taskAssigneeOk(store, str(p, "assigneeId"), b);
@@ -581,8 +603,8 @@ export function update(
       .array(z.string())
       .min(1)
       .parse(schemas.channels.parse(merged).participantIds);
-    ids.forEach((person) => staffOk(store, person, row.branchId));
-    Object.assign(merged, { participantIds: [...new Set([...ids, user.id])] });
+    ids.forEach((person) => channelParticipantOk(store, person, row.branchId));
+    Object.assign(merged, { participantIds: [...new Set(ids)] });
   }
   if (resource === "tasks") {
     const t = schemas.tasks.parse(merged);
@@ -1331,7 +1353,7 @@ export function clockin(store: MockStore, branchId: string) {
 }
 export function sendMessage(store: MockStore, p: Record<string, unknown>) {
   const user = store.activeUser(),
-    channel = store.get("channels", str(p, "channelId"));
+    channel = allowedChatChannel(store, str(p, "channelId"));
   assert(
     channel.participantIds.includes(user.id),
     "참여하지 않은 대화입니다.",
@@ -1346,7 +1368,8 @@ export function sendMessage(store: MockStore, p: Record<string, unknown>) {
     assert(
       prior.channelId === channel.id &&
         prior.text === str(p, "text") &&
-        prior.parentId === str(p, "parentId"),
+        prior.parentId === str(p, "parentId") &&
+        prior.taskId === str(p, "taskId"),
       "전송 식별자가 다른 메시지에 사용되었습니다.",
     );
     return prior;

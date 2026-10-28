@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { clearChatSession } from "../features/chat/session";
 export type Theme = "forest" | "navy" | "sand";
 function savedTheme(): Theme {
   try {
@@ -38,6 +39,7 @@ export const useUi = create<UiState>((set) => ({
   setDraft: (key, text) =>
     set((s) => ({ drafts: { ...s.drafts, [key]: text } })),
   clearPrivate: () => {
+    clearChatSession();
     clearTimeout(timer);
     set({ drafts: {}, navOpen: false, notice: "" });
   },
