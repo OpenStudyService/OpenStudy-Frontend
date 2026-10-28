@@ -53,3 +53,5 @@ API 어댑터는 이미 쓰던 데모 요청을 사용한다. 새 서버 API나 
 ## 전달 상태
 
 - 작업 브랜치: feature/task-management-ui. 원격 main 변경과 PR 병합은 수행하지 않는다.
+- 구현 커밋 `6628057`을 작업 브랜치에 push하고 [PR #37](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/37)을 생성했다. 첫 단계는 사용자 검토·병합 대기다.
+- #26은 열어 두었으며 두 번째 PR은 첫 PR의 사용자 병합과 #74의 업무 계약 준비 후 진행한다. 실제 서버 검증은 #75 이후다.
