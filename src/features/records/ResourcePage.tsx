@@ -40,6 +40,8 @@ import {
 import { Icon } from "../../shared/ui/Icon";
 import { ResourceForm } from "./ResourceForm";
 import { WeekSchedule } from "../attendance/WeekSchedule";
+import { Tasks } from "../tasks/Tasks";
+import { TaskPanel } from "../tasks/TaskPanel";
 
 export function format(
   row: Entity,
@@ -105,18 +107,9 @@ export function format(
   if (Array.isArray(raw)) return JSON.stringify(raw);
   return String(raw);
 }
-function editable(
-  user: Employee,
-  resource: Resource,
-  branch: string,
-  row?: Entity,
-) {
+function editable(user: Employee, resource: Resource, branch: string) {
   const def = catalog[resource];
   if (!def) return false;
-  if (resource === "tasks")
-    return (
-      admin(user, branch) || (!!row && text(row, "assigneeId") === user.id)
-    );
   if (resource === "branches" && !user.owner) return false;
   if (def.admin && !admin(user, branch)) return false;
   return !def.permission || can(user, branch, def.permission);
@@ -133,14 +126,6 @@ function availableActions(
           (row as Employee).memberships.some((m) => admin(user, m.branchId))
         : admin(user, row.branchId),
     own = text(row, "employeeId") === user.id;
-  if (resource === "tasks")
-    return isAdmin || text(row, "assigneeId") === user.id
-      ? [
-          ...(status !== "진행 중" && status !== "완료" ? ["progress"] : []),
-          status === "완료" ? "reopen" : "complete",
-          "share",
-        ]
-      : [];
   if (resource === "payments")
     return isAdmin && status === "승인" ? ["refund"] : [];
   if (resource === "passes")
@@ -201,7 +186,17 @@ function availableActions(
   if (resource === "employees") return isAdmin ? ["permissions"] : [];
   return [];
 }
-export function ResourcePage({
+export function ResourcePage(props: {
+  resource: Resource;
+  embedded?: boolean;
+}) {
+  return props.resource === "tasks" ? (
+    <Tasks />
+  ) : (
+    <GenericResourcePage {...props} />
+  );
+}
+function GenericResourcePage({
   resource,
   embedded = false,
 }: {
@@ -368,31 +363,7 @@ export function ResourcePage({
               <option key={s}>{s}</option>
             ))}
           </select>
-          {resource === "tasks" && (
-            <>
-              <select
-                aria-label="담당자 필터"
-                value={params.get("assigneeId") || ""}
-                onChange={(e) => search("assigneeId", e.target.value)}
-              >
-                <option value="">전체 담당자</option>
-                {lookups.employees.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <Button
-                variant={params.get("mine") ? "primary" : ""}
-                onClick={() => search("mine", params.get("mine") ? "" : "1")}
-              >
-                내 업무
-              </Button>
-            </>
-          )}
-          {["tasks", "reservations", "attendance", "shifts"].includes(
-            resource,
-          ) && (
+          {["reservations", "attendance", "shifts"].includes(resource) && (
             <input
               type="date"
               aria-label="날짜 필터"
@@ -408,7 +379,6 @@ export function ResourcePage({
             <option value="createdAt">등록일 순</option>
             <option value="name">이름 순</option>
             <option value="status">상태 순</option>
-            {resource === "tasks" && <option value="due">기한 순</option>}
           </select>
           <Button
             variant="quiet"
@@ -612,7 +582,19 @@ export function ResourcePage({
   );
 }
 
-export function RecordPanel({
+export function RecordPanel(props: {
+  resource: Resource;
+  id: string;
+  onClose: () => void;
+  onReschedule?: () => void;
+}) {
+  return props.resource === "tasks" ? (
+    <TaskPanel id={props.id} onClose={props.onClose} />
+  ) : (
+    <GenericRecordPanel {...props} />
+  );
+}
+function GenericRecordPanel({
   resource,
   id,
   onClose,
@@ -711,11 +693,9 @@ export function RecordPanel({
     def.actions?.find((a) => a.key === action)?.label ||
     (action === "permissions" ? "지점·권한 설정" : "작업 확인");
   const commandForm = r ? commandFields(resource, action, r) : [];
-  let fields = def.fields.filter(
+  const fields = def.fields.filter(
     (f) => f.key !== "simulateFailure" && f.key !== "branchId",
   );
-  if (resource === "tasks" && r && !admin(user, r.branchId))
-    fields = fields.filter((f) => ["status", "checks"].includes(f.key));
   return (
     <Panel
       open
@@ -814,26 +794,6 @@ export function RecordPanel({
                       </div>
                     ))}
                 </dl>
-                {resource === "tasks" && (
-                  <TaskChecks
-                    row={r as ResourceMap["tasks"]}
-                    enabled={editable(user, resource, r.branchId, r)}
-                    onSave={(checks) => save({ checks })}
-                  />
-                )}
-                {resource === "tasks" && (
-                  <div className="mt-6 border-t border-line pt-5">
-                    <h3>처리 이력</h3>
-                    {(r as ResourceMap["tasks"]).history.map((h, i) => (
-                      <p key={i} className="help mt-2">
-                        {displayDate(h.at)} ·{" "}
-                        {lookups.employees.find((p) => p.id === h.actorId)
-                          ?.name || h.actorId}{" "}
-                        · {h.text}
-                      </p>
-                    ))}
-                  </div>
-                )}
                 {resource === "lockers" &&
                   (r as ResourceMap["lockers"]).history.map((h, i) => (
                     <p className="help mt-3" key={i}>
@@ -917,7 +877,7 @@ export function RecordPanel({
                   </div>
                 )}
                 <div className="mt-7 flex flex-wrap gap-2 border-t border-line pt-5">
-                  {def.edit && editable(user, resource, r.branchId, r) && (
+                  {def.edit && editable(user, resource, r.branchId) && (
                     <Button onClick={() => setMode("edit", "1")}>
                       수정하기
                     </Button>
@@ -963,53 +923,6 @@ export function RecordPanel({
         )
       )}
     </Panel>
-  );
-}
-function TaskChecks({
-  row,
-  enabled,
-  onSave,
-}: {
-  row: ResourceMap["tasks"];
-  enabled: boolean;
-  onSave: (checks: ResourceMap["tasks"]["checks"]) => Promise<void>;
-}) {
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <section className="mt-6 border-t border-line pt-5">
-      <h3 className="mb-3">체크리스트</h3>
-      {row.checks.length ? (
-        row.checks.map((c, i) => (
-          <label
-            key={i}
-            className="my-3 flex items-start gap-2 text-[13px] font-normal"
-          >
-            <input
-              type="checkbox"
-              checked={c.done}
-              disabled={!enabled || busy}
-              onChange={(e) => {
-                setBusy(true);
-                void onSave(
-                  row.checks.map((c, n) =>
-                    n === i ? { ...c, done: e.target.checked } : c,
-                  ),
-                )
-                  .catch((e) => setError(e.message))
-                  .finally(() => setBusy(false));
-              }}
-            />
-            <span className={c.done ? "text-muted line-through" : ""}>
-              {c.text}
-            </span>
-          </label>
-        ))
-      ) : (
-        <p className="help">등록한 체크 항목이 없습니다.</p>
-      )}
-      {error && <FieldError>{error}</FieldError>}
-    </section>
   );
 }
 function PermissionsEditor({

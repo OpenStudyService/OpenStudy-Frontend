@@ -65,6 +65,7 @@ for (const width of [1440, 1024, 390])
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("업무 제목").fill("좁은 화면 입력 유지");
+    page.once("dialog", (dialog) => dialog.accept());
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible();
     await expect(trigger).toBeFocused();
@@ -77,6 +78,7 @@ for (const width of [1440, 1024, 390])
       dialog.getByRole("button", { name: "업무 등록", exact: true }),
     ).toBeInViewport();
     await page.screenshot({ path: `test-results/task-form-${width}.png` });
+    page.once("dialog", (dialog) => dialog.accept());
     await page.keyboard.press("Escape");
     if (width === 390) {
       await page.goto("/app/gangnam/chat");
@@ -86,11 +88,19 @@ for (const width of [1440, 1024, 390])
       ).toBeInViewport();
       await expect(page.locator("article").first()).toBeVisible();
       await page.screenshot({ path: "test-results/chat-mobile.png" });
-      await page.locator("article").first().getByRole("button",{name:"답글 달기"}).click();
-      await expect(page.getByRole("textbox",{name:"스레드 답글"})).toBeInViewport();
-      await page.screenshot({path:"test-results/thread-mobile.png"});
-      await page.getByRole("button",{name:"스레드 닫기"}).click();
-      await expect(page.getByRole("textbox",{name:"메시지",exact:true})).toBeInViewport();
+      await page
+        .locator("article")
+        .first()
+        .getByRole("button", { name: "답글 달기" })
+        .click();
+      await expect(
+        page.getByRole("textbox", { name: "스레드 답글" }),
+      ).toBeInViewport();
+      await page.screenshot({ path: "test-results/thread-mobile.png" });
+      await page.getByRole("button", { name: "스레드 닫기" }).click();
+      await expect(
+        page.getByRole("textbox", { name: "메시지", exact: true }),
+      ).toBeInViewport();
     }
     expect(errors).toEqual([]);
   });

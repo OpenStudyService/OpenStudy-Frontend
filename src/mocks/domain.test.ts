@@ -99,18 +99,16 @@ describe("authorization and consumer scope", () => {
       rowsFor(s, "payments", "all").every((p) => p.branchId === "gangnam"),
     ).toBe(true);
   });
-  it("lets assigned staff complete tasks but refuses reassignment", () => {
+  it("lets assigned staff edit and complete tasks but denies unrelated staff", () => {
     const s = owner();
     s.persona = "junho";
     const t = s.get("tasks", "task-2");
-    expect(() =>
-      update(s, "tasks", t.id, { version: 1, assigneeId: "minji" }),
-    ).toThrow(/상태와 체크리스트/);
-    command(s, "tasks", t.id, "complete", { version: 1 });
+    update(s, "tasks", t.id, { version: 1, title: "담당 직원의 업무 수정" });
+    command(s, "tasks", t.id, "complete", { version: 2 });
     expect(t.status).toBe("완료");
     expect(() =>
       command(s, "tasks", "task-1", "complete", { version: 1 }),
-    ).toThrow(/본인/);
+    ).toThrow(/등록자/);
   });
   it("does not expose unrelated customer history", async () => {
     const { customerHistory } = await import("./domain");

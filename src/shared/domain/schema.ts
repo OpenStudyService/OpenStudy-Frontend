@@ -84,6 +84,8 @@ export const schemas = {
   }),
   employees: person,
   tasks: base.extend({
+    // Demo metadata; the canonical collaboration DTO is not defined yet.
+    createdById: z.string().optional(),
     title: str.max(120),
     body: str,
     assigneeId: str,

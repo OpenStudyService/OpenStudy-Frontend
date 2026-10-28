@@ -269,6 +269,7 @@ export function seed(): Database {
   ] as const;
   taskData.forEach(([title, b, assigneeId, status, priority, category], i) =>
     add("tasks", `task-${i + 1}`, b, {
+      createdById: "owner",
       title,
       assigneeId,
       status,
