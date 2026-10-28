@@ -53,4 +53,5 @@
 
 - `graphify update .` 성공: 1,151 nodes / 3,516 edges / 65 communities. 심벌이 없는 설정·데이터 파일 17개 및 라벨 갱신 안내가 출력됐으며 갱신은 정상 완료했다. 그래프 산출물은 저장소의 기존 ignore 정책에 따라 로컬에 유지한다.
 - 타입·린트·단위 204개, Chrome 통합 회귀 23개, live/demo 빌드와 모드 시험 2개 통과 후 이번 작업 파일만 스테이징했다. `git diff --cached --check` 통과.
-- 작업 브랜치 커밋·push 및 PR 준비 후 링크를 추가한다. 사용자 병합과 두 번째 API 연결 PR은 별도 후속 단계다.
+- `3b23cc4` 기능 구현과 `9f7f634` DM 회귀 시험을 `feature/chat-collaboration-ui`에 커밋·push했다. [Frontend PR #48](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/48)을 생성하고 이 대화에 연결했다.
+- 사용자 병합 대기 상태이며 원격 main은 변경하지 않았다. 첫 PR 병합과 확정 계약 준비 이후의 API 연결 PR 및 실제 서버 검증은 후속 단계다. #27은 열린 상태로 유지한다.
