@@ -302,3 +302,24 @@ test("a task viewer can select a channel and share without gaining edit rights",
     ),
   ).toBe(true);
 });
+
+test("existing demo DM creation, sending and reload remain available", async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto("/app/gangnam/chat");
+  await page.getByLabel("DM 시작할 동료").selectOption("junho");
+  await expect(page.locator(".chat-main .chat-header h2")).toHaveText("박준호");
+  const input = page.getByRole("textbox", { name: "메시지", exact: true });
+  await input.fill("기존 데모 DM 확인");
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+  await expect(
+    page.locator("article p").filter({ hasText: "기존 데모 DM 확인" }),
+  ).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator(".chat-main .chat-header h2")).toHaveText("박준호");
+  await expect(
+    page.locator("article p").filter({ hasText: "기존 데모 DM 확인" }),
+  ).toHaveCount(1);
+});
