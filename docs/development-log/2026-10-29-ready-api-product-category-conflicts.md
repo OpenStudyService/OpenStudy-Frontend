@@ -53,4 +53,5 @@ Frontend main `4dc1ce4`에서 `fix/product-category-conflicts`를 생성했다. 
 
 - 실제 서버 두 세션에서 분류 충돌을 다시 확인하는 시험은 미수행이다.
 - 상품 구매·환불·기존 구매 표시 보존은 관련 Backend 구현이 준비된 뒤 해당 이슈에서 검증한다. 이 변경으로 구매나 다른 미구현 화면의 완료를 주장하지 않는다.
-- 작업 브랜치 push·PR 준비 결과를 추가한다. main 병합은 사용자가 수행한다.
+- `69df6e5`에 관련 변경만 커밋하고 `fix/product-category-conflicts`를 push했다. [Frontend PR #49](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/49)를 생성해 이 대화에 연결했다.
+- main 병합은 사용자 대기 상태다. Backend 작업 브랜치 및 원격 main은 변경하지 않았다.
