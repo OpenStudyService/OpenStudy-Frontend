@@ -133,8 +133,9 @@ test("failed messages and drafts survive ordinary navigation and reuse the origi
 }) => {
   await login(page);
   await page.goto("/app/gangnam/chat/gangnam");
-  await api(page, "/_demo", { scenario: "message-failure" });
   const input = page.getByRole("textbox", { name: "메시지", exact: true });
+  await expect(input).toBeVisible();
+  await api(page, "/_demo", { scenario: "message-failure" });
   await input.fill("화면 이동 후 재전송");
   await input.press("Enter");
   await expect(

@@ -31,6 +31,17 @@ export function assert(
   if (!condition) throw new DomainError(status, code, message);
 }
 type Listener = (event: WorkspaceEvent) => void;
+function isCustomerSnapshot(value: unknown) {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    "phone" in value &&
+    ("branchIds" in value ||
+      "memberNo" in value ||
+      "memo" in value ||
+      "note" in value)
+  );
+}
 interface Saved {
   db: Database;
   persona: string | null;
@@ -56,9 +67,14 @@ export class MockStore {
           const x = JSON.parse(raw) as Saved;
           if (resources.every((r) => Array.isArray(x.db[r]))) {
             this.db = x.db;
+            // Customer input stays in memory even in demo mode. Restore only the
+            // fixed synthetic fixture across a full browser reload.
+            this.db.members = seed().members;
             this.persona = x.persona;
             this.sequence = x.sequence;
-            this.idempotency = x.idempotency;
+            this.idempotency = x.idempotency ?? {};
+            // Also scrub legacy customer snapshots that older demo versions saved.
+            this.persist();
           }
         }
       } catch {
@@ -71,10 +87,22 @@ export class MockStore {
         sessionStorage.setItem(
           KEY,
           JSON.stringify({
-            db: this.db,
+            db: {
+              ...this.db,
+              members: seed().members,
+              audit: this.db.audit.map((row) =>
+                row.resource === "members"
+                  ? { ...row, before: "", after: "" }
+                  : row,
+              ),
+            },
             persona: this.persona,
             sequence: this.sequence,
-            idempotency: this.idempotency,
+            idempotency: Object.fromEntries(
+              Object.entries(this.idempotency).filter(
+                ([, record]) => !isCustomerSnapshot(record.result),
+              ),
+            ),
           }),
         );
       } catch {
@@ -139,7 +167,7 @@ export class MockStore {
     return row;
   }
   emit(
-    resource: Resource,
+    resource: WorkspaceEvent["resource"],
     entityId: string,
     branchId: string,
     type: WorkspaceEvent["type"] = "changed",

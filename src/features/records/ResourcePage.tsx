@@ -43,6 +43,8 @@ import { WeekSchedule } from "../attendance/WeekSchedule";
 import { Tasks } from "../tasks/Tasks";
 import { TaskPanel } from "../tasks/TaskPanel";
 import { ChannelManagement } from "../chat/ChannelManagement";
+import { Customers } from "../customers/Customers";
+import { CustomerPanel } from "../customers/CustomerPanel";
 
 export function format(
   row: Entity,
@@ -191,7 +193,9 @@ export function ResourcePage(props: {
   resource: Resource;
   embedded?: boolean;
 }) {
-  return props.resource === "channels" ? (
+  return props.resource === "members" ? (
+    <Customers embedded={props.embedded} />
+  ) : props.resource === "channels" ? (
     <ChannelManagement embedded={props.embedded} />
   ) : props.resource === "tasks" ? (
     <Tasks />
@@ -591,7 +595,9 @@ export function RecordPanel(props: {
   onClose: () => void;
   onReschedule?: () => void;
 }) {
-  return props.resource === "tasks" ? (
+  return props.resource === "members" ? (
+    <CustomerPanel id={props.id} onClose={props.onClose} />
+  ) : props.resource === "tasks" ? (
     <TaskPanel id={props.id} onClose={props.onClose} />
   ) : (
     <GenericRecordPanel {...props} />
