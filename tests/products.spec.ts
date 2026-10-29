@@ -97,3 +97,81 @@ test("a staff member sees only the branch's products and cannot manage sale stat
     0,
   );
 });
+
+test("category conflict compares the current name and preserves another editor's status", async ({
+  page,
+}) => {
+  await login(page, "사장님");
+  await page.goto("/app/all/products?tab=categories");
+  const category = await page.evaluate(async () => {
+    const { token } = await fetch("/api/auth/csrf").then((r) => r.json());
+    const response = await fetch("/api/product-categories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": token,
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        code: "CONFLICT_UI",
+        name: "충돌 검증 분류",
+        kind: "시간권",
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "분류 수정: 충돌 검증 분류" }).click();
+  const editor = page.getByRole("form", { name: "분류 이름 편집" });
+  await editor.getByLabel("분류 이름 변경").fill("입력을 유지한 분류");
+  await page.evaluate(async (category) => {
+    const { token } = await fetch("/api/auth/csrf").then((r) => r.json());
+    const response = await fetch(`/api/product-categories/${category.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
+      body: JSON.stringify({
+        version: category.version,
+        name: "다른 창의 분류",
+        status: "비활성",
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+  }, category);
+  await editor.getByRole("button", { name: "이름 저장" }).click();
+  await expect(editor.getByRole("alert")).toContainText(
+    "다른 사용자가 수정했습니다",
+  );
+  await expect(editor.getByLabel("분류 이름 변경")).toHaveValue(
+    "입력을 유지한 분류",
+  );
+  await expect(
+    editor.getByRole("button", { name: "이름 저장" }),
+  ).toBeDisabled();
+  await editor
+    .getByRole("button", { name: "최신 버전 확인 (입력 유지)" })
+    .click();
+  await expect(editor.getByRole("status")).toContainText(
+    "다른 창의 분류 / 비활성 (v2)",
+  );
+  const saved = page.waitForRequest(
+    isProductWrite("PATCH", /\/product-categories\/[^/]+$/),
+  );
+  await editor.getByRole("button", { name: "최신 기준으로 이름 저장" }).click();
+  expect((await saved).postDataJSON()).toEqual({
+    version: 2,
+    name: "입력을 유지한 분류",
+  });
+  await expect(editor).not.toBeVisible();
+  const card = page
+    .locator("article")
+    .filter({ hasText: "입력을 유지한 분류" });
+  await expect(card.getByText("비활성", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(
+    page
+      .locator("article")
+      .filter({ hasText: "입력을 유지한 분류" })
+      .getByText("비활성", { exact: true }),
+  ).toBeVisible();
+});
