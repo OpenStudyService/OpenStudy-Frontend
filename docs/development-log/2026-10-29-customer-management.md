@@ -72,4 +72,5 @@ Backend main `8eb2af6`을 무시되는 전용 디렉터리에 아카이브하고
 
 - `graphify update .` 성공: **1,282 nodes / 3,934 edges / 72 communities**. 심벌이 없는 설정·데이터 파일 20개 및 라벨 갱신 안내가 있었으며 AST 갱신은 정상 완료했다. 산출물은 기존 ignore 정책에 따라 로컬에 유지한다.
 - `git diff --check` 통과. 단위·컴포넌트 245개, Chrome MSW 통합 31개, 실제 Backend/DB Chrome 4개, 빌드 모드 2개가 통과한 상태로 관련 변경만 스테이징한다.
-- 작업 브랜치 push·PR 생성 후 링크를 추가한다. 사용자가 main 병합을 수행한다.
+- 구현 커밋 `3f0130e`를 `feature/customer-management`에 커밋·push하고 [Frontend PR #50](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/50)을 생성해 이 대화에 연결했다. 원격 작업 브랜치와 로컬 HEAD를 일치시켰다.
+- 사용자 검토·main 병합 대기 상태다. 원격 main 갱신이나 PR 병합은 수행하지 않았다. #19는 PR 병합 시 종료되도록 연결하며 #20은 후속 작업으로 유지한다.
