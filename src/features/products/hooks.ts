@@ -2,6 +2,27 @@ import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { api, queryString } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
+import type { ProductCategory } from "./model";
+
+/** The category API has a list and PATCH, but no GET /:id. Match immutable code and id. */
+export async function loadCategory(
+  category: ProductCategory,
+  signal: AbortSignal,
+) {
+  for (let page = 1; ; page++) {
+    const result = await api<components["schemas"]["ProductCategoryPage"]>(
+      `/product-categories?${queryString({ page, pageSize: 100, q: category.code, sort: "code", direction: "asc" })}`,
+      { signal },
+    );
+    const current = result.items.find((row) => row.id === category.id);
+    if (current) return current;
+    if (
+      !result.items.length ||
+      page * result.meta.pageSize >= result.meta.total
+    )
+      throw new Error("최신 분류를 찾지 못했어요. 목록을 다시 확인해 주세요.");
+  }
+}
 
 /** Categories change rarely and are small; one page covers the whole set. */
 export function useCategories() {
