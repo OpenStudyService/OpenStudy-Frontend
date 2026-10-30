@@ -1,5 +1,7 @@
 # 실제 서버·메일 링크 초대 검증
 
+외부 SMTP와 실제 수신함을 사용하는 검증은 [실제 수신함으로 직원 초대 검증](./invitation-real-mail.md)을 따른다. 아래 명령은 Mailpit 기반 로컬 자동 회귀이며 외부 메일 수신 성공을 뜻하지 않는다.
+
 `npm run test:e2e:live`는 MSW를 사용하지 않는다. 실제 Spring 서버·MySQL·SMTP worker가 만든 메일을 Mailpit에서 읽고 서로 다른 Chrome context로 관리자와 초대받은 직원을 검증한다. 기본 `test:e2e`는 이 테스트를 실행하지 않는다.
 
 ## 전용 로컬 환경
