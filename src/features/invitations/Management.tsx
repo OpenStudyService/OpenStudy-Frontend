@@ -21,7 +21,7 @@ export function InvitationManagement() {
     [grants, setGrants] = useState<components["schemas"]["Permissions"]>([]),
     [error, setError] = useState<Error | null>(null),
     [busy, setBusy] = useState(false),
-    [selected, setSelected] = useState<Invitation | null>(null),
+    [selectedId, setSelectedId] = useState<string | null>(null),
     [reason, setReason] = useState(""),
     [filter, setFilter] = useState("");
   const managed = session.branches
@@ -55,6 +55,26 @@ export function InvitationManagement() {
     retry: false,
     enabled: managed.length > 0,
   });
+  const detailKey = [
+    "data",
+    session.user.id,
+    scope,
+    "invitations",
+    "detail",
+    selectedId,
+  ];
+  const detail = useQuery({
+    queryKey: detailKey,
+    queryFn: ({ signal }) =>
+      api<Invitation>(
+        `/invitations/${encodeURIComponent(selectedId!)}?${queryString({ scope })}`,
+        { signal },
+      ),
+    enabled: managed.length > 0 && selectedId !== null,
+    retry: false,
+  });
+  const selected = selectedId ? detail.data : undefined;
+  const commandDisabled = busy || detail.isFetching || detail.isError;
   async function refresh() {
     await query.invalidateQueries({ queryKey: ["data", session.user.id] });
   }
@@ -71,7 +91,7 @@ export function InvitationManagement() {
         { method: "POST", body, key: key.key(`${i.id}/${command}`, body) },
       );
       key.committed();
-      setSelected(updated);
+      query.setQueryData(detailKey, updated);
       setReason("");
       await refresh();
     } catch (e) {
@@ -84,6 +104,12 @@ export function InvitationManagement() {
   return (
     <section className="grid gap-4">
       <h2>초대·승인 관리</h2>
+      <Button
+        disabled={busy || rows.isFetching || detail.isFetching}
+        onClick={() => void refresh()}
+      >
+        초대 상태 새로고침
+      </Button>
       {MOCK && (
         <p className="help">데모에서는 이메일을 실제 발송하지 않습니다.</p>
       )}
@@ -234,8 +260,9 @@ export function InvitationManagement() {
               </p>
               {i.rejectionReason && <p>반려 사유: {i.rejectionReason}</p>}
               <Button
+                disabled={busy}
                 onClick={() => {
-                  setSelected(i);
+                  setSelectedId(i.id);
                   setError(null);
                   setReason("");
                 }}
@@ -246,6 +273,10 @@ export function InvitationManagement() {
           ))}
           <Pager page={page} total={rows.data.meta.total} onChange={setPage} />
         </>
+      )}
+      {selectedId && detail.isPending && <State loading />}
+      {selectedId && detail.error && (
+        <ErrorState error={detail.error} retry={() => void detail.refetch()} />
       )}
       {selected && (
         <section className="card grid gap-3 p-4">
@@ -264,7 +295,7 @@ export function InvitationManagement() {
                     부여됩니다. 자동 메일 재시도는 기한을 연장하지 않습니다.
                   </p>
                   <Button
-                    disabled={busy}
+                    disabled={commandDisabled}
                     onClick={() => void action(selected, "reissue")}
                   >
                     새 24시간으로 재발급
@@ -273,7 +304,7 @@ export function InvitationManagement() {
               )}
               {selected.status === "초대 대기" && (
                 <Button
-                  disabled={busy}
+                  disabled={commandDisabled}
                   onClick={() => void action(selected, "cancel")}
                 >
                   초대 취소
@@ -286,7 +317,7 @@ export function InvitationManagement() {
                     다시 로그인해야 합니다.
                   </p>
                   <Button
-                    disabled={busy}
+                    disabled={commandDisabled}
                     onClick={() => void action(selected, "approve")}
                   >
                     최종 승인
@@ -299,7 +330,7 @@ export function InvitationManagement() {
                     />
                   </Field>
                   <Button
-                    disabled={busy || !reason.trim()}
+                    disabled={commandDisabled || !reason.trim()}
                     onClick={() => void action(selected, "reject")}
                   >
                     초대 반려
@@ -308,18 +339,14 @@ export function InvitationManagement() {
               )}
             </>
           )}
-          <Button onClick={() => setSelected(null)}>상세 닫기</Button>
+          <Button disabled={busy} onClick={() => setSelectedId(null)}>
+            상세 닫기
+          </Button>
         </section>
       )}
       <SaveError
         error={error}
         refresh={async () => {
-          if (selected)
-            setSelected(
-              await api<Invitation>(
-                `/invitations/${selected.id}?${queryString({ scope })}`,
-              ),
-            );
           await refresh();
         }}
       />
