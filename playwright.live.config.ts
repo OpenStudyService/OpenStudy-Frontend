@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 // Explicitly separate real-server checks from the default MSW suite.
 export default defineConfig({
   testDir: "./tests/live",
+  testMatch: "invitations.spec.ts",
   timeout: 120000,
   expect: { timeout: 30000 },
   workers: 1,

@@ -676,6 +676,178 @@ export interface paths {
     patch: operations["updateMyProfile"];
     trace?: never;
   };
+  "/customers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 고객 목록·검색
+     * @description scope 지점에 등록되었거나 scope 지점에서 결제(상태 무관)한 고객만 반환한다. q는 이름 부분 일치, 회원번호 정확 일치, 숫자 4자리 이상이면 연락처 부분 일치다. 범위 밖 고객은 total에도 포함하지 않는다. 다른 지점 고객 최소 요약은 M6(FR-MEM-03).
+     */
+    get: operations["listCustomers"];
+    put?: never;
+    /**
+     * 고객 등록
+     * @description 회원번호는 서버가 만든다. 연락처 중복은 허용한다(중복 병합은 M13). 운영 중지 지점에는 등록할 수 없다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createCustomer"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 고객 상세
+     * @description 조회 범위 밖이면 404이며 존재 여부를 알 수 없다. 결제 내역은 포함하지 않는다.
+     */
+    get: operations["getCustomer"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 고객 기본 정보 수정
+     * @description 이름·연락처·이메일·메모를 수정한다. 변경자·시각을 감사로 남긴다. 낡은 version은 409 VERSION_CONFLICT.
+     */
+    patch: operations["updateCustomer"];
+    trace?: never;
+  };
+  "/customers/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 고객 상태 변경
+     * @description 정상·이용 제한·비활성 전환과 사유를 기록한다. 고객 행·결제·이용권·이용 기록을 삭제하지 않는다. 같은 상태 요청은 현재 값을 돌려주며 이력을 만들지 않는다.
+     */
+    post: operations["changeCustomerStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Mock 결제 목록
+     * @description scope 지점 중 payments:read가 있는 지점의 결제만 반환한다. from·to는 createdAt 기준 [from, to) UTC다. 고급 필터(수단·분류·처리자)는 M13.
+     */
+    get: operations["listPayments"];
+    put?: never;
+    /**
+     * Mock 결제 생성·이용권 발급
+     * @description 고객·지점·상품을 서버에서 검증하고 상품의 현재 가격으로 금액을 산정한다. 승인이면 결제와 이용권 1장을 한 트랜잭션으로 확정하고, 실패면 실패 결제만 남기고 이용권을 만들지 않는다. 두 결과 모두 201이며 멱등 결과로 저장한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createPayment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Mock 결제 상세
+     * @description 결제 지점의 payments:read가 없으면 404다. 환불 사건을 함께 반환한다.
+     */
+    get: operations["getPayment"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments/{id}/refund": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 미사용 이용권 전액 환불
+     * @description 원결제·이용권을 잠근 뒤 승인 상태, 실제 사용 이력 없음, 미만료(expiresAt이 없거나 현재 < expiresAt)를 다시 확인한다. 환불 사건·결제 환불·이용권 환불·감사·멱등 결과를 한 트랜잭션으로 남긴다. 금액은 원결제 전액이며 처리 지점은 원결제 지점이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["refundPayment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/passes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 발급 이용권 목록
+     * @description 구매 지점이 scope 안에 있는 이용권만 반환한다. 다른 지점에서 산 이용권 요약은 M6(FR-MEM-03). status는 요청 시각 기준 실효 상태로 검색한다.
+     */
+    get: operations["listPasses"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/passes/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 발급 이용권 상세
+     * @description 구매 지점의 유효 소속이 없으면 404다.
+     */
+    get: operations["getPass"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1244,7 +1416,10 @@ export interface components {
         | "invitations"
         | "products"
         | "lookups"
-        | "permissions";
+        | "permissions"
+        | "customers"
+        | "payments"
+        | "passes";
       entityId: string | null;
       branchId: string | null;
       /** Format: date-time */
@@ -1297,6 +1472,227 @@ export interface components {
       /** @description 공백만 있는 값은 422. 원문 길이를 검사한 후 앞뒤 공백을 제거해 저장한다. 기존 VARCHAR(100)에 맞춰 Java UTF-16 길이 100 이하로 검증한다. */
       nickname: string;
       version: components["schemas"]["Version"];
+    };
+    /** @enum {string} */
+    CustomerStatus: "정상" | "이용 제한" | "비활성";
+    /** @description 결제·이용권 응답에 쓰는 고객 최소 식별 정보. 연락처·이메일·메모는 담지 않는다. */
+    CustomerSummary: {
+      id: components["schemas"]["Id"];
+      memberNo: string;
+      name: string;
+    };
+    /** @description 처리 직원 식별 정보. */
+    ActorSummary: {
+      id: components["schemas"]["Id"];
+      name: string;
+    };
+    /** @description 검색에 필요한 정보만 반환한다(FR-MEM-05, NFR-SEC-06). 이메일·메모·상태 사유는 상세에서만 제공한다. */
+    CustomerListItem: {
+      id: components["schemas"]["Id"];
+      memberNo: string;
+      name: string;
+      /** @description 숫자만 9~11자리. 입력 시 하이픈·공백은 서버가 제거한 뒤 검증하고 숫자만 저장한다. */
+      phone: string;
+      /** @enum {string} */
+      status: "정상" | "이용 제한" | "비활성";
+      registeredBranchId: components["schemas"]["Id"] | null;
+      /** Format: date-time */
+      registeredAt: string;
+    };
+    /** @description registeredBranchId가 null인 고객은 V2 이전에 결제 없이 저장된 고객이다(OWNER만 조회). canEdit은 화면 표시용이며 서버 검증을 대체하지 않는다. 결제 정보는 포함하지 않는다. */
+    Customer: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      memberNo: string;
+      name: string;
+      /** @description 숫자만 9~11자리. 입력 시 하이픈·공백은 서버가 제거한 뒤 검증하고 숫자만 저장한다. */
+      phone: string;
+      /** Format: email */
+      email: string | null;
+      /** @description 고객 응대 메모(M4-D06). 빈 문자열은 null로 저장한다. */
+      memo: string | null;
+      /** @enum {string} */
+      status: "정상" | "이용 제한" | "비활성";
+      statusReason: string | null;
+      registeredBranchId: components["schemas"]["Id"] | null;
+      /** Format: date-time */
+      registeredAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      canEdit: boolean;
+    };
+    CustomerPage: {
+      items: components["schemas"]["CustomerListItem"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /**
+     * @description 회원번호·상태·등록 시각은 서버가 정한다. 신규 고객은 정상 상태로 등록한다.
+     * @example {
+     *       "registeredBranchId": "1",
+     *       "name": "홍길동",
+     *       "phone": "01012345678",
+     *       "email": null,
+     *       "memo": "창가 자리 선호"
+     *     }
+     */
+    CustomerCreate: {
+      registeredBranchId: components["schemas"]["Id"];
+      name: string;
+      /** @description 숫자만 9~11자리. 입력 시 하이픈·공백은 서버가 제거한 뒤 검증하고 숫자만 저장한다. */
+      phone: string;
+      /** Format: email */
+      email?: string | null;
+      /** @description 고객 응대 메모(M4-D06). 빈 문자열은 null로 저장한다. */
+      memo?: string | null;
+    };
+    /** @description 누락 필드는 유지하고 email·memo의 명시적 null은 삭제다. memberNo·registeredBranchId·status는 받지 않는다(422 IMMUTABLE_FIELD). */
+    CustomerUpdate: {
+      version: components["schemas"]["Version"];
+      name?: string;
+      /** @description 숫자만 9~11자리. 입력 시 하이픈·공백은 서버가 제거한 뒤 검증하고 숫자만 저장한다. */
+      phone?: string;
+      /** Format: email */
+      email?: string | null;
+      /** @description 고객 응대 메모(M4-D06). 빈 문자열은 null로 저장한다. */
+      memo?: string | null;
+    };
+    /** @description customer_status_events에 이전·새 상태와 사유를 남긴다. 결제·이용권·이용 기록은 바뀌지 않는다(FR-MEM-06). */
+    CustomerStatusChange: {
+      version: components["schemas"]["Version"];
+      /** @enum {string} */
+      status: "정상" | "이용 제한" | "비활성";
+      reason: string;
+    };
+    /**
+     * @description 금액·수량·상품명·발급 조건 필드는 없다. 금액은 서버가 잠근 상품의 현재 가격으로 산정한다(FR-PAY-02). 정의되지 않은 필드(amountKrw 등)는 422다.
+     * @example {
+     *       "customerId": "10",
+     *       "branchId": "1",
+     *       "productId": "3",
+     *       "method": "카드",
+     *       "mockOutcome": "APPROVED"
+     *     }
+     */
+    PaymentCreate: {
+      customerId: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      productId: components["schemas"]["Id"];
+      /** @enum {string} */
+      method: "현금" | "카드" | "계좌이체" | "기타";
+      /**
+       * @description Mock 승인·실패 선택(M4-D07). 실제 결제사 호출이나 금전 이동은 없다.
+       * @default APPROVED
+       * @enum {string}
+       */
+      mockOutcome: "APPROVED" | "FAILED";
+    };
+    /** @description 원결제당 1회 전액 환불 사건(FR-PAY-10). processingBranchId는 원결제 지점이다(M4-D08). */
+    Refund: {
+      id: components["schemas"]["Id"];
+      amountKrw: number;
+      reason: string;
+      /** Format: date-time */
+      refundedAt: string;
+      processingBranchId: components["schemas"]["Id"];
+      processedBy: components["schemas"]["ActorSummary"];
+    };
+    /** @description 승인 결제는 passId와 approvedAt, 실패 결제는 failedAt을 가지며 passId가 null이다. 환불 후에도 amountKrw와 approvedAt은 원래 값을 유지한다. */
+    Payment: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      /**
+       * @description 항상 true. 실제 금전 이동이 없는 Mock 거래임을 화면에 표시한다(FR-PAY-01).
+       * @enum {boolean}
+       */
+      mock: true;
+      /**
+       * @description M4는 이용권 결제만 다룬다. 스터디룸·사물함은 M6.
+       * @enum {string}
+       */
+      purpose: "이용권";
+      branchId: components["schemas"]["Id"];
+      customer: components["schemas"]["CustomerSummary"];
+      productId: components["schemas"]["Id"];
+      /** @description 결제 당시 상품명 스냅샷 */
+      productName: string;
+      /** @enum {string} */
+      method: "현금" | "카드" | "계좌이체" | "기타";
+      amountKrw: number;
+      /**
+       * @description Mock 결제는 요청 안에서 승인·실패가 확정되므로 PENDING은 저장·응답하지 않는다.
+       * @enum {string}
+       */
+      status: "승인" | "실패" | "환불";
+      /** Format: date-time */
+      approvedAt: string | null;
+      /** Format: date-time */
+      failedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      createdBy: components["schemas"]["ActorSummary"];
+      passId: components["schemas"]["Id"] | null;
+      refund: components["schemas"]["Refund"] | null;
+      /** @description 요청자에게 원결제 지점 payments:write가 있고 승인·미사용·미만료이면 true. 서버 검증을 대체하지 않는다. */
+      canRefund: boolean;
+    };
+    PaymentPage: {
+      items: components["schemas"]["Payment"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /**
+     * @description 금액 필드는 없다. 환불 금액은 원결제 amountKrw 전액이다(M4-D04, 부분 환불 없음).
+     * @example {
+     *       "reason": "고객 단순 변심(미사용)"
+     *     }
+     */
+    RefundCreate: {
+      reason: string;
+    };
+    /**
+     * @description 요청 처리 시각 기준 실효 상태. 환불 > 만료(expiresAt <= 현재) > 소진 > 활성 순으로 판정한다. NOT_STARTED는 신규 발급에서 만들지 않으며 응답하지 않는다(M4-D01).
+     * @enum {string}
+     */
+    PassStatus: "활성" | "소진" | "만료" | "환불";
+    /** @description 가격은 담지 않는다. 결제 금액은 payments:read가 있을 때 결제 API로 조회한다. */
+    Pass: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      customer: components["schemas"]["CustomerSummary"];
+      /** @enum {string} */
+      kind: "시간권" | "기간권" | "정액권";
+      productId: components["schemas"]["Id"];
+      productName: string;
+      categoryName: string;
+      /** @description 발급 당시 조건 스냅샷(FR-PASS-03). 현재 상품 수정은 반영하지 않는다. */
+      terms: Omit<components["schemas"]["ProductTerms"], "kind">;
+      /** @description 시간권만 값이 있다. */
+      remainingMinutes: number | null;
+      /** @description 정액권만 값이 있다. */
+      remainingCreditKrw: number | null;
+      /**
+       * @description 요청 처리 시각 기준 실효 상태. 환불 > 만료(expiresAt <= 현재) > 소진 > 활성 순으로 판정한다. NOT_STARTED는 신규 발급에서 만들지 않으며 응답하지 않는다(M4-D01).
+       * @enum {string}
+       */
+      status: "활성" | "소진" | "만료" | "환불";
+      /** Format: date-time */
+      startedAt: string;
+      /**
+       * Format: date-time
+       * @description null이면 만료 없음(유효기간 없는 시간권·정액권, M4-D03). 경계는 [startedAt, expiresAt).
+       */
+      expiresAt: string | null;
+      purchaseBranchId: components["schemas"]["Id"];
+      purchasePaymentId: components["schemas"]["Id"];
+      /** Format: date-time */
+      createdAt: string;
+      /** @description seat_sessions 또는 pass_balance_events USE 이력이 있으면 true. */
+      used: boolean;
+      /** @description Payment.canRefund와 같은 기준 */
+      canRefund: boolean;
+    };
+    PassPage: {
+      items: components["schemas"]["Pass"][];
+      meta: components["schemas"]["PageMeta"];
     };
   };
   responses: {
@@ -2936,6 +3332,450 @@ export interface operations {
       403: components["responses"]["Error403"];
       409: components["responses"]["Error409"];
       422: components["responses"]["Error422"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listCustomers: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+        /** @description 기본 registeredAt. 동률은 id로 안정 정렬. */
+        sort?: "registeredAt" | "name";
+        status?: "정상" | "이용 제한" | "비활성";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CustomerPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createCustomer: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CustomerCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Customer"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getCustomer: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Customer"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateCustomer: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CustomerUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Customer"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeCustomerStatus: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CustomerStatusChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Customer"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listPayments: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+        /** @description 기본 createdAt. 동률은 id로 안정 정렬. */
+        sort?: "createdAt" | "amountKrw";
+        status?: "승인" | "실패" | "환불";
+        from?: string;
+        to?: string;
+        customerId?: components["schemas"]["Id"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaymentPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createPayment: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PaymentCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Payment"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getPayment: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Payment"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  refundPayment: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RefundCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Payment"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listPasses: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+        /** @description 기본 createdAt. expiresAt 정렬에서 null(만료 없음)은 가장 뒤. 동률은 id. */
+        sort?: "createdAt" | "expiresAt";
+        customerId?: components["schemas"]["Id"];
+        status?: "활성" | "소진" | "만료" | "환불";
+        kind?: "시간권" | "기간권" | "정액권";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PassPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getPass: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Pass"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
     };
   };

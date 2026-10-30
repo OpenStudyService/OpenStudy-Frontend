@@ -103,6 +103,22 @@ export const schemas = {
     status: z.enum(["정상", "이용 제한", "비활성"]),
     note: z.string(),
     branchIds: z.array(str),
+    // Optional demo metadata for canonical /customers; not a second customer ledger.
+    memberNo: z.string().optional(),
+    registeredBranchId: z.string().nullable().optional(),
+    registeredAt: z.string().optional(),
+    statusReason: z.string().nullable().optional(),
+    statusEvents: z
+      .array(
+        z.object({
+          at: z.string(),
+          actorId: z.string(),
+          before: z.string(),
+          after: z.string(),
+          reason: z.string(),
+        }),
+      )
+      .optional(),
   }),
   // Canonical product contract (Backend #16). `branchId` is always "all": the
   // sale branches live in `branchIds`, so a product is never one branch's row.
@@ -328,7 +344,7 @@ export interface Page<T> {
 export interface WorkspaceEvent {
   id: string;
   type: "changed" | "message" | "read" | "permissions";
-  resource: Resource;
+  resource: Resource | "customers";
   entityId: string;
   branchId: string;
 }
