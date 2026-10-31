@@ -70,3 +70,4 @@ Backend main **`d5b68f8346f4ae68edde7e8d1b897bd3894bb286`**의 독립 아카이�
 - 전체 그래프에는 SQL 파서 미설치로 SQL 18개 미추출, Backend Gradle 구문의 부분 추출 경고와 심벌 없는 설정 파일 경고가 남는다. 새 기능 검증을 대신하는 근거로 사용하지 않았다.
 - 실제 시험의 Backend PID·포트·명령 및 생성한 컨테이너 ID·이름을 대조한 뒤 해당 Backend와 일회용 MySQL 컨테이너를 종료·제거했다. 자격증명 fixture도 제거했다. 사용자 DB·기존 서버·Backend 작업 트리는 변경하지 않았다.
 - `git diff --check` 통과. 위 검증을 확인한 관련 변경만 커밋·push하며 기존 `.gitattributes`는 제외한다. PR의 base는 main이고 사용자가 검토·병합한다.
+- 구현 커밋 **`b8d7304`**를 `feature/payment-api`에 커밋·push하고 [Frontend PR #52](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/52)를 생성했다. PR은 #20과 연결했으며 검증·미검증·범위 밖 항목을 구분해 작성했다. 사용자 main 병합 대기 상태다.
