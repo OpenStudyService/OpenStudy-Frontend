@@ -103,6 +103,9 @@ test("category conflict compares the current name and preserves another editor's
 }) => {
   await login(page, "사장님");
   await page.goto("/app/all/products?tab=categories");
+  await expect(
+    page.getByRole("button", { name: "분류 등록", exact: true }),
+  ).toBeVisible();
   const category = await page.evaluate(async () => {
     const { token } = await fetch("/api/auth/csrf").then((r) => r.json());
     const response = await fetch("/api/product-categories", {

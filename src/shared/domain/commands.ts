@@ -12,11 +12,7 @@ export const commandFields = (
     type: Field["type"] = "text",
     extra: Partial<Field> = {},
   ): Field => ({ key, label, type, required: true, ...extra });
-  if (action === "refund")
-    return [
-      field("reason", "환불 사유", "textarea"),
-      field("refundBranchId", "환불 처리 지점", "select", { ref: "branches" }),
-    ];
+  if (action === "refund") return [field("reason", "환불 사유", "textarea")];
   if (action === "adjust")
     return [
       field("remaining", "잔여량 (분 / 일 / 원)", "number", { min: 0 }),

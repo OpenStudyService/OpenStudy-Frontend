@@ -149,7 +149,8 @@ describe("shared ledger and idempotency", () => {
   it("does not issue on failed payment", () => {
     const s = owner(),
       before = s.db.passes.length;
-    create(s, "payments", { ...payment, simulateFailure: true });
+    s.scenario = "payment-failure";
+    create(s, "payments", payment);
     expect(s.db.passes.length).toBe(before);
     expect(s.db.payments.at(-1)?.status).toBe("실패");
   });

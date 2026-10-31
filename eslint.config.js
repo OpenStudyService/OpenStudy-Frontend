@@ -11,6 +11,8 @@ export default ts.config(
       "src/shared/api/generated.ts",
       "playwright-report/**",
       "test-results*/**",
+      "qa-artifacts/**",
+      "graphify-out/**",
     ],
   },
   js.configs.recommended,
