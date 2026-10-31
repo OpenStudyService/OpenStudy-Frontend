@@ -100,28 +100,53 @@ test("purchase/refund and room booking conflicts preserve input", async ({
 }) => {
   await login(page);
   await page.goto("/app/gangnam/payments");
-  await page.getByRole("button", { name: "결제 등록", exact: true }).click();
+  await page.getByRole("button", { name: "Mock 결제", exact: true }).click();
   const panel = page.getByRole("dialog");
+  const customer = panel.getByLabel("고객 선택");
+  await expect(
+    customer.locator("option").filter({ hasText: "한유나" }),
+  ).toBeAttached();
+  await customer.selectOption(
+    (await customer
+      .locator("option")
+      .filter({ hasText: "한유나" })
+      .getAttribute("value"))!,
+  );
+  const product = panel.getByRole("combobox", {
+    name: "판매 상품",
+    exact: true,
+  });
+  await expect(
+    product.locator("option").filter({ hasText: "루틴 기간권 4주" }),
+  ).toBeAttached();
+  await product.selectOption(
+    (await product
+      .locator("option")
+      .filter({ hasText: "루틴 기간권 4주" })
+      .getAttribute("value"))!,
+  );
+  const paymentResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/api/payments",
+  );
   await panel
-    .getByLabel("회원", { exact: true })
-    .selectOption({ label: "한유나" });
-  await panel
-    .getByLabel("구매 상품")
-    .selectOption({ label: "루틴 기간권 4주" });
-  await panel.getByRole("button", { name: "결제 등록", exact: true }).click();
-  await expect(panel).not.toBeVisible();
+    .getByRole("button", { name: "Mock 결제 요청", exact: true })
+    .click();
+  const payment = await (await paymentResponse).json();
+  await expect(panel.getByText("결제 승인", { exact: true })).toBeVisible();
+  await panel.getByRole("button", { name: "확인", exact: true }).click();
   await page
-    .getByRole("button", { name: "한유나", exact: true })
-    .first()
+    .getByRole("button", { name: `결제 상세: ${payment.id}`, exact: true })
     .click();
-  await panel
-    .getByRole("button", { name: "미사용 전액 환불", exact: true })
-    .click();
+  await panel.getByRole("button", { name: "전액 환불", exact: true }).click();
   await panel.getByLabel("환불 사유").fill("미사용 전액 환불 요청");
   await panel
-    .getByRole("button", { name: "미사용 전액 환불", exact: true })
+    .getByRole("button", { name: "전액 환불 확정", exact: true })
     .click();
-  await expect(panel.locator(".badge")).toHaveText("환불");
+  await expect(
+    panel.getByRole("heading", { name: "전액 환불 완료" }),
+  ).toBeVisible();
   await panel.getByRole("button", { name: "닫기", exact: true }).click();
   await page.goto("/app/gangnam/reservations");
   await page.getByRole("button", { name: "예약 등록", exact: true }).click();

@@ -45,6 +45,9 @@ import { TaskPanel } from "../tasks/TaskPanel";
 import { ChannelManagement } from "../chat/ChannelManagement";
 import { Customers } from "../customers/Customers";
 import { CustomerPanel } from "../customers/CustomerPanel";
+import { Payments } from "../payments/Payments";
+import { Passes } from "../payments/Passes";
+import { PaymentPanel, PassPanel } from "../payments/PaymentPanels";
 
 export function format(
   row: Entity,
@@ -129,10 +132,6 @@ function availableActions(
           (row as Employee).memberships.some((m) => admin(user, m.branchId))
         : admin(user, row.branchId),
     own = text(row, "employeeId") === user.id;
-  if (resource === "payments")
-    return isAdmin && status === "승인" ? ["refund"] : [];
-  if (resource === "passes")
-    return isAdmin && status !== "환불" ? ["adjust"] : [];
   if (resource === "members") return ["history"];
   if (resource === "seats")
     return editable(user, resource, row.branchId)
@@ -193,7 +192,11 @@ export function ResourcePage(props: {
   resource: Resource;
   embedded?: boolean;
 }) {
-  return props.resource === "members" ? (
+  return props.resource === "payments" ? (
+    <Payments embedded={props.embedded} />
+  ) : props.resource === "passes" ? (
+    <Passes embedded={props.embedded} />
+  ) : props.resource === "members" ? (
     <Customers embedded={props.embedded} />
   ) : props.resource === "channels" ? (
     <ChannelManagement embedded={props.embedded} />
@@ -595,7 +598,11 @@ export function RecordPanel(props: {
   onClose: () => void;
   onReschedule?: () => void;
 }) {
-  return props.resource === "members" ? (
+  return props.resource === "payments" ? (
+    <PaymentPanel id={props.id} onClose={props.onClose} />
+  ) : props.resource === "passes" ? (
+    <PassPanel id={props.id} onClose={props.onClose} />
+  ) : props.resource === "members" ? (
     <CustomerPanel id={props.id} onClose={props.onClose} />
   ) : props.resource === "tasks" ? (
     <TaskPanel id={props.id} onClose={props.onClose} />
@@ -968,8 +975,9 @@ function PermissionsEditor({
       }}
     >
       <p className="tip">
-        환불·초대·권한 변경·승인은 관리자 전용입니다. 일반 직원의 협업 기능은
-        기본 허용됩니다.
+        환불은 원결제 지점의 결제 권한과 이용권 사용·만료 조건에 따라
+        허용됩니다. 초대·권한 변경·승인은 관리자 전용이며 일반 직원의 협업
+        기능은 기본 허용됩니다.
       </p>
       {lookups.branches
         .filter((b) => admin(session.user, b.id))

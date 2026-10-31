@@ -42,6 +42,25 @@ function isCustomerSnapshot(value: unknown) {
       "note" in value)
   );
 }
+function isPaymentSnapshot(value: unknown) {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    (("amount" in value && "memberId" in value) ||
+      ("amountKrw" in value && "customer" in value))
+  );
+}
+function publicLedger(db: Database) {
+  const fixtureIds = new Set(seed().members.map((member) => member.id));
+  return {
+    // Customer entry is memory-only. Do not leave orphan transactions after
+    // restoring only the synthetic customer fixture on a full demo reload.
+    payments: db.payments
+      .filter((row) => fixtureIds.has(row.memberId))
+      .map((row) => ({ ...row, reason: "" })),
+    passes: db.passes.filter((row) => fixtureIds.has(row.memberId)),
+  };
+}
 interface Saved {
   db: Database;
   persona: string | null;
@@ -70,6 +89,7 @@ export class MockStore {
             // Customer input stays in memory even in demo mode. Restore only the
             // fixed synthetic fixture across a full browser reload.
             this.db.members = seed().members;
+            Object.assign(this.db, publicLedger(this.db));
             this.persona = x.persona;
             this.sequence = x.sequence;
             this.idempotency = x.idempotency ?? {};
@@ -90,6 +110,9 @@ export class MockStore {
             db: {
               ...this.db,
               members: seed().members,
+              // Refund reasons can contain personal data. Keep entered text in
+              // memory for the current demo session, never in browser storage.
+              ...publicLedger(this.db),
               audit: this.db.audit.map((row) =>
                 row.resource === "members"
                   ? { ...row, before: "", after: "" }
@@ -100,7 +123,9 @@ export class MockStore {
             sequence: this.sequence,
             idempotency: Object.fromEntries(
               Object.entries(this.idempotency).filter(
-                ([, record]) => !isCustomerSnapshot(record.result),
+                ([, record]) =>
+                  !isCustomerSnapshot(record.result) &&
+                  !isPaymentSnapshot(record.result),
               ),
             ),
           }),

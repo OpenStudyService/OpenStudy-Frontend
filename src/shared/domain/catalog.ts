@@ -184,7 +184,6 @@ export const catalog: Partial<Record<Resource, Definition>> = {
       "구매 시 조건과 잔여량을 확인해요. 구매는 결제 관리에서 진행해 주세요.",
     columns: ["memberId", "name", "remaining", "expiresAt", "status"],
     fields: [],
-    actions: [{ key: "adjust", label: "잔여량·유효기간 조정" }],
   },
   payments: {
     title: "결제·환불",
@@ -200,7 +199,6 @@ export const catalog: Partial<Record<Resource, Definition>> = {
       f("method", "결제 수단", "select", {
         options: ["Mock 카드", "Mock 현금"],
       }),
-      f("simulateFailure", "승인 실패 재현", "checkbox", { required: false }),
     ],
     columns: [
       "memberId",

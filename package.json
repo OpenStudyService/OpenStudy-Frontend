@@ -18,6 +18,7 @@
     "test:e2e": "playwright test",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "test:e2e:customers:live": "playwright test --config playwright.customers.config.ts",
+    "test:e2e:payments:live": "playwright test --config playwright.payments.config.ts",
     "test:builds": "npm run build && npm run build:demo -- --outDir dist-demo && playwright test --config playwright.build.config.ts",
     "check": "npm run typecheck && npm run lint && npm test && npm run test:real-mail:tool",
     "api:generate": "tsx scripts/generate-contract.ts && openapi-typescript docs/api/openapi.json -o src/shared/api/generated.ts && prettier --write src/shared/api/generated.ts",
