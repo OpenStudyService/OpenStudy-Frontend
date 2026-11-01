@@ -59,4 +59,5 @@ Frontend main `d1983c9`([PR #52](https://github.com/OpenStudyService/OpenStudy-F
 
 - Frontend `graphify update .` 성공: **1,498 nodes / 4,589 edges / 79 communities**. AST만 사용했고 LLM/API 비용은 없다. 심벌이 없는 설정·데이터 파일 안내와 community 라벨 갱신 안내가 있었으며 코드 그래프 갱신은 완료됐다. 기존 ignore 정책에 따라 산출물은 로컬에 유지한다.
 - `git diff --check` 통과. 새 작업 관련 변경만 커밋·push하고 기존 `.gitattributes`는 제외한다. 원격 main은 작업 기준인 `d1983c9` 상태임을 다시 확인했다.
-- 커밋·push·PR 결과는 확인 후 추가한다.
+- 워크스페이스 전체 그래프도 갱신했다(**8,889 nodes / 20,080 edges / 623 communities**). SQL 파서 미설치 및 Backend Gradle 구문의 부분 추출 경고는 남으며 실제 빌드 검증을 대체하는 근거로 사용하지 않는다.
+- 구현 커밋 **`bb5a9ea`**를 작업 브랜치에 커밋·push하고 [Frontend PR #53](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/53)을 생성했다. #34를 연결했고 검증 경계와 후속 운영 검증을 PR에 구분했다. 사용자 main 검토·병합 대기 상태다.
