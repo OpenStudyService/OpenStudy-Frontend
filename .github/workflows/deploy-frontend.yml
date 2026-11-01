@@ -23,18 +23,14 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: node --test scripts/deploy-static.test.mjs
-      - name: Build live frontend
-        run: npm run build
-        env:
-          VITE_API_MODE: live
-          VITE_API_BASE_URL: /api
+      - name: Install browser for production build checks
+        run: npx playwright install --with-deps chromium
+      - name: Verify live and Mock production builds
+        run: npm run test:builds
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: frontend-${{ github.sha }}
-          path: |
-            dist/
-            !dist/**/*.map
-            !dist/mockServiceWorker.js
+          path: dist/
           if-no-files-found: error
           retention-days: 7
 

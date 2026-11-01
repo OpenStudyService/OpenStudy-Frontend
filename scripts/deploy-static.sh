@@ -10,6 +10,9 @@ if [[ ! -s dist/index.html || ! -d dist/assets ]]; then
   exit 1
 fi
 
+# Validate the downloaded artifact before the first publish operation too.
+node "$(dirname "${BASH_SOURCE[0]}")/check-build.mjs" --mode live dist
+
 # Keep old hashed assets so open browser tabs can finish loading their release.
 aws s3 sync dist/assets/ "s3://$S3_BUCKET/assets/" \
   --exclude '*.map' --cache-control 'public,max-age=31536000,immutable' --only-show-errors

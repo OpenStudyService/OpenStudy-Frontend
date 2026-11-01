@@ -6,21 +6,45 @@ import {
   writeFileSync,
   readFileSync,
   rmSync,
+  existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
 
 const script = fileURLToPath(new URL("deploy-static.sh", import.meta.url));
+const bash =
+  process.platform === "win32" ? "C:/Program Files/Git/bin/bash.exe" : "bash";
+const deployArgs = [
+  "-c",
+  'export PATH="$DEPLOY_TEST_BIN:$PATH"; exec bash "$1"',
+  "deploy-test",
+  script.replaceAll("\\", "/"),
+];
 
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), "openstudy-deploy-"));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(() => {
+    assert.ok(resolve(dir).startsWith(resolve(tmpdir()) + sep));
+    rmSync(dir, { recursive: true, force: true });
+  });
   mkdirSync(join(dir, "bin"));
   mkdirSync(join(dir, "dist/assets"), { recursive: true });
-  writeFileSync(join(dir, "dist/index.html"), "<html>release</html>");
+  writeFileSync(
+    join(dir, "dist/index.html"),
+    '<html><script type="module" src="/assets/app.js"></script></html>',
+  );
+  writeFileSync(join(dir, "dist/assets/app.js"), 'console.log("release");');
+  writeFileSync(
+    join(dir, "dist/build-provenance.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      mode: "live",
+      chunks: [{ fileName: "assets/app.js", modules: ["src/main.tsx"] }],
+    }),
+  );
   writeFileSync(
     join(dir, "bin/aws"),
     `#!/usr/bin/env node
@@ -49,7 +73,10 @@ fs.copyFileSync('dist/index.html', args[args.indexOf('--output') + 1]);
     dir,
     env: {
       ...process.env,
-      PATH: join(dir, "bin") + ":" + process.env.PATH,
+      PATH: join(dir, "bin") + delimiter + process.env.PATH,
+      DEPLOY_TEST_BIN: join(dir, "bin")
+        .replaceAll("\\", "/")
+        .replace(/^([a-z]):\//i, (_, drive) => `/${drive.toLowerCase()}/`),
       AWS_REGION: "ap-northeast-2",
       S3_BUCKET: "example-frontend",
       CLOUDFRONT_DISTRIBUTION_ID: "EXAMPLE123",
@@ -61,7 +88,7 @@ fs.copyFileSync('dist/index.html', args[args.indexOf('--output') + 1]);
 
 test("assets precede index publication; cache invalidation and SPA checks complete", (t) => {
   const f = fixture(t);
-  const result = spawnSync("bash", [script], {
+  const result = spawnSync(bash, deployArgs, {
     cwd: f.dir,
     env: f.env,
     encoding: "utf8",
@@ -91,7 +118,7 @@ test("assets precede index publication; cache invalidation and SPA checks comple
 
 test("a failed invalidation fails deployment before reporting success", (t) => {
   const f = fixture(t);
-  const result = spawnSync("bash", [script], {
+  const result = spawnSync(bash, deployArgs, {
     cwd: f.dir,
     env: { ...f.env, FAIL_INVALIDATION: "1" },
     encoding: "utf8",
@@ -107,11 +134,27 @@ test("a failed invalidation fails deployment before reporting success", (t) => {
 test("an incomplete build fails before publishing any files", (t) => {
   const f = fixture(t);
   rmSync(join(f.dir, "dist/index.html"));
-  const result = spawnSync("bash", [script], {
+  const result = spawnSync(bash, deployArgs, {
     cwd: f.dir,
     env: f.env,
     encoding: "utf8",
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Build the live frontend/);
+});
+
+test("a contaminated artifact fails before any AWS call", (t) => {
+  const f = fixture(t);
+  writeFileSync(
+    join(f.dir, "dist/mockServiceWorker.js"),
+    "// accidental demo worker",
+  );
+  const result = spawnSync(bash, deployArgs, {
+    cwd: f.dir,
+    env: f.env,
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /worker|MSW/i);
+  assert.equal(existsSync(f.env.DEPLOY_COMMANDS), false);
 });

@@ -311,13 +311,11 @@ function GenericResourcePage({
     );
     close();
   }
-  const fields = def.fields
-    .filter((f) => f.key !== "simulateFailure" || MOCK)
-    .map((f) =>
-      ["notices"].includes(resource) && f.key === "branchId" && user.owner
-        ? { ...f, options: ["all"] }
-        : f,
-    );
+  const fields = def.fields.map((f) =>
+    ["notices"].includes(resource) && f.key === "branchId" && user.owner
+      ? { ...f, options: ["all"] }
+      : f,
+  );
   return (
     <section className={embedded ? "" : "page"}>
       {!embedded && (
@@ -710,7 +708,7 @@ function GenericRecordPanel({
     (action === "permissions" ? "지점·권한 설정" : "작업 확인");
   const commandForm = r ? commandFields(resource, action, r) : [];
   const fields = def.fields.filter(
-    (f) => f.key !== "simulateFailure" && f.key !== "branchId",
+    (f) => (!MOCK || f.key !== "simulateFailure") && f.key !== "branchId",
   );
   return (
     <Panel
@@ -793,9 +791,11 @@ function GenericRecordPanel({
                   ]
                     .filter(
                       (k) =>
-                        !["checks", "simulateFailure", "memberships"].includes(
-                          k,
-                        ),
+                        ![
+                          "checks",
+                          ...(MOCK ? ["simulateFailure"] : []),
+                          "memberships",
+                        ].includes(k),
                     )
                     .map((k) => (
                       <div className="contents" key={k}>

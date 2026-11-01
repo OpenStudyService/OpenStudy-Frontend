@@ -326,6 +326,9 @@ export function create(
   const user = writable(store, resource, b);
   const inputFields = new Set([
     ...(catalog[resource]?.fields.map((f) => f.key) || []),
+    // This module is mock-only. Its request contract must remain testable when
+    // the importing test process uses the live UI catalog.
+    ...(resource === "reservations" ? ["simulateFailure"] : []),
     "branchId",
   ]);
   assert(

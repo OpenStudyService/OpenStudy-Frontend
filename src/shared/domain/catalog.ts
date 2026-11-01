@@ -1,4 +1,5 @@
 import type { Permission, Resource } from "./schema";
+import { MOCK } from "../api/client";
 export interface Field {
   key: string;
   label: string;
@@ -297,7 +298,13 @@ export const catalog: Partial<Record<Resource, Definition>> = {
       f("startsAt", "시작 일시", "datetime-local"),
       f("endsAt", "종료 일시", "datetime-local"),
       f("people", "이용 인원", "number", { min: 1 }),
-      f("simulateFailure", "결제 실패 재현", "checkbox", { required: false }),
+      ...(MOCK
+        ? [
+            f("simulateFailure", "결제 실패 재현", "checkbox", {
+              required: false,
+            }),
+          ]
+        : []),
     ],
     columns: ["memberId", "roomId", "startsAt", "endsAt", "amount", "status"],
     actions: [
