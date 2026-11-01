@@ -158,6 +158,9 @@ export function Login() {
           <h2 className="text-[28px] font-semibold tracking-tight">
             다시 만나 반가워요.
           </h2>
+          <p className="help mt-2" role="note">
+            {MOCK ? "데모 데이터" : "실제 API 연결"}
+          </p>
           <p className="mt-2 mb-7 text-[13px] leading-6 text-muted">
             오늘도 우리 공간의 하루를 함께 시작해요.
             <br />

@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: "list",
   use: {
     browserName: "chromium",
-    channel: "chrome",
+    channel: process.env.CI ? undefined : "chrome",
     screenshot: "only-on-failure",
   },
   webServer: [

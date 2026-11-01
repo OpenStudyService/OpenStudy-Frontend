@@ -391,9 +391,8 @@ export function Layout() {
             <strong className="truncate text-xs">{title}</strong>
           </div>
           <div className="flex items-center gap-3">
-            {(MOCK || lookups.data?.preview) && (
-              <Badge>{MOCK ? "데모 데이터" : "로컬 샘플"}</Badge>
-            )}
+            <Badge>{MOCK ? "데모 데이터" : "실제 API 연결"}</Badge>
+            {!MOCK && lookups.data?.preview && <Badge>로컬 샘플</Badge>}
             <span
               className="hidden text-[10px] text-muted lg:inline"
               role="status"
