@@ -49,3 +49,11 @@ DomainLenz 개발자에게 OpenStudy에서 자연어로 조회할 DB 도메인, 
 - 권한 미확정 도메인 정책과 전사 휴가의 지점 귀속, 실제 채널 공유 권한 회수·보관·다중 사용자 전달을 협의해야 한다.
 - 서버 페이징·CSV·업무 변경·일반 자연어 해석은 데모 범위가 아니다. 시연 성공을 #32/#92/#97 또는 상위 자연어 기능의 완료로 간주하지 않는다.
 - 원격 main 직접 push·PR 병합·자동 병합은 하지 않는다. 작업 브랜치 push와 PR 준비 후 사용자 검토·병합에 맡긴다.
+
+## 7. 전달 기록
+
+- 구현·문서·화면·테스트를 `4cf069c`로 커밋하고 `feature/domainlenz-chat-demo`를 push했다.
+- [Frontend PR #56](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/56)을 생성했다. 실제 연동 이슈를 닫지 않고 참고 관계만 연결했으며 사용자 검토·병합 대기 상태다.
+- 최종 AST 갱신은 **1,897 nodes / 5,482 edges / 96 communities**다. 생성 HTML의 Radix 내장 CSS 템플릿에서 공백만 있는 줄을 정리해 `git diff --cached --check`를 통과했고, 재생성 후 오프라인 갤러리·공유·모바일 Chrome 검사 1개를 추가로 통과했다.
+- 전달 ZIP을 최종 HTML·문서·화면으로 다시 생성했다. 저장 위치는 작업공간 `outputs/OpenStudy_DomainLenz_Demo.zip`이며 압축 해제 후 `OpenStudy_DomainLenz_Demo.html`을 열면 된다.
+- PR 생성 시 base는 main `242af5b`였다. 원격 main 갱신, 병합 및 자동 병합은 수행하지 않았다.
