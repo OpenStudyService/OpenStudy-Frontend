@@ -167,3 +167,23 @@ it("rejects a looping cursor instead of falsely completing a gap", async () => {
     })),
   ).rejects.toThrow(/커서/);
 });
+it("orders canonical bigint IDs exactly and fills refresh gaps without numeric sequences", async () => {
+  const template = fixture().db.messages[0];
+  const messages = [
+    "9007199254740992",
+    "9007199254740993",
+    "9007199254740994",
+  ].map((id): Message => ({ ...template, id, sequence: 0 }));
+  expect(
+    mergeMessages([messages[2], messages[0]], [messages[1]]).map((m) => m.id),
+  ).toEqual(messages.map((m) => m.id));
+  const fetched: string[] = [];
+  const result = await refreshFeed({ items: [messages[0]] }, async (cursor) => {
+    fetched.push(cursor ?? "latest");
+    return cursor
+      ? { items: messages.slice(0, 2) }
+      : { items: [messages[2]], nextCursor: messages[2].id };
+  });
+  expect(fetched).toEqual(["latest", messages[2].id]);
+  expect(result.items.map((m) => m.id)).toEqual(messages.map((m) => m.id));
+});

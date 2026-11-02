@@ -3,8 +3,46 @@ import { Badge, Button } from "../../shared/ui/primitives";
 import { Icon } from "../../shared/ui/Icon";
 import { displayDate } from "../../shared/domain/schema";
 import { useTaskDetail } from "../tasks/hooks";
+import type { components } from "../../shared/api/foundation.generated";
 
-export function TaskCard({ id, onOpen }: { id: string; onOpen: () => void }) {
+export function TaskCard({
+  id,
+  onOpen,
+  snapshot,
+}: {
+  id: string;
+  onOpen: () => void;
+  snapshot?: components["schemas"]["TaskCard"] | null;
+}) {
+  if (snapshot) {
+    if (!snapshot.accessible)
+      return (
+        <div className="task-card" role="note">
+          접근 불가
+        </div>
+      );
+    return (
+      <button className="task-card" onClick={onOpen}>
+        <span className="flex items-center gap-2 text-[10px] text-muted">
+          <Icon name="tasks" size={14} />
+          연결된 업무
+        </span>
+        <b className="my-2 block text-[13px] text-primary">{snapshot.title}</b>
+        <small className="block text-[10px]">
+          담당자 {snapshot.assignee?.name ?? "미정"}
+        </small>
+        <div className="flex justify-between">
+          <small className="text-[10px]">
+            기한 {snapshot.dueAt ? displayDate(snapshot.dueAt) : "미정"}
+          </small>
+          <Badge>{snapshot.status}</Badge>
+        </div>
+      </button>
+    );
+  }
+  return <QueriedTaskCard id={id} onOpen={onOpen} />;
+}
+function QueriedTaskCard({ id, onOpen }: { id: string; onOpen: () => void }) {
   const task = useTaskDetail(id);
   const inaccessible =
     task.error instanceof ApiError && [403, 404].includes(task.error.status);

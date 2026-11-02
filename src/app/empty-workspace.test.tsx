@@ -286,8 +286,14 @@ it("keeps sales totals and table headers with no sales response", async () => {
   expect(screen.getByRole("columnheader", { name: "순매출" })).toBeVisible();
 });
 
-it("shows a channel empty state when chat returns no data", async () => {
-  renderWorkspace(() => new Response(null, { status: 204 }), "chat");
+it("shows a channel empty state for a canonical empty channel collection", async () => {
+  renderWorkspace(
+    (path) =>
+      path === "/api/channels"
+        ? Response.json({ items: [] })
+        : Response.json({}),
+    "chat",
+  );
   expect(
     await screen.findByRole("heading", {
       name: "아직 참여 중인 대화가 없어요",
@@ -375,7 +381,11 @@ it("preserves search and pagination conditions when switching branch", async () 
       },
     ],
   };
-  renderWorkspace((path) => emptyTasks(path, 3), "tasks?q=검색&page=3", current);
+  renderWorkspace(
+    (path) => emptyTasks(path, 3),
+    "tasks?q=검색&page=3",
+    current,
+  );
   await screen.findByRole("heading", { name: "업무 관리" });
   const client = clients[0];
   client.setQueryData(["data", "owner", "all", "sensitive"], { secret: true });

@@ -8,6 +8,7 @@ import { MockStore } from "../../mocks/store";
 import { ApiError } from "../../shared/api/client";
 import { ChannelManagement } from "./ChannelManagement";
 import { chatApi } from "./api";
+import { PartialChannelSaveError } from "./canonical";
 const context = vi.hoisted(() => ({ value: {} as AppContext }));
 vi.mock("../../app/context", () => ({ useApp: () => context.value }));
 vi.mock("./api", () => ({
@@ -118,4 +119,33 @@ it("does not load administration data for staff even with a direct detail URL", 
   mount("?detail=gangnam");
   expect(screen.getByText("채널 관리 권한이 없어요")).toBeVisible();
   expect(chatApi.managed).not.toHaveBeenCalled();
+});
+it("keeps partially saved channel inputs and requires latest comparison before retry", async () => {
+  const base = store.get("channels", "gangnam");
+  vi.mocked(chatApi.saveChannel).mockRejectedValueOnce(
+    new PartialChannelSaveError(
+      new ApiError(503, {
+        code: "SERVICE_UNAVAILABLE",
+        message: "참여자 변경 실패",
+      }),
+    ),
+  );
+  vi.mocked(chatApi.channel).mockResolvedValue({
+    ...base,
+    version: 3,
+    name: "새 채널 이름",
+  });
+  const user = mount("?tab=channels&detail=gangnam");
+  const name = await screen.findByLabelText("채널 이름");
+  await user.clear(name);
+  await user.type(name, "새 채널 이름");
+  await user.click(screen.getByRole("button", { name: "저장하기" }));
+  await screen.findByRole("button", { name: "최신 내용 확인" });
+  expect(name).toHaveValue("새 채널 이름");
+  expect(screen.getByRole("button", { name: "저장하기" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "최신 내용 확인" }));
+  await screen.findByRole("heading", { name: "최신 채널 · 버전 3" });
+  expect(
+    screen.getByRole("button", { name: "최신 기준으로 다시 저장" }),
+  ).toBeEnabled();
 });

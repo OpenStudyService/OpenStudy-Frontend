@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
-import { ApiError } from "../../shared/api/client";
+import { ApiError, MOCK } from "../../shared/api/client";
 import type { ResourceMap } from "../../shared/domain/schema";
 import {
   Button,
@@ -17,6 +17,7 @@ import {
   useTaskWrite as useChannelWrite,
 } from "../tasks/hooks";
 import { chatApi } from "./api";
+import { canonicalChannel, PartialChannelSaveError } from "./canonical";
 import { canManageChannel } from "./model";
 
 type ManagedChannel = ResourceMap["channels"];
@@ -108,7 +109,11 @@ export function ChannelManagement({
               </tr>
             ) : (
               rows.data?.items
-                .filter((c) => canManageChannel(session.user, c.branchId))
+                .filter(
+                  (c) =>
+                    canManageChannel(session.user, c.branchId) &&
+                    (canonicalChannel(c)?.canManage ?? true),
+                )
                 .map((c) => (
                   <tr key={c.id}>
                     <td>
@@ -127,6 +132,7 @@ export function ChannelManagement({
                       {c.participantIds
                         .map(
                           (id) =>
+                            canonicalChannel(c)?.memberNames[id] ??
                             lookups.employees.find((p) => p.id === id)?.name ??
                             (session.user.id === id ? session.user.name : id),
                         )
@@ -153,7 +159,9 @@ export function ChannelManagement({
           onClose={close}
         >
           {id === "new" ||
-          (channel && canManageChannel(session.user, channel.branchId)) ? (
+          (channel &&
+            canManageChannel(session.user, channel.branchId) &&
+            (canonicalChannel(channel)?.canManage ?? true)) ? (
             <ChannelEditor
               key={`${id}:${context}`}
               channel={channel}
@@ -209,7 +217,7 @@ function ChannelEditor({
   );
   const denied =
     error instanceof ApiError &&
-    [401, 403].includes(error.status) &&
+    [401, 403, 404].includes(error.status) &&
     error.detail.code !== "CSRF_INVALID";
   async function refresh() {
     try {
@@ -233,9 +241,11 @@ function ChannelEditor({
     if (!canManageChannel(session.user, draft.branchId) || !draft.branchId)
       invalid.branchId = "관리 가능한 지점을 선택해 주세요.";
     if (
-      !draft.participantIds.length ||
+      (MOCK && !draft.participantIds.length) ||
       draft.participantIds.some(
-        (id) => !candidates.data?.some((p) => p.id === id),
+        (id) =>
+          !candidates.data?.some((p) => p.id === id) &&
+          !initial.participantIds.includes(id),
       )
     )
       invalid.participantIds = "선택 지점의 활성 직원을 선택해 주세요.";
@@ -268,7 +278,8 @@ function ChannelEditor({
       setLatest(null);
       if (e instanceof ApiError) {
         setFields(e.detail.fieldErrors ?? {});
-        if (e.status === 409) setConflict(true);
+        if (e.status === 409 || e instanceof PartialChannelSaveError)
+          setConflict(true);
       }
     }
   }

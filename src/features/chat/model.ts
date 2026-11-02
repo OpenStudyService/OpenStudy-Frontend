@@ -44,10 +44,20 @@ export const draftKey = (
   channelId: string,
   parentId = "",
 ) => JSON.stringify([userId, scope, channelId, parentId]);
+export function compareMessages(a: Message, b: Message) {
+  // Canonical IDs are unsigned bigint strings. Conversion to Number loses
+  // ordering beyond 2^53; legacy demo messages still use numeric sequences.
+  if (/^\d+$/.test(a.id) && /^\d+$/.test(b.id)) {
+    const left = BigInt(a.id),
+      right = BigInt(b.id);
+    return left < right ? -1 : left > right ? 1 : 0;
+  }
+  return a.sequence - b.sequence || a.id.localeCompare(b.id);
+}
 export function mergeMessages(...pages: Message[][]) {
   return [
     ...new Map(pages.flat().map((message) => [message.id, message])).values(),
-  ].sort((a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id));
+  ].sort(compareMessages);
 }
 export async function refreshFeed(
   previous: MessageFeed | undefined,
@@ -55,7 +65,7 @@ export async function refreshFeed(
 ): Promise<MessageFeed> {
   const first = await fetchPage(),
     fresh = [...first.items];
-  const highest = previous?.items.at(-1)?.sequence ?? 0;
+  const highest = previous?.items.at(-1);
   let page = first;
   const cursors = new Set<string>();
   // Fill the gap when more than one page arrived between refreshes.
@@ -63,7 +73,7 @@ export async function refreshFeed(
     highest &&
     page.nextCursor &&
     page.items.length &&
-    page.items[0].sequence > highest
+    compareMessages(page.items[0], highest) > 0
   ) {
     if (cursors.has(page.nextCursor))
       throw new Error("메시지 커서가 반복됩니다. 다시 조회해 주세요.");

@@ -11,6 +11,13 @@ import { MessageViewport } from "./MessageViewport";
 import type { ChatFeed } from "./hooks";
 import { chatApi } from "./api";
 import { MockStore } from "../../mocks/store";
+const mode = vi.hoisted(() => ({ mock: true }));
+vi.mock("../../shared/api/client", async (original) => ({
+  ...(await original<typeof import("../../shared/api/client")>()),
+  get MOCK() {
+    return mode.mock;
+  },
+}));
 
 vi.mock("../../app/context", () => ({
   useApp: () => ({ session: { user: { id: "junho" } }, scope: "gangnam" }),
@@ -21,6 +28,7 @@ let height = 200,
   visibleHeight = 200;
 beforeEach(() => {
   vi.resetAllMocks();
+  mode.mock = true;
   height = 200;
   visibleHeight = 200;
   vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
@@ -49,6 +57,13 @@ beforeEach(() => {
     {},
   ] as unknown as DOMRectList);
   vi.mocked(chatApi.read).mockResolvedValue({ ok: true });
+});
+it("does not send channel-level receipts in live mode while independent reads are pending", async () => {
+  mode.mock = false;
+  mount(fixture());
+  fireEvent.scroll(document.querySelector(".messages")!);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(chatApi.read).not.toHaveBeenCalled();
 });
 afterEach(() => {
   cleanup();

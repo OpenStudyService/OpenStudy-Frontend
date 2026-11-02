@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { isAccessError } from "../../shared/api/read-model";
-import { ApiError } from "../../shared/api/client";
+import { ApiError, MOCK } from "../../shared/api/client";
 import {
   Button,
   ErrorState,
@@ -55,6 +55,7 @@ export function MessageViewport({
     const element = viewport.current,
       sentinel = last.current;
     if (
+      !MOCK ||
       !element ||
       !sentinel ||
       !highest ||
