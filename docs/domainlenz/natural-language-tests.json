@@ -823,6 +823,26 @@
             ]
           },
           {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "product_id",
+              "purpose",
+              "status",
+              "approved_at",
+              "issued_pass_quantity"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "refunded_at"
+            ]
+          },
+          {
             "table": "passes",
             "fields": [
               "id",
@@ -978,6 +998,26 @@
           ]
         },
         {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "product_id",
+            "purpose",
+            "status",
+            "approved_at",
+            "issued_pass_quantity"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "refunded_at"
+          ]
+        },
+        {
           "table": "passes",
           "fields": [
             "id",
@@ -1019,6 +1059,26 @@
             "fields": [
               "product_id",
               "branch_id"
+            ]
+          },
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "product_id",
+              "purpose",
+              "status",
+              "approved_at",
+              "issued_pass_quantity"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "refunded_at"
             ]
           },
           {
@@ -1176,6 +1236,26 @@
           "fields": [
             "product_id",
             "branch_id"
+          ]
+        },
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "product_id",
+            "purpose",
+            "status",
+            "approved_at",
+            "issued_pass_quantity"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "refunded_at"
           ]
         },
         {
@@ -1620,10 +1700,14 @@
             "type": "KpiGroup"
           },
           {
-            "type": "bar",
+            "type": "seats",
             "bindings": {
               "label": "label",
-              "value": "occupied"
+              "value": "occupied",
+              "occupied": "occupied",
+              "available": "available",
+              "blocked": "blocked",
+              "total": "total"
             }
           },
           {
@@ -1987,7 +2071,9 @@
           {
             "type": "calendar",
             "bindings": {
-              "label": "label"
+              "label": "label",
+              "date": "date",
+              "time": "time"
             }
           },
           {
@@ -3742,7 +3828,9 @@
           {
             "type": "calendar",
             "bindings": {
-              "label": "label"
+              "label": "label",
+              "date": "date",
+              "time": "time"
             }
           },
           {
@@ -4747,6 +4835,1007 @@
             "action",
             "occurred_at",
             "result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seats-heatmap",
+      "domainId": "seats",
+      "prompt": "지난주 요일·시간대별 좌석 이용 건수를 보여줘",
+      "outcome": "ready",
+      "metric": "유효 입실 시각의 KST 요일·시간대별 COUNT(seat_sessions.id). 입실 시작 건수이며 동시 점유율이나 실제 혼잡도 예측이 아님.",
+      "grain": "요일·시간대·이용 지점",
+      "period": "지난주 · 10.05–10.11",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "seats",
+            "fields": [
+              "id",
+              "branch_id",
+              "seat_no",
+              "zone",
+              "status"
+            ]
+          },
+          {
+            "table": "seat_sessions",
+            "fields": [
+              "id",
+              "branch_id",
+              "seat_id",
+              "status",
+              "effective_checked_in_at",
+              "effective_checked_out_at",
+              "billed_minutes",
+              "billed_krw"
+            ]
+          }
+        ],
+        "grain": "요일·시간대·이용 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.seats-heatmap",
+            "definition": "유효 입실 시각의 KST 요일·시간대별 COUNT(seat_sessions.id). 입실 시작 건수이며 동시 점유율이나 실제 혼잡도 예측이 아님."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "seat_sessions.effective_checked_in_at",
+            "op": "GTE",
+            "value": "2026-10-05T00:00:00+09:00"
+          },
+          {
+            "field": "seat_sessions.effective_checked_in_at",
+            "op": "LT",
+            "value": "2026-10-12T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "seats-heatmap",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "heatmap",
+            "bindings": {
+              "label": "label",
+              "value": "value",
+              "column": "slot"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "요일"
+              },
+              {
+                "key": "slot",
+                "label": "시간대"
+              },
+              {
+                "key": "value",
+                "label": "이용 시작",
+                "unit": "건"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 70,
+        "total": 798,
+        "rows": [
+          {
+            "id": "heat-0",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "월",
+            "slot": "09–12시",
+            "value": 4
+          },
+          {
+            "id": "heat-1",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "월",
+            "slot": "09–12시",
+            "value": 6
+          },
+          {
+            "id": "heat-2",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "월",
+            "slot": "12–15시",
+            "value": 11
+          },
+          {
+            "id": "heat-3",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "월",
+            "slot": "12–15시",
+            "value": 13
+          },
+          {
+            "id": "heat-4",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "월",
+            "slot": "15–18시",
+            "value": 5
+          },
+          {
+            "id": "heat-5",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "월",
+            "slot": "15–18시",
+            "value": 7
+          },
+          {
+            "id": "heat-6",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "월",
+            "slot": "18–21시",
+            "value": 20
+          },
+          {
+            "id": "heat-7",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "월",
+            "slot": "18–21시",
+            "value": 22
+          },
+          {
+            "id": "heat-8",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "월",
+            "slot": "21–24시",
+            "value": 6
+          },
+          {
+            "id": "heat-9",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "월",
+            "slot": "21–24시",
+            "value": 8
+          },
+          {
+            "id": "heat-10",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "화",
+            "slot": "09–12시",
+            "value": 7
+          },
+          {
+            "id": "heat-11",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "화",
+            "slot": "09–12시",
+            "value": 9
+          },
+          {
+            "id": "heat-12",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "화",
+            "slot": "12–15시",
+            "value": 14
+          },
+          {
+            "id": "heat-13",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "화",
+            "slot": "12–15시",
+            "value": 16
+          },
+          {
+            "id": "heat-14",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "화",
+            "slot": "15–18시",
+            "value": 8
+          },
+          {
+            "id": "heat-15",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "화",
+            "slot": "15–18시",
+            "value": 10
+          },
+          {
+            "id": "heat-16",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "화",
+            "slot": "18–21시",
+            "value": 23
+          },
+          {
+            "id": "heat-17",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "화",
+            "slot": "18–21시",
+            "value": 12
+          },
+          {
+            "id": "heat-18",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "화",
+            "slot": "21–24시",
+            "value": 9
+          },
+          {
+            "id": "heat-19",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "화",
+            "slot": "21–24시",
+            "value": 11
+          },
+          {
+            "id": "heat-20",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "수",
+            "slot": "09–12시",
+            "value": 10
+          },
+          {
+            "id": "heat-21",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "수",
+            "slot": "09–12시",
+            "value": 12
+          },
+          {
+            "id": "heat-22",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "수",
+            "slot": "12–15시",
+            "value": 4
+          },
+          {
+            "id": "heat-23",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "수",
+            "slot": "12–15시",
+            "value": 6
+          },
+          {
+            "id": "heat-24",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "수",
+            "slot": "15–18시",
+            "value": 11
+          },
+          {
+            "id": "heat-25",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "수",
+            "slot": "15–18시",
+            "value": 13
+          },
+          {
+            "id": "heat-26",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "수",
+            "slot": "18–21시",
+            "value": 13
+          },
+          {
+            "id": "heat-27",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "수",
+            "slot": "18–21시",
+            "value": 15
+          },
+          {
+            "id": "heat-28",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "수",
+            "slot": "21–24시",
+            "value": 12
+          },
+          {
+            "id": "heat-29",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "수",
+            "slot": "21–24시",
+            "value": 14
+          },
+          {
+            "id": "heat-30",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "목",
+            "slot": "09–12시",
+            "value": 13
+          },
+          {
+            "id": "heat-31",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "목",
+            "slot": "09–12시",
+            "value": 15
+          },
+          {
+            "id": "heat-32",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "목",
+            "slot": "12–15시",
+            "value": 7
+          },
+          {
+            "id": "heat-33",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "목",
+            "slot": "12–15시",
+            "value": 9
+          },
+          {
+            "id": "heat-34",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "목",
+            "slot": "15–18시",
+            "value": 14
+          },
+          {
+            "id": "heat-35",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "목",
+            "slot": "15–18시",
+            "value": 16
+          },
+          {
+            "id": "heat-36",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "목",
+            "slot": "18–21시",
+            "value": 16
+          },
+          {
+            "id": "heat-37",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "목",
+            "slot": "18–21시",
+            "value": 18
+          },
+          {
+            "id": "heat-38",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "목",
+            "slot": "21–24시",
+            "value": 15
+          },
+          {
+            "id": "heat-39",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "목",
+            "slot": "21–24시",
+            "value": 4
+          },
+          {
+            "id": "heat-40",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "금",
+            "slot": "09–12시",
+            "value": 16
+          },
+          {
+            "id": "heat-41",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "금",
+            "slot": "09–12시",
+            "value": 5
+          },
+          {
+            "id": "heat-42",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "금",
+            "slot": "12–15시",
+            "value": 10
+          },
+          {
+            "id": "heat-43",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "금",
+            "slot": "12–15시",
+            "value": 12
+          },
+          {
+            "id": "heat-44",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "금",
+            "slot": "15–18시",
+            "value": 4
+          },
+          {
+            "id": "heat-45",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "금",
+            "slot": "15–18시",
+            "value": 6
+          },
+          {
+            "id": "heat-46",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "금",
+            "slot": "18–21시",
+            "value": 19
+          },
+          {
+            "id": "heat-47",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "금",
+            "slot": "18–21시",
+            "value": 21
+          },
+          {
+            "id": "heat-48",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "금",
+            "slot": "21–24시",
+            "value": 5
+          },
+          {
+            "id": "heat-49",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "금",
+            "slot": "21–24시",
+            "value": 7
+          },
+          {
+            "id": "heat-50",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "토",
+            "slot": "09–12시",
+            "value": 6
+          },
+          {
+            "id": "heat-51",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "토",
+            "slot": "09–12시",
+            "value": 8
+          },
+          {
+            "id": "heat-52",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "토",
+            "slot": "12–15시",
+            "value": 13
+          },
+          {
+            "id": "heat-53",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "토",
+            "slot": "12–15시",
+            "value": 15
+          },
+          {
+            "id": "heat-54",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "토",
+            "slot": "15–18시",
+            "value": 7
+          },
+          {
+            "id": "heat-55",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "토",
+            "slot": "15–18시",
+            "value": 9
+          },
+          {
+            "id": "heat-56",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "토",
+            "slot": "18–21시",
+            "value": 22
+          },
+          {
+            "id": "heat-57",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "토",
+            "slot": "18–21시",
+            "value": 24
+          },
+          {
+            "id": "heat-58",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "토",
+            "slot": "21–24시",
+            "value": 8
+          },
+          {
+            "id": "heat-59",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "토",
+            "slot": "21–24시",
+            "value": 10
+          },
+          {
+            "id": "heat-60",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "일",
+            "slot": "09–12시",
+            "value": 9
+          },
+          {
+            "id": "heat-61",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "일",
+            "slot": "09–12시",
+            "value": 11
+          },
+          {
+            "id": "heat-62",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "일",
+            "slot": "12–15시",
+            "value": 16
+          },
+          {
+            "id": "heat-63",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "일",
+            "slot": "12–15시",
+            "value": 5
+          },
+          {
+            "id": "heat-64",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "일",
+            "slot": "15–18시",
+            "value": 10
+          },
+          {
+            "id": "heat-65",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "일",
+            "slot": "15–18시",
+            "value": 12
+          },
+          {
+            "id": "heat-66",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "일",
+            "slot": "18–21시",
+            "value": 12
+          },
+          {
+            "id": "heat-67",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "일",
+            "slot": "18–21시",
+            "value": 14
+          },
+          {
+            "id": "heat-68",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "일",
+            "slot": "21–24시",
+            "value": 11
+          },
+          {
+            "id": "heat-69",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "일",
+            "slot": "21–24시",
+            "value": 13
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "seats",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_no",
+            "zone",
+            "status"
+          ]
+        },
+        {
+          "table": "seat_sessions",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_id",
+            "status",
+            "effective_checked_in_at",
+            "effective_checked_out_at",
+            "billed_minutes",
+            "billed_krw"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "products-top5",
+      "domainId": "products",
+      "prompt": "지난달 가장 잘 팔린 이용권 TOP 5를 보여줘",
+      "outcome": "ready",
+      "metric": "이용권 결제만 대상. 상품별 승인 발급 수량에서 기간 내 환불 수량을 차감한 순판매량. 상품별로 지점 값을 합한 뒤 순판매량 내림차순 TOP 5. 이 fixture는 5개 상품으로 고정.",
+      "grain": "상품·원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "products",
+            "fields": [
+              "id",
+              "name",
+              "kind",
+              "sale_status",
+              "price_krw"
+            ]
+          },
+          {
+            "table": "product_branches",
+            "fields": [
+              "product_id",
+              "branch_id"
+            ]
+          },
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "product_id",
+              "purpose",
+              "status",
+              "approved_at",
+              "issued_pass_quantity"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "refunded_at"
+            ]
+          },
+          {
+            "table": "passes",
+            "fields": [
+              "id",
+              "customer_id",
+              "purchase_branch_id",
+              "kind",
+              "status",
+              "expires_at",
+              "remaining_minutes",
+              "remaining_credit_krw"
+            ]
+          }
+        ],
+        "grain": "상품·원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.products-top5",
+            "definition": "이용권 결제만 대상. 상품별 승인 발급 수량에서 기간 내 환불 수량을 차감한 순판매량. 상품별로 지점 값을 합한 뒤 순판매량 내림차순 TOP 5. 이 fixture는 5개 상품으로 고정."
+          }
+        ],
+        "filters": [
+          {
+            "field": "payments.purpose",
+            "op": "EQ",
+            "value": "PASS"
+          }
+        ],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "products-top5",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "상품"
+              },
+              {
+                "key": "value",
+                "label": "순판매",
+                "unit": "개"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 10,
+        "total": 453,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "50시간권",
+            "value": 86
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "50시간권",
+            "value": 64
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "4주 기간권",
+            "value": 63
+          },
+          {
+            "id": "row-4",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "4주 기간권",
+            "value": 48
+          },
+          {
+            "id": "row-5",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "100시간권",
+            "value": 46
+          },
+          {
+            "id": "row-6",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "100시간권",
+            "value": 35
+          },
+          {
+            "id": "row-7",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "10만원 정액권",
+            "value": 35
+          },
+          {
+            "id": "row-8",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "10만원 정액권",
+            "value": 28
+          },
+          {
+            "id": "row-9",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "8주 기간권",
+            "value": 27
+          },
+          {
+            "id": "row-10",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "8주 기간권",
+            "value": 21
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "products",
+          "fields": [
+            "id",
+            "name",
+            "kind",
+            "sale_status",
+            "price_krw"
+          ]
+        },
+        {
+          "table": "product_branches",
+          "fields": [
+            "product_id",
+            "branch_id"
+          ]
+        },
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "product_id",
+            "purpose",
+            "status",
+            "approved_at",
+            "issued_pass_quantity"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "refunded_at"
+          ]
+        },
+        {
+          "table": "passes",
+          "fields": [
+            "id",
+            "customer_id",
+            "purchase_branch_id",
+            "kind",
+            "status",
+            "expires_at",
+            "remaining_minutes",
+            "remaining_credit_krw"
           ]
         }
       ]

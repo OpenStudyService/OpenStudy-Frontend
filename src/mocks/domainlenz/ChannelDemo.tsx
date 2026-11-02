@@ -10,8 +10,9 @@ import {
   shareResult,
   subscribeShares,
 } from "./model";
-import type { DemoResult, DemoViewer } from "./model";
+import type { DemoResult, DemoViewer, DemoTrace } from "./model";
 import { ResultCard } from "./ResultCard";
+import { Showcase } from "./Showcase";
 import "./demo.css";
 
 interface Entry {
@@ -32,8 +33,22 @@ export interface ChannelDemoProps {
   galleryOpen: boolean;
   onGalleryOpen: (open: boolean) => void;
   onPick: (prompt: string) => void;
+  onTrace?: (trace: DemoTrace) => void;
+  workspace?: boolean;
 }
 const phases = ["질문 해석", "조건 확인", "데이터 조회", "결과 준비"];
+function revealEntry(node: HTMLElement | null) {
+  if (!node) return;
+  const viewport = node.closest<HTMLElement>(".v8-conversation, .messages");
+  if (viewport) {
+    const top =
+      node.getBoundingClientRect().top -
+      viewport.getBoundingClientRect().top +
+      viewport.scrollTop -
+      12;
+    viewport.scrollTo?.({ top: Math.max(0, top), behavior: "smooth" });
+  } else node.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+}
 export default function ChannelDemo({
   viewer,
   scope,
@@ -43,6 +58,8 @@ export default function ChannelDemo({
   galleryOpen,
   onGalleryOpen,
   onPick,
+  onTrace,
+  workspace = false,
 }: ChannelDemoProps) {
   const [entries, setEntries] = useState<Entry[]>([]),
     [group, setGroup] = useState("all"),
@@ -50,6 +67,8 @@ export default function ChannelDemo({
   const active = useRef<{
     id: string;
     timers: ReturnType<typeof setTimeout>[];
+    scope: string;
+    prompt: string;
   } | null>(null);
   const newestEntry = useRef<HTMLElement>(null);
   const newestPublication = useRef<HTMLElement>(null);
@@ -75,6 +94,12 @@ export default function ChannelDemo({
           : e,
       ),
     );
+    onTrace?.({
+      id: pending.id,
+      prompt: pending.prompt,
+      status: "canceled",
+      scope: pending.scope,
+    });
   }
   function run(
     text: string,
@@ -86,7 +111,7 @@ export default function ChannelDemo({
     const s = forcedScenario ?? matchScenario(text);
     setEntries((items) => [...items, { id, prompt: text, phase: 0 }]);
     const timers: ReturnType<typeof setTimeout>[] = [];
-    active.current = { id, timers };
+    active.current = { id, timers, scope: refinedScope, prompt: text };
     for (let phase = 1; phase < 4; phase++)
       timers.push(
         setTimeout(() => {
@@ -124,6 +149,7 @@ export default function ChannelDemo({
             e.id === id ? { ...e, phase: 4, status, message, result } : e,
           ),
         );
+        onTrace?.({ id, prompt: text, status, scope: refinedScope, result });
       }, 880),
     );
   }
@@ -164,20 +190,14 @@ export default function ChannelDemo({
     },
     [],
   );
+  const lastStatus = entries.at(-1)?.status;
   useEffect(() => {
-    if (entries.length)
-      newestEntry.current?.scrollIntoView?.({
-        block: "start",
-        behavior: "smooth",
-      });
-  }, [entries.length]);
+    if (entries.length) revealEntry(newestEntry.current);
+  }, [entries.length, lastStatus]);
   const previousShareCount = useRef(published.length);
   useEffect(() => {
     if (published.length > previousShareCount.current)
-      newestPublication.current?.scrollIntoView?.({
-        block: "start",
-        behavior: "smooth",
-      });
+      revealEntry(newestPublication.current);
     previousShareCount.current = published.length;
   }, [published.length]);
   const choose = (prompt: string) => {
@@ -194,18 +214,31 @@ export default function ChannelDemo({
       `${s.prompt} ${s.title}`.includes(search),
   );
   return (
-    <div className="dl-demo" aria-label="DomainLenz 채팅 데모">
-      {!entries.length && !published.length && (
+    <div
+      className={`dl-demo ${workspace ? "dl-workspace-mode" : ""}`}
+      aria-label="DomainLenz 채팅 데모"
+    >
+      {!workspace && !entries.length && !published.length && (
         <div className="dl-welcome">
           <span className="dl-ai-mark">
             D<span>✦</span>
           </span>
           <div>
             <b>업무 데이터에 질문해 보세요</b>
-            <p>13개 업무군 · 34개 예문 · 결과는 먼저 나에게만</p>
+            <p>
+              13개 업무군 · {scenarios.length}개 예문 · 결과는 먼저 나에게만
+            </p>
           </div>
           <button onClick={() => onGalleryOpen(true)}>예문 둘러보기 ↗</button>
         </div>
+      )}
+      {!workspace && (
+        <details className="dl-inline-showcase">
+          <summary>
+            추천 질문 6개 <span>질문마다 다른 결과 화면을 확인해 보세요</span>
+          </summary>
+          <Showcase onPick={choose} />
+        </details>
       )}
       {entries.map((entry, index) => (
         <article
@@ -391,7 +424,7 @@ export default function ChannelDemo({
                   className={group === "all" ? "active" : ""}
                   onClick={() => setGroup("all")}
                 >
-                  전체 예문 <span>34</span>
+                  전체 예문 <span>{scenarios.length}</span>
                 </button>
                 {domains.map((d) => (
                   <button
@@ -401,7 +434,13 @@ export default function ChannelDemo({
                   >
                     <i>{d.icon}</i>
                     {d.name}
-                    <span>2</span>
+                    <span>
+                      {
+                        scenarios.filter(
+                          (s) => s.domainId === d.id && s.outcome === "ready",
+                        ).length
+                      }
+                    </span>
                   </button>
                 ))}
                 <button

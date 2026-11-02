@@ -1,6 +1,6 @@
 # 자연어 시연·인수 테스트셋
 
-총 34개: 정상 26개 + 상태 8개. 기준 2026-10-17 11:00 Asia/Seoul. 전체 지점, OWNER, 전체-공지 채널이 기본이다. JSON의 수치는 실제 DB 정답이 아닌 **프론트 고정 fixture의 기대값**이다.
+총 36개: 정상 28개 + 상태 8개. 기준 2026-10-17 11:00 Asia/Seoul. 전체 지점, OWNER, 전체-공지 채널이 기본이다. JSON의 수치는 실제 DB 정답이 아닌 **프론트 고정 fixture의 기대값**이다.
 
 | ID | 도메인 | 질문 | 기대 상태 | UI | 기대 행 |
 |---|---|---|---|---|---|
@@ -12,7 +12,7 @@
 | passes-expiring | 상품·이용권 | 7일 안에 만료되는 이용권을 보여줘 | ready | table | 3 |
 | sales-net | 결제·환불·매출 | 지난달 지점별 순매출을 보여줘 | ready | bar | 2 |
 | sales-refunds | 결제·환불·매출 | 이번 달 환불 내역을 보여줘 | ready | table | 3 |
-| seats-now | 좌석·입퇴실 | 현재 지점별 좌석 이용 현황을 보여줘 | ready | bar | 2 |
+| seats-now | 좌석·입퇴실 | 현재 지점별 좌석 이용 현황을 보여줘 | ready | seats | 2 |
 | seats-completed | 좌석·입퇴실 | 오늘 완료된 좌석 이용 내역을 보여줘 | ready | table | 3 |
 | rooms-today | 스터디룸·예약 | 오늘의 스터디룸 예약을 보여줘 | ready | calendar | 3 |
 | rooms-week | 스터디룸·예약 | 이번 주 룸별 예약 건수를 보여줘 | ready | bar | 4 |
@@ -30,6 +30,8 @@
 | swaps-pending | 휴가·대체근무 | 처리 대기 대체근무 신청을 보여줘 | ready | table | 2 |
 | audit-today | 감사 이력 | 오늘의 업무 변경 이력을 보여줘 | ready | timeline | 3 |
 | audit-payments | 감사 이력 | 결제·환불 관련 처리 이력을 보여줘 | ready | timeline | 3 |
+| seats-heatmap | 좌석·입퇴실 | 지난주 요일·시간대별 좌석 이용 건수를 보여줘 | ready | heatmap | 70 |
+| products-top5 | 상품·이용권 | 지난달 가장 잘 팔린 이용권 TOP 5를 보여줘 | ready | bar | 10 |
 | state-clarification | 결제·환불·매출 | 매출 현황을 비교해줘 | clarification | bar | 0 |
 | state-unsupported | 결제·환불·매출 | 내년 현금흐름을 예측해줘 | unsupported | bar | 0 |
 | state-empty | 결제·환불·매출 | 이번 달 100만 원 이상 환불 내역을 보여줘 | empty | table | 0 |

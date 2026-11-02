@@ -60,11 +60,15 @@ API 계약 확인:
 
 - `products`: `id`, `name`, `kind`, `sale_status`, `price_krw`
 - `product_branches`: `product_id`, `branch_id`
+- `payments`: `id`, `branch_id`, `product_id`, `purpose`, `status`, `approved_at`, `issued_pass_quantity`
+- `refunds`: `id`, `payment_id`, `refunded_at`
 - `passes`: `id`, `customer_id`, `purchase_branch_id`, `kind`, `status`, `expires_at`, `remaining_minutes`, `remaining_credit_krw`
 
 관계:
 
 - product_branches.product_id → products.id
+- payments.product_id → products.id
+- refunds.payment_id → payments.id
 - passes.customer_id → customers.id
 
 API 계약 확인:
@@ -76,6 +80,7 @@ API 계약 확인:
 
 - **products-active** — 판매 중 상품의 유형별 현황을 보여줘: 판매 중 상품을 판매 지점별 DISTINCT products.id로 집계. 전체 지점 선택 시 같은 상품의 지점 중복 제거가 필요하며, 이 fixture의 상품은 서로 다름.
 - **passes-expiring** — 7일 안에 만료되는 이용권을 보여줘: 활성 이용권 중 expires_at이 기준 시각 이후이고 종료 경계 미만. 시작 전·만료 없음 제외.
+- **products-top5** — 지난달 가장 잘 팔린 이용권 TOP 5를 보여줘: 이용권 결제만 대상. 상품별 승인 발급 수량에서 기간 내 환불 수량을 차감한 순판매량. 상품별로 지점 값을 합한 뒤 순판매량 내림차순 TOP 5. 이 fixture는 5개 상품으로 고정.
 
 ### 04. 결제·환불·매출
 
@@ -118,6 +123,7 @@ API 계약 확인:
 
 - **seats-now** — 현재 지점별 좌석 이용 현황을 보여줘: 활성 좌석 세션 기준 점유 좌석 수. 이용 가능 + 이용 중 + 사용 불가 = 전체 좌석. 점유율 분모 정책은 정본 API와 대조.
 - **seats-completed** — 오늘 완료된 좌석 이용 내역을 보여줘: 유효 퇴실 시각이 오늘인 완료 세션. 보정된 시각을 사용하고 청구분은 billed_minutes를 별도로 표시.
+- **seats-heatmap** — 지난주 요일·시간대별 좌석 이용 건수를 보여줘: 유효 입실 시각의 KST 요일·시간대별 COUNT(seat_sessions.id). 입실 시작 건수이며 동시 점유율이나 실제 혼잡도 예측이 아님.
 
 ### 06. 스터디룸·예약
 

@@ -71,14 +71,14 @@ describe("scenario contract", () => {
         expect(fields.has(filter.field)).toBe(true);
     }
   });
-  it("covers 13 domains with two normal cases and eight separate states", () => {
+  it("covers 13 domains with at least two cases, two extra showcase cases and eight states", () => {
     expect(domains).toHaveLength(13);
-    expect(scenarios).toHaveLength(34);
-    expect(new Set(scenarios.map((s) => s.id)).size).toBe(34);
+    expect(scenarios).toHaveLength(36);
+    expect(new Set(scenarios.map((s) => s.id)).size).toBe(36);
     for (const d of domains)
       expect(
         scenarios.filter((s) => s.domainId === d.id && s.outcome === "ready"),
-      ).toHaveLength(2);
+      ).toHaveLength(["products", "seats"].includes(d.id) ? 3 : 2);
     expect(
       new Set(
         scenarios.filter((s) => s.outcome !== "ready").map((s) => s.outcome),
@@ -249,6 +249,34 @@ describe("conversation and renderer", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByText("29,200,000원")).toBeInTheDocument();
+  });
+  it("renders seat counts as a consistent synthetic layout and heatmap cells from both branches", () => {
+    const view = render(
+      <ResultCard
+        result={makeResult(
+          scenarios.find((s) => s.id === "seats-now")!,
+          "all",
+          "general",
+        )}
+      />,
+    );
+    expect(document.querySelectorAll(".dl-seat-grid button")).toHaveLength(80);
+    expect(document.querySelectorAll(".dl-seat-grid .occupied")).toHaveLength(
+      53,
+    );
+    expect(document.querySelectorAll(".dl-seat-grid .available")).toHaveLength(
+      24,
+    );
+    view.unmount();
+    const scenario = scenarios.find((s) => s.id === "seats-heatmap")!;
+    render(<ResultCard result={makeResult(scenario, "all", "general")} />);
+    expect(document.querySelectorAll(".dl-heatmap button")).toHaveLength(35);
+    const monday = scenario.rows
+      .filter((r) => r.label === "월" && r.slot === "09–12시")
+      .reduce((sum, r) => sum + Number(r.value), 0);
+    expect(
+      screen.getByRole("button", { name: `월요일 09–12시 ${monday}건` }),
+    ).toBeInTheDocument();
   });
   it("unmount cancels all pending work", async () => {
     vi.useFakeTimers();

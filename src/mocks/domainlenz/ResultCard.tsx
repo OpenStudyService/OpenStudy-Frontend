@@ -2,7 +2,8 @@ import { useId, useState } from "react";
 import { domainFor, DEMO_CLOCK } from "./catalog";
 import { chartData, resultTotal, scopeLabel, resolveView } from "./model";
 import type { DemoResult } from "./model";
-const palette = ["#376c55", "#88a990", "#c6d79c", "#dfb677", "#8d9db2"];
+import { Heatmap, SeatMap, WeekCalendar } from "./RichVisuals";
+const palette = ["#087f71", "#3f7fbd", "#8fb9cb", "#dba464", "#9b91c7"];
 const fmt = (value: string | number, unit?: string) =>
   typeof value === "number"
     ? `${value.toLocaleString("ko-KR")}${unit ?? ""}`
@@ -259,7 +260,12 @@ export function ResultCard({
           <Chart result={result} />
         </div>
       )}
-      {view === "calendar" && (
+      {view === "heatmap" && <Heatmap result={result} />}
+      {view === "seats" && <SeatMap result={result} />}
+      {view === "calendar" && ["rooms", "attendance"].includes(s.domainId) && (
+        <WeekCalendar result={result} />
+      )}
+      {view === "calendar" && !["rooms", "attendance"].includes(s.domainId) && (
         <div className="dl-agenda" aria-label="일정 보기">
           {result.rows.map((r) => (
             <div key={r.id}>

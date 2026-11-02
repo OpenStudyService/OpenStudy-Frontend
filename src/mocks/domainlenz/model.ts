@@ -23,6 +23,13 @@ export interface SharedResult {
   author: string;
   result: DemoResult;
 }
+export interface DemoTrace {
+  id: string;
+  prompt: string;
+  status: string;
+  scope: string;
+  result?: DemoResult;
+}
 export function resolveView(spec: DemoResult["viewSpec"]): View {
   const candidate = spec.components[1]?.type;
   const allowed: View[] = [
@@ -33,6 +40,8 @@ export function resolveView(spec: DemoResult["viewSpec"]): View {
     "list",
     "calendar",
     "timeline",
+    "heatmap",
+    "seats",
   ];
   return allowed.includes(candidate as View) ? (candidate as View) : "table";
 }

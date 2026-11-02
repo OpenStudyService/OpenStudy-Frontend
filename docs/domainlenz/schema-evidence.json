@@ -139,6 +139,28 @@
           "verified": true
         },
         {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "product_id",
+            "purpose",
+            "status",
+            "approved_at",
+            "issued_pass_quantity"
+          ],
+          "verified": true
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "refunded_at"
+          ],
+          "verified": true
+        },
+        {
           "table": "passes",
           "fields": [
             "id",
@@ -155,6 +177,8 @@
       ],
       "relations": [
         "product_branches.product_id → products.id",
+        "payments.product_id → products.id",
+        "refunds.payment_id → payments.id",
         "passes.customer_id → customers.id"
       ],
       "apiPaths": [

@@ -31,7 +31,8 @@
     "test:e2e:real-mail": "tsx scripts/invitation-real-mail.ts",
     "test:real-mail:tool": "tsx --test scripts/invitation-real-mail.test.ts",
     "build:domainlenz": "tsx scripts/generate-domainlenz-docs.ts && tsx scripts/build-domainlenz-demo.ts",
-    "test:e2e:domainlenz": "playwright test --config playwright.domainlenz.config.ts"
+    "test:e2e:domainlenz": "playwright test --config playwright.domainlenz.config.ts",
+    "dev:domainlenz": "vite --config vite.domainlenz.config.ts --mode mock --host 127.0.0.1 --port 5195 --strictPort"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

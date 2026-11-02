@@ -4,7 +4,15 @@ export const DEMO_CLOCK = "2026.10.17 11:00 · Asia/Seoul";
 export type Cell = string | number;
 export type Row = Record<string, Cell> & { id: string; branchId: string };
 export type View =
-  "bar" | "line" | "donut" | "table" | "list" | "calendar" | "timeline";
+  | "bar"
+  | "line"
+  | "donut"
+  | "table"
+  | "list"
+  | "calendar"
+  | "timeline"
+  | "heatmap"
+  | "seats";
 export type Outcome =
   | "ready"
   | "clarification"
@@ -99,12 +107,19 @@ export const domains: Domain[] = [
       src("products", "id name kind sale_status price_krw"),
       src("product_branches", "product_id branch_id"),
       src(
+        "payments",
+        "id branch_id product_id purpose status approved_at issued_pass_quantity",
+      ),
+      src("refunds", "id payment_id refunded_at"),
+      src(
         "passes",
         "id customer_id purchase_branch_id kind status expires_at remaining_minutes remaining_credit_krw",
       ),
     ],
     relations: [
       "product_branches.product_id → products.id",
+      "payments.product_id → products.id",
+      "refunds.payment_id → payments.id",
       "passes.customer_id → customers.id",
     ],
     apiPaths: ["/products", "/passes"],
@@ -546,7 +561,7 @@ export const scenarios: DemoScenario[] = [
     "seats-now",
     "seats",
     "현재 지점별 좌석 이용 현황을 보여줘",
-    "bar",
+    "seats",
     cols(
       "label:지점",
       "occupied:이용 중:석",
@@ -890,6 +905,121 @@ export const scenarios: DemoScenario[] = [
     { ...month },
   ),
 ];
+// Additional showcase views from the user's v8 layout reference. Fixed fixture,
+// with the same query/expected-result contract as the original domain cases.
+scenarios.push(
+  scenario(
+    "seats-heatmap",
+    "seats",
+    "지난주 요일·시간대별 좌석 이용 건수를 보여줘",
+    "heatmap",
+    cols("label:요일", "slot:시간대", "value:이용 시작:건"),
+    Array.from({ length: 70 }, (_, i) => {
+      const day = Math.floor(i / 10),
+        slot = Math.floor((i % 10) / 2),
+        branchId = i % 2 ? "seongsu" : "gangnam";
+      return {
+        id: `heat-${i}`,
+        branchId,
+        branch: i % 2 ? "성수점" : "강남점",
+        label: ["월", "화", "수", "목", "금", "토", "일"][day],
+        slot: ["09–12시", "12–15시", "15–18시", "18–21시", "21–24시"][slot],
+        value:
+          4 + ((day * 3 + slot * 7 + (i % 2) * 2) % 13) + (slot === 3 ? 8 : 0),
+      };
+    }),
+    "유효 입실 시각의 KST 요일·시간대별 COUNT(seat_sessions.id). 입실 시작 건수이며 동시 점유율이나 실제 혼잡도 예측이 아님.",
+    {
+      period: "지난주 · 10.05–10.11",
+      start: "2026-10-05T00:00:00+09:00",
+      end: "2026-10-12T00:00:00+09:00",
+      valueKey: "value",
+      valueUnit: "건",
+      grain: "요일·시간대·이용 지점",
+      summary:
+        "요일과 시간대별 이용 시작 건수를 비교했습니다. 색이 진할수록 이용 시작이 많은 구간입니다.",
+    },
+  ),
+  scenario(
+    "products-top5",
+    "products",
+    "지난달 가장 잘 팔린 이용권 TOP 5를 보여줘",
+    "bar",
+    cols("label:상품", "value:순판매:개"),
+    rows(
+      [
+        ["50시간권", 86],
+        ["50시간권", 64],
+        ["4주 기간권", 63],
+        ["4주 기간권", 48],
+        ["100시간권", 46],
+        ["100시간권", 35],
+        ["10만원 정액권", 35],
+        ["10만원 정액권", 28],
+        ["8주 기간권", 27],
+        ["8주 기간권", 21],
+      ],
+      ["label", "value"],
+    ),
+    "이용권 결제만 대상. 상품별 승인 발급 수량에서 기간 내 환불 수량을 차감한 순판매량. 상품별로 지점 값을 합한 뒤 순판매량 내림차순 TOP 5. 이 fixture는 5개 상품으로 고정.",
+    {
+      period: "지난달 · 09.01–09.30",
+      start: "2026-09-01T00:00:00+09:00",
+      end: "2026-10-01T00:00:00+09:00",
+      valueKey: "value",
+      valueUnit: "개",
+      grain: "상품·원결제 지점",
+      filters: [{ field: "payments.purpose", op: "EQ", value: "PASS" }],
+      summary:
+        "가상 판매 원장의 상품별 순판매 수량을 비교했습니다. 매출액과 판매 수량은 서로 다른 지표입니다.",
+    },
+  ),
+);
+
+export const showcase = [
+  {
+    id: "sales-net",
+    icon: "₩",
+    label: "지점별 매출을 비교해줘",
+    description: "KPI · 막대 차트 · 비교 표",
+    tone: "teal",
+  },
+  {
+    id: "seats-heatmap",
+    icon: "▦",
+    label: "언제 이용이 가장 많을까?",
+    description: "요일 × 시간대 히트맵",
+    tone: "orange",
+  },
+  {
+    id: "products-top5",
+    icon: "★",
+    label: "잘 팔린 이용권 TOP 5는?",
+    description: "상품 판매 순위 · 막대 차트",
+    tone: "purple",
+  },
+  {
+    id: "seats-now",
+    icon: "▦",
+    label: "지금 지점에 빈자리는?",
+    description: "좌석 배치 · 현재 점유 현황",
+    tone: "blue",
+  },
+  {
+    id: "rooms-today",
+    icon: "▣",
+    label: "스터디룸 예약 일정은?",
+    description: "주간 캘린더 · 예약 목록",
+    tone: "pink",
+  },
+  {
+    id: "passes-expiring",
+    icon: "◷",
+    label: "7일 안에 만료되는 이용권은?",
+    description: "만료 예정 KPI · 목록",
+    tone: "olive",
+  },
+];
 const special: [string, string, Outcome, string][] = [
   [
     "state-clarification",
@@ -991,6 +1121,8 @@ export function querySpecFor(
     : s.id;
   const timeFields: Record<string, string[]> = {
     "customers-new": ["customers.registered_at"],
+    "seats-heatmap": ["seat_sessions.effective_checked_in_at"],
+    "products-top5": ["payments.approved_at", "refunds.refunded_at"],
     "passes-expiring": ["passes.expires_at"],
     "sales-net": ["payments.approved_at", "refunds.refunded_at"],
     "sales-refunds": ["refunds.refunded_at"],
@@ -1045,10 +1177,9 @@ export function querySpecFor(
         : []),
     ],
     timeConstraints,
-    timeConstraintPolicy:
-      baseId === "sales-net"
-        ? "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합"
-        : "AND",
+    timeConstraintPolicy: ["sales-net", "products-top5"].includes(baseId)
+      ? "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합"
+      : "AND",
     effectiveScope: {
       branch: scope,
       channelId,
@@ -1071,7 +1202,23 @@ export function viewSpecFor(s: DemoScenario) {
       { type: "KpiGroup" },
       {
         type: s.outcome === "fallback" ? "UnregisteredChart" : s.view,
-        bindings: { label: s.columns[0].key, value: s.valueKey },
+        bindings: {
+          label: s.columns[0].key,
+          value: s.valueKey,
+          ...(s.view === "heatmap" ? { column: "slot" } : {}),
+          ...(s.view === "seats"
+            ? {
+                occupied: "occupied",
+                available: "available",
+                blocked: "blocked",
+                total: "total",
+              }
+            : {}),
+          ...(s.view === "calendar" &&
+          ["rooms", "attendance"].includes(s.domainId)
+            ? { date: "date", time: "time" }
+            : {}),
+        },
       },
       { type: "PaginatedDataTable", columns: s.columns, pageSize: 5 },
     ],
