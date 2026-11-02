@@ -1,3 +1,4 @@
+import { collaborationHandlers } from "./collaboration";
 import {
   invitationHandlers,
   setInvitationSessionMode,
@@ -343,6 +344,7 @@ function executeAi(r: AiRequest) {
 }
 
 export const handlers = [
+  ...collaborationHandlers,
   ...invitationHandlers,
   ...organizationHandlers,
   ...productHandlers,

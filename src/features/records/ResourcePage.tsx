@@ -1,3 +1,5 @@
+import { Records } from "../collaboration/Records";
+import { RecordDetail } from "../collaboration/RecordDetail";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -194,7 +196,11 @@ export function ResourcePage(props: {
   resource: Resource;
   embedded?: boolean;
 }) {
-  return props.resource === "payments" ? (
+  return props.resource === "facilities" ||
+    props.resource === "inquiries" ||
+    props.resource === "notices" ? (
+    <Records resource={props.resource} embedded={props.embedded} />
+  ) : props.resource === "payments" ? (
     <Payments embedded={props.embedded} />
   ) : props.resource === "passes" ? (
     <Passes embedded={props.embedded} />
@@ -602,7 +608,15 @@ export function RecordPanel(props: {
   onClose: () => void;
   onReschedule?: () => void;
 }) {
-  return props.resource === "payments" ? (
+  return props.resource === "facilities" ||
+    props.resource === "inquiries" ||
+    props.resource === "notices" ? (
+    <RecordDetail
+      resource={props.resource}
+      id={props.id}
+      onClose={props.onClose}
+    />
+  ) : props.resource === "payments" ? (
     <PaymentPanel id={props.id} onClose={props.onClose} />
   ) : props.resource === "passes" ? (
     <PassPanel id={props.id} onClose={props.onClose} />

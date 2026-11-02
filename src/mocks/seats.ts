@@ -1,3 +1,4 @@
+import { rememberCustomerLookup } from "./customer-lookup-access";
 /** M5 contract adapter over the shared demo seat, usage and pass ledgers. */
 import { delay } from "msw";
 import { http, HttpResponse } from "msw/http";
@@ -597,6 +598,7 @@ export const seatHandlers = [
           )
           .slice(0, 10)
           .map((m) => {
+            rememberCustomerLookup(actor.id, input.branchId, m.id);
             const current = store.db.usage.find(
               (u) => u.memberId === m.id && u.status === "이용 중",
             );
