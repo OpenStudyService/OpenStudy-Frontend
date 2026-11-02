@@ -200,6 +200,7 @@ export const schemas = {
   seats: base.extend({
     name: str,
     zone: str,
+    kind: z.enum(["일반", "모니터", "기타"]).optional(),
     status: z.enum(["이용 가능", "이용 중", "사용 불가"]),
     memberId: z.string(),
   }),
@@ -213,6 +214,25 @@ export const schemas = {
     charged: money,
     excess: money,
     status: z.enum(["이용 중", "완료"]),
+    seatSession: z
+      .object({
+        checkedInBy: z.object({ id: str, name: z.string() }).nullable(),
+        checkInReason: z.string().nullable(),
+        moves: z.array(
+          z.object({
+            fromSeat: z.object({ id: str, zone: str, seatNo: str }),
+            toSeat: z.object({ id: str, zone: str, seatNo: str }),
+            movedAt: str,
+            movedBy: z.object({ id: str, name: z.string() }).nullable(),
+            reason: z.string().nullable(),
+          }),
+        ),
+        deductedMinutes: money,
+        deductedKrw: money,
+        overageMinutes: money,
+        overageKrw: money,
+      })
+      .optional(),
   }),
   lockers: base.extend({
     name: str,
@@ -379,7 +399,7 @@ export interface Page<T> {
 export interface WorkspaceEvent {
   id: string;
   type: "changed" | "message" | "read" | "permissions";
-  resource: Resource | "customers";
+  resource: Resource | "customers" | "seat-sessions";
   entityId: string;
   branchId: string;
 }

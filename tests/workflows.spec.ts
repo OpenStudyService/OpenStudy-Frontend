@@ -213,10 +213,14 @@ test("staff cannot open owner menus or read another branch through HTTP", async 
   await expect(page.getByText("이 지점에 접근할 수 없어요")).toBeVisible();
   const statuses = await page.evaluate(async () => {
     return Promise.all(
-      ["/api/payments?scope=gangnam", "/api/tasks?scope=seongsu"].map(
-        async (url) => (await fetch(url)).status,
-      ),
+      [
+        "/api/payments?scope=gangnam",
+        "/api/tasks?scope=seongsu",
+        "/api/seats?scope=gangnam",
+        "/api/seats?scope=seongsu",
+        "/api/seats/seongsu-seat-1",
+      ].map(async (url) => (await fetch(url)).status),
     );
   });
-  expect(statuses).toEqual([403, 403]);
+  expect(statuses).toEqual([403, 403, 200, 403, 404]);
 });

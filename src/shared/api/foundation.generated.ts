@@ -2837,9 +2837,9 @@ export interface components {
       deductedKrw: number;
       overageMinutes: number;
       overageKrw: number;
-      /** @description 응답 시점 이용권 잔량. 시간권만 값이 있다. */
+      /** @description 처리 시점 이용권 잔량. 시간권만 값이 있다. 조회(GET)에서는 진행 중인 이용에만 값이 있고 종료된 이용은 null이다. */
       passRemainingMinutes: number | null;
-      /** @description 응답 시점 이용권 잔량. 정액권만 값이 있다. */
+      /** @description 처리 시점 이용권 잔량. 정액권만 값이 있다. 조회(GET)에서는 진행 중인 이용에만 값이 있고 종료된 이용은 null이다. */
       passRemainingCreditKrw: number | null;
       checkedInBy: components["schemas"]["ActorSummary"] | null;
       checkInReason: string | null;
@@ -2907,7 +2907,7 @@ export interface components {
       | unknown
       | unknown
       | unknown;
-    /** @description 결제 금액은 담지 않는다(NFR-SEC-06). */
+    /** @description 결제 금액은 담지 않는다(NFR-SEC-06). 이용 지점이 요청 scope 밖이면 reason·actor·usedMinutes·seatSessionId는 null이다. */
     PassHistoryEvent: {
       /** Format: date-time */
       at: string;
@@ -3030,7 +3030,7 @@ export interface components {
       status?: components["schemas"]["TaskStatus"];
       checklist?: string[];
     };
-    /** @description 누락 필드는 유지한다. branchId·status·checklist는 받지 않는다(422 IMMUTABLE_FIELD). */
+    /** @description 누락 필드는 유지한다. branchId·status·checklist는 받지 않는다(422 IMMUTABLE_FIELD). version 외 항목이 없으면 422. */
     TaskUpdate: {
       version: components["schemas"]["Version"];
       title?: string;
