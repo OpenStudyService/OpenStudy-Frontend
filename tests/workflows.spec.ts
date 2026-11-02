@@ -40,7 +40,7 @@ test("task -> shared card -> staff report -> completion persists everywhere", as
   await panel
     .getByLabel("담당자", { exact: true })
     .selectOption({ label: "박준호" });
-  await panel.getByLabel("기한").fill("2026-10-17");
+  await panel.getByLabel("기한").fill("2026-10-17T18:00");
   await panel.getByLabel("체크리스트").fill("필터 상태 확인\n온도 확인");
   await panel.getByRole("button", { name: "업무 등록", exact: true }).click();
   await expect(panel).not.toBeVisible();
@@ -82,7 +82,9 @@ test("task -> shared card -> staff report -> completion persists everywhere", as
   ).toBeChecked();
   await panel.getByRole("button", { name: "완료하기", exact: true }).click();
   await panel.getByRole("button", { name: "완료하기", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "다시 열기" })).toBeVisible();
+  await expect(
+    panel.getByRole("button", { name: "할 일로 변경", exact: true }),
+  ).toBeVisible();
   await panel.getByRole("button", { name: "닫기", exact: true }).click();
   await expect(shared.getByText("완료", { exact: true })).toBeVisible();
   await page.reload();

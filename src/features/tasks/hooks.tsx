@@ -35,12 +35,16 @@ export function useTaskWrite() {
     session.user.memberships,
   ]);
   const controller = useRef<AbortController | null>(null);
-  const lock = useRef(false),
-    [busy, setBusy] = useState(false),
+  const lock = useRef<AbortController | null>(null),
+    [busyState, setBusyState] = useState({ key: permissionKey, busy: false }),
     idempotency = useIdempotency();
+  const idempotencyRef = useRef(idempotency);
+  const busy = busyState.key === permissionKey && busyState.busy;
   useEffect(() => {
     const current = new AbortController();
     controller.current = current;
+    lock.current = null;
+    idempotencyRef.current.committed();
     return () => current.abort();
   }, [permissionKey]);
   async function run<T>(
@@ -53,21 +57,31 @@ export function useTaskWrite() {
     const current = controller.current;
     if (!current) throw new Error("화면 준비 중입니다. 다시 시도해 주세요.");
     current.signal.throwIfAborted();
-    lock.current = true;
-    setBusy(true);
+    lock.current = current;
+    setBusyState({ key: permissionKey, busy: true });
     try {
       const result = await request(
         current.signal,
-        idempotency.key(operation, body),
+        idempotencyRef.current.key(operation, body),
       );
       current.signal.throwIfAborted();
       if (commit) {
-        idempotency.committed();
+        idempotencyRef.current.committed();
         void query.invalidateQueries({ queryKey: ["data", session.user.id] });
       }
       current.signal.throwIfAborted();
       return result;
     } catch (error) {
+      // Cancelling the response cannot roll back a write already committed by
+      // the server. Refresh surviving views without allowing stale callbacks.
+      if (
+        commit &&
+        (current.signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError") ||
+          (error instanceof ApiError && error.status === 0))
+      ) {
+        void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+      }
       if (error instanceof ApiError && error.status === 403) {
         void query.invalidateQueries({ queryKey: ["session"] });
         void query.invalidateQueries({
@@ -76,8 +90,11 @@ export function useTaskWrite() {
       }
       throw error;
     } finally {
-      lock.current = false;
-      if (!current.signal.aborted) setBusy(false);
+      if (lock.current === current) {
+        lock.current = null;
+        if (!current.signal.aborted)
+          setBusyState({ key: permissionKey, busy: false });
+      }
     }
   }
   return { run, busy };
@@ -121,4 +138,22 @@ export function useTaskLeaveGuard(changed: boolean) {
       dirty.current = false;
     },
   };
+}
+
+export function useTaskEvents(id: string, page = 1) {
+  const { session, scope } = useApp();
+  return useQuery({
+    queryKey: ["data", session.user.id, scope, "tasks", "events", id, page],
+    queryFn: ({ signal }) => taskApi.events(scope, id, signal, page),
+    enabled: !!id && id !== "new",
+    retry: false,
+  });
+}
+export function useTaskSummary(search: string) {
+  const { session, scope } = useApp();
+  return useQuery({
+    queryKey: ["data", session.user.id, scope, "tasks", "summary", search],
+    queryFn: ({ signal }) => taskApi.summary(scope, search, signal),
+    retry: false,
+  });
 }

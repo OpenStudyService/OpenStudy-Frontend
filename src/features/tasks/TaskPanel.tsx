@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { useUi } from "../../app/store";
 import { ApiError, MOCK } from "../../shared/api/client";
+import { isAccessError } from "../../shared/api/read-model";
 import { displayDate } from "../../shared/domain/schema";
-import type { Task } from "../../shared/domain/schema";
+import type { Task, TaskEvent } from "./api";
 import {
   Badge,
   Button,
@@ -17,7 +18,7 @@ import {
 import { canCreateTask, canEditTask, actionLabels, taskActions } from "./model";
 import type { TaskAction } from "./model";
 import { taskApi } from "./api";
-import { useTaskDetail, useTaskWrite } from "./hooks";
+import { useTaskDetail, useTaskWrite, useTaskLeaveGuard } from "./hooks";
 import { LatestTask, TaskForm } from "./TaskForm";
 import { TaskShare } from "../chat/TaskShare";
 
@@ -87,11 +88,14 @@ function TaskPanelSession({
         )
       ) : row.isPending ? (
         <State loading />
-      ) : row.error ? (
+      ) : row.error && (!task || isAccessError(row.error)) ? (
         <ErrorState error={row.error} retry={() => void row.refetch()} />
       ) : (
         task && (
           <>
+            {row.error && (
+              <ErrorState error={row.error} retry={() => void row.refetch()} />
+            )}
             {editing ? (
               editable ? (
                 <TaskForm
@@ -135,7 +139,12 @@ function TaskPanelSession({
                     ],
                     ["내용", task.body],
                     ["분류", task.category],
-                    ["기한", task.due],
+                    [
+                      "기한",
+                      task.dueAt
+                        ? new Date(task.dueAt).toLocaleString("ko-KR")
+                        : "미지정",
+                    ],
                   ].map(([label, val]) => (
                     <div key={label}>
                       <dt className="text-muted">{label}</dt>
@@ -151,10 +160,14 @@ function TaskPanelSession({
                     </dd>
                   </div>
                 </dl>
-                <TaskChecks task={task} enabled={editable} />
+                <TaskChecks
+                  key={`${task.id}:${editable}`}
+                  task={task}
+                  enabled={editable}
+                />
                 <section className="mt-6 border-t border-line pt-5">
                   <h3>처리 이력</h3>
-                  <TaskHistory task={task} />
+                  <TaskHistory id={task.id} />
                 </section>
                 {editable && (
                   <div className="mt-6 flex flex-wrap gap-2">
@@ -182,37 +195,103 @@ function TaskPanelSession({
   );
 }
 function TaskPeople({ task }: { task: Task }) {
-  const { lookups } = useApp();
-  const person = (id: string) =>
-    lookups.employees.find((p) => p.id === id)?.name ?? id;
   return (
     <>
       <div>
         <dt className="text-muted">담당자</dt>
-        <dd>{person(task.assigneeId)}</dd>
+        <dd>{task.assignee.name}</dd>
       </div>
-      {task.createdById && (
+      {task.createdBy && (
         <div>
           <dt className="text-muted">등록자</dt>
-          <dd>{person(task.createdById)}</dd>
+          <dd>{task.createdBy.name}</dd>
         </div>
       )}
     </>
   );
 }
-function TaskHistory({ task }: { task: Task }) {
-  const { lookups } = useApp();
-  return task.history.length ? (
-    task.history.map((h, i) => (
-      <p key={i} className="help mt-2 whitespace-pre-wrap break-words">
-        {displayDate(h.at)} ·{" "}
-        {lookups.employees.find((p) => p.id === h.actorId)?.name ?? h.actorId} ·{" "}
-        {h.text}
-      </p>
-    ))
-  ) : (
-    <p className="help">처리 이력이 없습니다.</p>
+const eventLabels: Record<TaskEvent["type"], string> = {
+  CREATED: "업무 등록",
+  CONTENT_CHANGED: "내용 변경",
+  ASSIGNEE_CHANGED: "담당자 변경",
+  DUE_CHANGED: "기한 변경",
+  STATUS_CHANGED: "상태 변경",
+  CHECKLIST_ADDED: "체크 항목 추가",
+  CHECKLIST_CHANGED: "체크 항목 변경",
+  CHECKLIST_REMOVED: "체크 항목 삭제",
+};
+function TaskHistory({ id }: { id: string }) {
+  const { session, scope, lookups } = useApp(),
+    [page, setPage] = useState(1);
+  const events = useQuery({
+    queryKey: ["data", session.user.id, scope, "tasks", "events", id, page],
+    queryFn: ({ signal }) => taskApi.events(scope, id, signal, page),
+    retry: false,
+  });
+  if (events.isPending) return <State loading />;
+  if (events.error)
+    return (
+      <ErrorState error={events.error} retry={() => void events.refetch()} />
+    );
+  return (
+    <>
+      {events.data.items.length ? (
+        events.data.items.map((event) => (
+          <div
+            key={event.id}
+            className="help mt-3 whitespace-pre-wrap break-words"
+          >
+            <p>
+              {displayDate(event.at)} · {event.actor?.name ?? "탈퇴한 직원"} ·{" "}
+              {eventLabels[event.type]}
+            </p>
+            {event.before && eventValues(event.before, lookups.employees) && (
+              <p>변경 전: {eventValues(event.before, lookups.employees)}</p>
+            )}
+            {event.after && eventValues(event.after, lookups.employees) && (
+              <p>변경 후: {eventValues(event.after, lookups.employees)}</p>
+            )}
+          </div>
+        ))
+      ) : (
+        <p className="help">처리 이력이 없습니다.</p>
+      )}
+      <div className="mt-3 flex gap-2">
+        <Button disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          이전 이력
+        </Button>
+        <Button
+          disabled={page * events.data.meta.pageSize >= events.data.meta.total}
+          onClick={() => setPage(page + 1)}
+        >
+          다음 이력
+        </Button>
+      </div>
+    </>
   );
+}
+function eventValues(
+  values: Record<string, unknown>,
+  employees: { id: string; name: string }[],
+) {
+  const labels: Record<string, string> = {
+    title: "제목",
+    body: "내용",
+    status: "상태",
+    priority: "우선순위",
+    category: "분류",
+    assigneeId: "담당자",
+    assignee: "담당자",
+    dueAt: "기한",
+    done: "완료",
+  };
+  return Object.entries(values)
+    .filter(([key]) => Object.hasOwn(labels, key))
+    .map(
+      ([key, value]) =>
+        `${labels[key]}: ${value == null ? "없음" : key === "assigneeId" ? (employees.find((employee) => employee.id === value)?.name ?? "담당자 변경") : key === "assignee" && typeof value === "object" && "name" in value ? String(value.name) : key === "dueAt" ? new Date(String(value)).toLocaleString("ko-KR") : typeof value === "boolean" ? (value ? "예" : "아니요") : typeof value === "object" ? "변경됨" : String(value)}`,
+    )
+    .join(" · ");
 }
 function TaskActionForm({
   task,
@@ -260,8 +339,21 @@ function TaskActionForm({
       await write.run(
         `tasks/${task.id}/${action}`,
         { version: base.version },
-        (signal, key) =>
-          taskApi.action(scope, task.id, action, base.version, signal, key),
+        (signal) =>
+          taskApi.status(
+            scope,
+            task.id,
+            {
+              version: base.version,
+              status:
+                action === "complete"
+                  ? "완료"
+                  : action === "progress"
+                    ? "진행 중"
+                    : "할 일",
+            },
+            signal,
+          ),
       );
       toast("처리 결과를 저장했어요.");
       onSaved();
@@ -305,23 +397,81 @@ function TaskActionForm({
   );
 }
 function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
-  const row = useTaskDetail(task.id),
+  const { scope, session } = useApp(),
+    query = useQueryClient(),
     write = useTaskWrite();
   const [error, setError] = useState<Error | null>(null),
     [mustRefresh, setMustRefresh] = useState(false);
-  async function toggle(index: number) {
-    if (!enabled || write.busy || mustRefresh) return;
-    const body = {
+  const [body, setBody] = useState(""),
+    [editing, setEditing] = useState<string | null>(null),
+    [editBody, setEditBody] = useState("");
+  const denied = error instanceof ApiError && [401, 403].includes(error.status);
+  const blocked = !enabled || write.busy || mustRefresh || denied;
+  const orphaned =
+    editing !== null && !task.checklist.some((item) => item.id === editing);
+  const leave = useTaskLeaveGuard(!!body || editing !== null);
+  const cache = (value: Task) =>
+    query.setQueryData(
+      ["data", session.user.id, scope, "tasks", "detail", task.id],
+      value,
+    );
+  async function change(
+    kind: "add" | "update" | "delete",
+    itemId?: string,
+    changes?: { body?: string; done?: boolean },
+  ) {
+    if (
+      blocked ||
+      (kind !== "add" && !task.checklist.some((item) => item.id === itemId))
+    )
+      return;
+    const addedBody = (changes?.body ?? body).trim();
+    if (
+      (kind === "add" && !addedBody) ||
+      (kind === "update" && changes?.body !== undefined && !changes.body.trim())
+    ) {
+      setError(new Error("체크 항목의 내용을 입력해 주세요."));
+      return;
+    }
+    const payload = {
       version: task.version,
-      checks: task.checks.map((c, i) =>
-        i === index ? { ...c, done: !c.done } : c,
-      ),
+      ...(kind === "add" ? { body: addedBody } : changes),
     };
     try {
-      await write.run(`tasks/${task.id}/checks`, body, (signal, key) =>
-        taskApi.update(task.id, body, signal, key),
+      const result = await write.run(
+        `tasks/${task.id}/checklist/${itemId ?? "new"}/${kind}`,
+        payload,
+        (signal) =>
+          kind === "add"
+            ? taskApi.addChecklist(
+                scope,
+                task.id,
+                { version: task.version, body: addedBody },
+                signal,
+              )
+            : kind === "delete"
+              ? taskApi.deleteChecklist(
+                  scope,
+                  task.id,
+                  itemId!,
+                  task.version,
+                  signal,
+                )
+              : taskApi.updateChecklist(
+                  scope,
+                  task.id,
+                  itemId!,
+                  payload,
+                  signal,
+                ),
       );
+      cache(result);
       setError(null);
+      if (kind === "add") {
+        if (changes?.body !== undefined) setEditing(null);
+        else setBody("");
+      }
+      if (kind === "update" && changes?.body !== undefined) setEditing(null);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e as Error);
@@ -329,11 +479,19 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
     }
   }
   async function refresh() {
-    const result = await row.refetch();
-    if (result.error) setError(result.error);
-    else {
+    try {
+      const result = await write.run(
+        "checklist-latest",
+        {},
+        (signal) => taskApi.detail(scope, task.id, signal),
+        false,
+      );
+      cache(result);
       setMustRefresh(false);
       setError(null);
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError"))
+        setError(e as Error);
     }
   }
   return (
@@ -341,34 +499,127 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
       className="mt-6 border-t border-line pt-5"
       aria-label="업무 체크리스트"
     >
+      {leave.guard}
       <h3 className="mb-3">체크리스트</h3>
-      {task.checks.length ? (
-        task.checks.map((c, i) => (
-          <label
-            key={i}
-            className="my-3 flex items-start gap-2 text-[13px] font-normal"
-          >
-            <input
-              type="checkbox"
-              checked={c.done}
-              disabled={!enabled || write.busy || mustRefresh}
-              onChange={() => void toggle(i)}
-            />
-            <span className={c.done ? "text-muted line-through" : ""}>
-              {c.text}
-            </span>
-          </label>
+      {task.checklist.length ? (
+        task.checklist.map((item) => (
+          <div key={item.id} className="my-3 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-[13px] font-normal">
+              <input
+                type="checkbox"
+                checked={item.done}
+                disabled={blocked}
+                onChange={() =>
+                  void change("update", item.id, { done: !item.done })
+                }
+              />
+              <span className={item.done ? "text-muted line-through" : ""}>
+                {item.body}
+              </span>
+            </label>
+            {enabled &&
+              (editing === item.id ? (
+                <>
+                  <input
+                    aria-label="체크 항목 내용 수정"
+                    value={editBody}
+                    disabled={blocked}
+                    maxLength={500}
+                    onChange={(event) => setEditBody(event.target.value)}
+                  />
+                  <Button
+                    disabled={blocked}
+                    onClick={() =>
+                      void change("update", item.id, { body: editBody.trim() })
+                    }
+                  >
+                    항목 저장
+                  </Button>
+                  <Button
+                    disabled={write.busy}
+                    onClick={() => setEditing(null)}
+                  >
+                    취소
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    disabled={blocked}
+                    aria-label={`${item.body} 수정`}
+                    onClick={() => {
+                      setEditing(item.id);
+                      setEditBody(item.body);
+                    }}
+                  >
+                    수정
+                  </Button>
+                  <Button
+                    disabled={blocked}
+                    aria-label={`${item.body} 삭제`}
+                    onClick={() => void change("delete", item.id)}
+                  >
+                    삭제
+                  </Button>
+                </>
+              ))}
+          </div>
         ))
       ) : (
         <p className="help">등록한 체크 항목이 없습니다.</p>
+      )}
+      {enabled && orphaned && (
+        <section className="tip mt-3" aria-label="삭제된 체크 항목 입력 복구">
+          <p>
+            수정 중인 항목이 삭제됐어요. 입력 내용을 복사하거나 새 항목으로
+            추가할 수 있어요.
+          </p>
+          <input
+            aria-label="체크 항목 내용 수정"
+            value={editBody}
+            maxLength={500}
+            disabled={write.busy}
+            onChange={(event) => setEditBody(event.target.value)}
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              disabled={blocked || task.checklist.length >= 100}
+              onClick={() => void change("add", undefined, { body: editBody })}
+            >
+              새 항목으로 추가
+            </Button>
+            <Button disabled={write.busy} onClick={() => setEditing(null)}>
+              취소
+            </Button>
+          </div>
+        </section>
+      )}
+      {enabled && (
+        <div className="mt-3 flex gap-2">
+          <input
+            aria-label="새 체크 항목"
+            placeholder="체크 항목을 입력해 주세요"
+            value={body}
+            maxLength={500}
+            disabled={blocked || task.checklist.length >= 100}
+            onChange={(event) => setBody(event.target.value)}
+          />
+          <Button
+            disabled={blocked || task.checklist.length >= 100}
+            onClick={() => void change("add")}
+          >
+            항목 추가
+          </Button>
+        </div>
       )}
       {error && <FieldError>{error.message}</FieldError>}
       {mustRefresh && (
         <>
           <p className="help">
-            최신 내용을 확인한 후 체크 항목을 다시 선택해 주세요.
+            입력은 유지했어요. 최신 내용을 확인한 후 항목 작업을 다시 선택해
+            주세요.
           </p>
-          <Button onClick={() => void refresh()} disabled={row.isFetching}>
+          <Button onClick={() => void refresh()} disabled={write.busy}>
             최신 내용 확인
           </Button>
         </>

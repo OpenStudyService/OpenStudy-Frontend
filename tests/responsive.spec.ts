@@ -70,7 +70,7 @@ for (const width of [1440, 1024, 390])
     await expect(dialog).not.toBeVisible();
     await expect(trigger).toBeFocused();
     await trigger.click();
-    await dialog.getByLabel("기한").fill("2026-10-20");
+    await dialog.getByLabel("기한").fill("2026-10-20T18:00");
     await dialog
       .getByRole("button", { name: "업무 등록", exact: true })
       .scrollIntoViewIfNeeded();

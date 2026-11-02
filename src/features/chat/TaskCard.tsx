@@ -1,12 +1,11 @@
-import { useApp } from "../../app/context";
 import { ApiError } from "../../shared/api/client";
 import { Badge, Button } from "../../shared/ui/primitives";
 import { Icon } from "../../shared/ui/Icon";
+import { displayDate } from "../../shared/domain/schema";
 import { useTaskDetail } from "../tasks/hooks";
 
 export function TaskCard({ id, onOpen }: { id: string; onOpen: () => void }) {
-  const { lookups } = useApp(),
-    task = useTaskDetail(id);
+  const task = useTaskDetail(id);
   const inaccessible =
     task.error instanceof ApiError && [403, 404].includes(task.error.status);
   if (inaccessible)
@@ -34,12 +33,12 @@ export function TaskCard({ id, onOpen }: { id: string; onOpen: () => void }) {
       {task.data && (
         <>
           <small className="block text-[10px]">
-            담당자{" "}
-            {lookups.employees.find((e) => e.id === task.data!.assigneeId)
-              ?.name ?? task.data.assigneeId}
+            담당자 {task.data.assignee.name}
           </small>
           <div className="flex justify-between">
-            <small className="text-[10px]">기한 {task.data.due}</small>
+            <small className="text-[10px]">
+              기한 {task.data.dueAt ? displayDate(task.data.dueAt) : "미정"}
+            </small>
             <Badge>{task.data.status}</Badge>
           </div>
         </>

@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AppContext } from "../../app/context";
-import type { Task } from "../../shared/domain/schema";
+import type { Task } from "./api";
 import { MockStore } from "../../mocks/store";
 import { ApiError } from "../../shared/api/client";
 import { Tasks } from "./Tasks";
@@ -27,7 +27,12 @@ vi.mock("./api", () => ({
     assignees: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    action: vi.fn(),
+    status: vi.fn(),
+    summary: vi.fn(),
+    events: vi.fn(),
+    addChecklist: vi.fn(),
+    updateChecklist: vi.fn(),
+    deleteChecklist: vi.fn(),
   },
 }));
 let store: MockStore, current: Task;
@@ -36,7 +41,47 @@ beforeEach(() => {
   vi.resetAllMocks();
   store = new MockStore(false);
   store.persona = "junho";
-  current = structuredClone(store.get("tasks", "task-2"));
+  const legacy = store.get("tasks", "task-2");
+  current = {
+    id: legacy.id,
+    branchId: legacy.branchId,
+    title: legacy.title,
+    body: legacy.body,
+    priority: legacy.priority,
+    category: legacy.category,
+    status: legacy.status,
+    assignee: {
+      id: legacy.assigneeId,
+      name: store.get("employees", legacy.assigneeId).name,
+    },
+    createdBy: { id: "junho", name: "박준호" },
+    dueAt: "2026-11-03T08:00:00Z",
+    completedAt: null,
+    overdue: false,
+    canEdit: true,
+    version: legacy.version,
+    createdAt: "2026-11-01T08:00:00Z",
+    updatedAt: "2026-11-01T08:00:00Z",
+    checklist: legacy.checks.map((item, index) => ({
+      id: `check-${index}`,
+      body: item.text,
+      done: item.done,
+      sortOrder: index,
+      updatedBy: null,
+      updatedAt: "2026-11-01T08:00:00Z",
+    })),
+    checklistTotal: legacy.checks.length,
+    checklistDone: legacy.checks.filter((item) => item.done).length,
+  };
+  vi.mocked(taskApi.events).mockResolvedValue({
+    items: [],
+    meta: { page: 1, pageSize: 20, total: 0 },
+  });
+  vi.mocked(taskApi.summary).mockResolvedValue({
+    asOf: store.now(),
+    totals: { total: 1, todo: 1, inProgress: 0, done: 0, overdue: 0 },
+    branches: [],
+  });
   context.value = {
     session: {
       user: structuredClone(store.user()),
@@ -49,9 +94,7 @@ beforeEach(() => {
   };
   vi.mocked(taskApi.list).mockImplementation(async () => ({
     items: [structuredClone(current)],
-    page: 1,
-    pageSize: 20,
-    total: 1,
+    meta: { page: 1, pageSize: 20, total: 1 },
   }));
   vi.mocked(taskApi.detail).mockImplementation(async () =>
     structuredClone(current),
@@ -59,8 +102,7 @@ beforeEach(() => {
   vi.mocked(taskApi.assignees).mockImplementation(async (branch) =>
     store.db.employees.filter(
       (e) =>
-        e.status === "활성" &&
-        (e.owner || e.memberships.some((m) => m.branchId === branch)),
+        e.status === "활성" && e.memberships.some((m) => m.branchId === branch),
     ),
   );
   vi.mocked(taskApi.update).mockImplementation(async (_id, body) => {
@@ -68,6 +110,48 @@ beforeEach(() => {
     return current;
   });
   vi.mocked(taskApi.create).mockResolvedValue(current);
+  vi.mocked(taskApi.updateChecklist).mockImplementation(
+    async (_scope, _id, itemId, body) => {
+      current = {
+        ...current,
+        version: current.version + 1,
+        checklist: current.checklist.map((item) =>
+          item.id === itemId ? { ...item, ...body } : item,
+        ),
+      };
+      return current;
+    },
+  );
+  vi.mocked(taskApi.addChecklist).mockImplementation(
+    async (_scope, _id, body) => {
+      current = {
+        ...current,
+        version: current.version + 1,
+        checklist: [
+          ...current.checklist,
+          {
+            id: "new-check",
+            body: body.body,
+            done: false,
+            sortOrder: current.checklist.length,
+            updatedBy: null,
+            updatedAt: store.now(),
+          },
+        ],
+      };
+      return current;
+    },
+  );
+  vi.mocked(taskApi.deleteChecklist).mockImplementation(
+    async (_scope, _id, itemId) => {
+      current = {
+        ...current,
+        version: current.version + 1,
+        checklist: current.checklist.filter((item) => item.id !== itemId),
+      };
+      return current;
+    },
+  );
 });
 afterEach(() => {
   cleanup();
@@ -114,7 +198,7 @@ it("allows staff creation and resets assignee when the creation branch changes",
     ).not.toBeInTheDocument(),
   );
 });
-it("keeps input on 422, maps field errors and retries the same logical request key", async () => {
+it("keeps input on 422 and maps field errors", async () => {
   const { user } = mount();
   const title = await screen.findByLabelText("업무 제목");
   await user.clear(title);
@@ -131,9 +215,10 @@ it("keeps input on 422, maps field errors and retries the same logical request k
   expect(title).toHaveValue("수정한 업무");
   await user.click(screen.getByRole("button", { name: "저장하기" }));
   await waitFor(() => expect(taskApi.update).toHaveBeenCalledTimes(2));
-  expect(vi.mocked(taskApi.update).mock.calls[0][3]).toBe(
-    vi.mocked(taskApi.update).mock.calls[1][3],
-  );
+  expect(vi.mocked(taskApi.update).mock.calls[1][1]).toEqual({
+    version: current.version - 1,
+    title: "수정한 업무",
+  });
 });
 it("preserves the draft through 409 and latest refresh, then submits only edited fields", async () => {
   const { user } = mount();
@@ -165,6 +250,42 @@ it("preserves the draft through 409 and latest refresh, then submits only edited
   });
   expect(current.body).toBe("다른 사용자의 본문");
 });
+it("saves an explicit return to the original title after comparing a conflict", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const originalTitle = current.title;
+  const { user, router } = mount();
+  const title = await screen.findByLabelText("업무 제목");
+  await user.clear(title);
+  await user.type(title, "내 첫 수정");
+  vi.mocked(taskApi.update).mockRejectedValueOnce(
+    new ApiError(409, { code: "VERSION_CONFLICT", message: "버전 충돌" }),
+  );
+  await user.click(screen.getByRole("button", { name: "저장하기" }));
+  await screen.findByRole("button", { name: "최신 내용 확인" });
+  current = {
+    ...current,
+    title: "다른 사용자의 제목",
+    body: "다른 사용자의 본문",
+    version: 9,
+  };
+  await user.click(screen.getByRole("button", { name: "최신 내용 확인" }));
+  await screen.findByText("최신 업무 · 버전 9");
+  await user.clear(title);
+  await user.type(title, originalTitle);
+  await user.click(screen.getByRole("button", { name: "닫기" }));
+  expect(confirm).toHaveBeenCalled();
+  expect(router.state.location.search).toContain("edit=1");
+  await user.click(
+    screen.getByRole("button", { name: "최신 기준으로 다시 저장" }),
+  );
+  await waitFor(() => expect(taskApi.update).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(taskApi.update).mock.calls[1][1]).toEqual({
+    title: originalTitle,
+    version: 9,
+  });
+  expect(current.title).toBe(originalTitle);
+  expect(current.body).toBe("다른 사용자의 본문");
+});
 it("blocks leaving a dirty form until the user accepts discarding it", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   const { user, router } = mount();
@@ -177,7 +298,12 @@ it("blocks leaving a dirty form until the user accepts discarding it", async () 
   await waitFor(() => expect(router.state.location.search).toBe(""));
 });
 it("does not expose editing through a direct URL to unrelated staff", async () => {
-  current = { ...current, assigneeId: "minji", createdById: "owner" };
+  current = {
+    ...current,
+    canEdit: false,
+    assignee: { id: "minji", name: "민지" },
+    createdBy: { id: "owner", name: "대표" },
+  };
   mount();
   expect(
     await screen.findByText("이 업무를 수정할 권한이 없어요"),
@@ -187,9 +313,7 @@ it("does not expose editing through a direct URL to unrelated staff", async () =
 it("keeps list conditions and uses the returned page size", async () => {
   vi.mocked(taskApi.list).mockResolvedValue({
     items: [current],
-    total: 11,
-    page: 1,
-    pageSize: 20,
+    meta: { total: 11, page: 1, pageSize: 20 },
   });
   const { user, router } = mount("?q=업무&status=할+일&mine=1&detail=task-2");
   await screen.findByRole("button", { name: "수정하기" });
@@ -211,7 +335,12 @@ it("hides an editor and aborts its in-flight write after permission revocation",
   await user.click(screen.getByRole("button", { name: "저장하기" }));
   await waitFor(() => expect(signal).toBeDefined());
   await act(async () => {
-    current = { ...current, assigneeId: "minji", createdById: "owner" };
+    current = {
+      ...current,
+      canEdit: false,
+      assignee: { id: "minji", name: "민지" },
+      createdBy: { id: "owner", name: "대표" },
+    };
     await client.invalidateQueries({ queryKey: ["data"] });
   });
   expect(
@@ -241,7 +370,7 @@ it("keeps saving blocked when reading the latest version fails", async () => {
 it("requires an explicit refresh and second checkbox choice after a checklist conflict", async () => {
   const { user } = mount("?detail=task-2");
   const first = await screen.findByRole("checkbox", { name: "현장 상태 확인" });
-  vi.mocked(taskApi.update).mockRejectedValueOnce(
+  vi.mocked(taskApi.updateChecklist).mockRejectedValueOnce(
     new ApiError(409, { code: "VERSION_CONFLICT", message: "체크리스트 충돌" }),
   );
   await user.click(first);
@@ -253,36 +382,39 @@ it("requires an explicit refresh and second checkbox choice after a checklist co
   current = {
     ...current,
     version: 6,
-    checks: current.checks.map((c, i) => ({ ...c, done: i === 1 })),
+    checklist: current.checklist.map((c, i) => ({ ...c, done: i === 1 })),
   };
   await user.click(screen.getByRole("button", { name: "최신 내용 확인" }));
   await waitFor(() => expect(first).toBeEnabled());
   expect(
     screen.getByRole("checkbox", { name: "운영 채널에 결과 공유" }),
   ).toBeChecked();
-  expect(taskApi.update).toHaveBeenCalledTimes(1);
+  expect(taskApi.updateChecklist).toHaveBeenCalledTimes(1);
   await user.click(first);
-  await waitFor(() => expect(taskApi.update).toHaveBeenCalledTimes(2));
-  expect(vi.mocked(taskApi.update).mock.calls[1][1]).toMatchObject({
+  await waitFor(() => expect(taskApi.updateChecklist).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(taskApi.updateChecklist).mock.calls[1][3]).toMatchObject({
     version: 6,
   });
 });
 it("does not replay a state transition automatically after a conflict", async () => {
-  vi.mocked(taskApi.action)
+  vi.mocked(taskApi.status)
     .mockRejectedValueOnce(
       new ApiError(409, { code: "VERSION_CONFLICT", message: "상태 충돌" }),
     )
-    .mockResolvedValue(undefined);
+    .mockResolvedValue(current);
   const { user } = mount("?detail=task-2&action=complete");
   await user.click(await screen.findByRole("button", { name: "완료하기" }));
   await screen.findByRole("button", { name: "최신 내용 확인" });
   current = { ...current, version: 7 };
   await user.click(screen.getByRole("button", { name: "최신 내용 확인" }));
   await screen.findByText("최신 업무 · 버전 7");
-  expect(taskApi.action).toHaveBeenCalledTimes(1);
+  expect(taskApi.status).toHaveBeenCalledTimes(1);
   await user.click(screen.getByRole("button", { name: "완료하기" }));
-  await waitFor(() => expect(taskApi.action).toHaveBeenCalledTimes(2));
-  expect(vi.mocked(taskApi.action).mock.calls[1][3]).toBe(7);
+  await waitFor(() => expect(taskApi.status).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(taskApi.status).mock.calls[1][2]).toEqual({
+    version: 7,
+    status: "완료",
+  });
 });
 it("sends one request when save is clicked twice while a write is pending", async () => {
   let resolve!: (task: Task) => void;
@@ -298,4 +430,241 @@ it("sends one request when save is clicked twice while a write is pending", asyn
   expect(taskApi.update).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: "처리 중…" })).toBeDisabled();
   await act(async () => resolve(current));
+});
+
+it("reuses a creation key after a failed request and sends canonical optional fields", async () => {
+  const { user } = mount("?detail=new");
+  await user.type(await screen.findByLabelText("업무 제목"), "새 업무");
+  await waitFor(() =>
+    expect(screen.getByRole("option", { name: "박준호" })).toBeInTheDocument(),
+  );
+  await user.selectOptions(
+    screen.getByLabelText("담당자", { selector: "select" }),
+    "junho",
+  );
+  vi.mocked(taskApi.create).mockRejectedValueOnce(
+    new ApiError(0, { code: "NETWORK_ERROR", message: "연결 실패" }),
+  );
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: "업무 등록",
+    }),
+  );
+  await screen.findByText("연결 실패");
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: "업무 등록",
+    }),
+  );
+  await waitFor(() => expect(taskApi.create).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(taskApi.create).mock.calls[0][2]).toBe(
+    vi.mocked(taskApi.create).mock.calls[1][2],
+  );
+  expect(vi.mocked(taskApi.create).mock.calls[0][0]).toMatchObject({
+    title: "새 업무",
+    branchId: "gangnam",
+    assigneeId: "junho",
+    dueAt: null,
+    body: null,
+    checklist: [],
+  });
+});
+
+it("uses the returned task version for checklist add, content edit and removal", async () => {
+  const { user } = mount("?detail=task-2");
+  const version = current.version;
+  await user.type(await screen.findByLabelText("새 체크 항목"), "새 확인 항목");
+  await user.click(screen.getByRole("button", { name: "항목 추가" }));
+  await screen.findByRole("checkbox", { name: "새 확인 항목" });
+  expect(vi.mocked(taskApi.addChecklist).mock.calls[0][2]).toEqual({
+    version,
+    body: "새 확인 항목",
+  });
+  await user.click(screen.getByRole("button", { name: "새 확인 항목 수정" }));
+  const input = screen.getByLabelText("체크 항목 내용 수정");
+  await user.clear(input);
+  await user.type(input, "변경한 항목");
+  await user.click(screen.getByRole("button", { name: "항목 저장" }));
+  await screen.findByRole("checkbox", { name: "변경한 항목" });
+  expect(vi.mocked(taskApi.updateChecklist).mock.calls[0].slice(2, 4)).toEqual([
+    "new-check",
+    { version: version + 1, body: "변경한 항목" },
+  ]);
+  await user.click(screen.getByRole("button", { name: "변경한 항목 삭제" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("checkbox", { name: "변경한 항목" }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(vi.mocked(taskApi.deleteChecklist).mock.calls[0].slice(2, 4)).toEqual([
+    "new-check",
+    version + 2,
+  ]);
+  expect(taskApi.update).not.toHaveBeenCalled();
+});
+
+it("keeps a deleted checklist item's draft visible and can add it as a new item", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const { user, router } = mount("?detail=task-2");
+  await user.click(
+    await screen.findByRole("button", { name: "현장 상태 확인 수정" }),
+  );
+  const input = screen.getByLabelText("체크 항목 내용 수정");
+  await user.clear(input);
+  await user.type(input, "삭제된 항목의 내 입력");
+  await user.type(screen.getByLabelText("새 체크 항목"), "별도의 새 항목 입력");
+  vi.mocked(taskApi.updateChecklist).mockRejectedValueOnce(
+    new ApiError(409, { code: "VERSION_CONFLICT", message: "체크리스트 충돌" }),
+  );
+  await user.click(screen.getByRole("button", { name: "항목 저장" }));
+  await screen.findByRole("button", { name: "최신 내용 확인" });
+  current = {
+    ...current,
+    version: 12,
+    checklist: current.checklist.filter((item) => item.id !== "check-0"),
+  };
+  await user.click(screen.getByRole("button", { name: "최신 내용 확인" }));
+  const recovery = await screen.findByRole("region", {
+    name: "삭제된 체크 항목 입력 복구",
+  });
+  expect(within(recovery).getByLabelText("체크 항목 내용 수정")).toHaveValue(
+    "삭제된 항목의 내 입력",
+  );
+  expect(
+    within(recovery).queryByRole("button", { name: "항목 저장" }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "닫기" }));
+  expect(confirm).toHaveBeenCalled();
+  expect(router.state.location.search).toContain("detail=task-2");
+  expect(taskApi.updateChecklist).toHaveBeenCalledTimes(1);
+  await user.click(
+    within(recovery).getByRole("button", { name: "새 항목으로 추가" }),
+  );
+  await screen.findByRole("checkbox", { name: "삭제된 항목의 내 입력" });
+  expect(vi.mocked(taskApi.addChecklist).mock.calls[0][2]).toEqual({
+    version: 12,
+    body: "삭제된 항목의 내 입력",
+  });
+  expect(
+    screen.queryByRole("region", { name: "삭제된 체크 항목 입력 복구" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("새 체크 항목")).toHaveValue(
+    "별도의 새 항목 입력",
+  );
+});
+it("lets the user cancel a checklist draft deleted during a background refresh", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const { user, client, router } = mount("?detail=task-2");
+  await user.click(
+    await screen.findByRole("button", { name: "현장 상태 확인 수정" }),
+  );
+  await user.type(screen.getByLabelText("체크 항목 내용 수정"), " 내 입력");
+  await act(async () => {
+    current = { ...current, version: 13, checklist: [] };
+    await client.invalidateQueries({ queryKey: ["data"] });
+  });
+  const recovery = await screen.findByRole("region", {
+    name: "삭제된 체크 항목 입력 복구",
+  });
+  await user.click(screen.getByRole("button", { name: "닫기" }));
+  expect(confirm).toHaveBeenCalledTimes(1);
+  await user.click(within(recovery).getByRole("button", { name: "취소" }));
+  await user.click(screen.getByRole("button", { name: "닫기" }));
+  await waitFor(() => expect(router.state.location.search).toBe(""));
+  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(taskApi.addChecklist).not.toHaveBeenCalled();
+});
+it("preserves filters after a list reload failure and closing a detail", async () => {
+  const search =
+    "?q=업무&mine=true&dueFrom=2026-11-01T00%3A00%3A00Z&dueTo=2026-11-10T00%3A00%3A00Z&overdue=true&sort=dueAt&direction=asc&page=2&detail=task-2";
+  const { user, client, router } = mount(search);
+  await screen.findByRole("button", { name: "수정하기" });
+  vi.mocked(taskApi.list).mockRejectedValue(
+    new ApiError(0, { code: "NETWORK_ERROR", message: "목록 재조회 실패" }),
+  );
+  await act(async () => {
+    await client.invalidateQueries({
+      queryKey: [
+        "data",
+        context.value.session.user.id,
+        "gangnam",
+        "tasks",
+        "list",
+      ],
+    });
+  });
+  expect(
+    await screen.findByText(/업무 관리 데이터를 불러오지 못했어요/),
+  ).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "닫기" }));
+  const params = new URLSearchParams(router.state.location.search);
+  expect(params.get("dueFrom")).toBe("2026-11-01T00:00:00Z");
+  expect(params.get("dueTo")).toBe("2026-11-10T00:00:00Z");
+  expect(params.get("page")).toBe("2");
+  expect(params.get("overdue")).toBe("true");
+  expect(screen.getByRole("button", { name: "기한 초과" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+});
+
+it("loads processing history independently and shows its actor and changed values", async () => {
+  vi.mocked(taskApi.events).mockResolvedValue({
+    items: [
+      {
+        id: "event-1",
+        type: "STATUS_CHANGED",
+        actor: { id: "junho", name: "박준호" },
+        before: { status: "할 일" },
+        after: { status: "진행 중" },
+        at: "2026-11-02T01:00:00Z",
+      },
+    ],
+    meta: { page: 1, pageSize: 20, total: 1 },
+  });
+  mount("?detail=task-2");
+  expect(await screen.findByText(/박준호 · 상태 변경/)).toBeVisible();
+  expect(screen.getByText("변경 전: 상태: 할 일")).toBeVisible();
+  expect(screen.getByText("변경 후: 상태: 진행 중")).toBeVisible();
+});
+
+it("preserves a custom category and saves a new free-text category", async () => {
+  current = { ...current, category: "야간 특별 운영", priority: "긴급" };
+  const { user } = mount();
+  const category = await screen.findByLabelText("분류", { selector: "input" });
+  expect(category).toHaveValue("야간 특별 운영");
+  expect(screen.getByLabelText("우선순위")).toHaveValue("긴급");
+  await user.clear(category);
+  await user.type(category, "자유 분류 2026");
+  await user.click(screen.getByRole("button", { name: "저장하기" }));
+  await waitFor(() => expect(taskApi.update).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(taskApi.update).mock.calls[0][1]).toEqual({
+    version: current.version - 1,
+    category: "자유 분류 2026",
+  });
+});
+
+it("keeps a dirty edit draft when a background detail reload fails", async () => {
+  const { user, client } = mount();
+  const title = await screen.findByLabelText("업무 제목");
+  await user.type(title, " 유지");
+  vi.mocked(taskApi.detail).mockRejectedValueOnce(
+    new ApiError(500, { code: "INTERNAL_ERROR", message: "상세 재조회 실패" }),
+  );
+  await act(async () => {
+    await client.invalidateQueries({
+      queryKey: [
+        "data",
+        context.value.session.user.id,
+        "gangnam",
+        "tasks",
+        "detail",
+      ],
+    });
+  });
+  expect(screen.getByLabelText("업무 제목")).toHaveValue(
+    `${current.title} 유지`,
+  );
+  expect(screen.getByRole("button", { name: "저장하기" })).toBeEnabled();
 });

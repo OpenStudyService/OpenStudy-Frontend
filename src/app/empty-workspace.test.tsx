@@ -252,8 +252,20 @@ it("does not treat an authorization failure as empty data", async () => {
   ).not.toBeInTheDocument();
 });
 
-it("keeps list columns and filters with missing page items", async () => {
-  renderWorkspace(() => Response.json({ items: null }), "tasks");
+function emptyTasks(path: string, page = 1) {
+  if (path === "/api/tasks")
+    return Response.json({ items: [], meta: { page, pageSize: 20, total: 0 } });
+  if (path === "/api/tasks/summary")
+    return Response.json({
+      asOf: session.asOf,
+      totals: { total: 0, todo: 0, inProgress: 0, done: 0, overdue: 0 },
+      branches: [],
+    });
+  return Response.json({});
+}
+
+it("keeps list columns and filters with an empty canonical task page", async () => {
+  renderWorkspace(emptyTasks, "tasks");
   expect(
     await screen.findByRole("heading", { name: "등록된 항목이 없어요" }),
   ).toBeVisible();
@@ -363,7 +375,7 @@ it("preserves search and pagination conditions when switching branch", async () 
       },
     ],
   };
-  renderWorkspace(() => Response.json({}), "tasks?q=검색&page=3", current);
+  renderWorkspace((path) => emptyTasks(path, 3), "tasks?q=검색&page=3", current);
   await screen.findByRole("heading", { name: "업무 관리" });
   const client = clients[0];
   client.setQueryData(["data", "owner", "all", "sensitive"], { secret: true });
