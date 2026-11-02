@@ -48,3 +48,10 @@
 - 독립 화면의 모든 텍스트 입력은 AI 예문으로 처리한다. 일반 프로젝트 채팅은 `@DomainLenz` 호출로 구분한다. 질문 선택은 입력창 준비 단계이며 전송 후 실행한다.
 - 전달본은 작업공간 `outputs/domainlenz-demo-v8/OpenStudy_DomainLenz_Demo.html`, 문서·화면을 포함한 ZIP은 `outputs/OpenStudy_DomainLenz_Demo_v8.zip`이다. worktree 없이 파일을 열 수 있다.
 - 작업 브랜치 push와 새 PR 준비까지 수행한다. 원격 main 반영·병합·자동 병합은 사용자에게 맡긴다.
+
+## 7. 전달 완료 기록
+
+- 개정 구현을 `80df8de`로 커밋하고 `feature/domainlenz-demo-layout`을 원격에 push했다.
+- [Frontend PR #57](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/57)을 생성했다. 병합 없이 닫힌 #56을 다시 열지 않고 개정본으로 연결했으며 사용자 검토·병합 대기 상태다.
+- 전달 디렉터리의 HTML은 검증한 저장소 HTML과 해시가 일치한다. ZIP에는 HTML·문서·JSON·화면 총 18개 파일이 들어 있다.
+- 원격 main 변경·병합·자동 병합은 수행하지 않았다. main과 이전 데모 작업공간은 유지했다.
