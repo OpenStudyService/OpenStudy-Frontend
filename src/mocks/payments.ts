@@ -112,7 +112,7 @@ const refundable = (actor: Employee, row: PassRow) =>
   !used(row) &&
   effective(row) === "활성" &&
   store.get("payments", row.paymentId).status === "승인";
-function passView(actor: Employee, row: PassRow): Pass {
+export function passView(actor: Employee, row: PassRow): Pass {
   const saved = metadata(store.get("payments", row.paymentId), state());
   return {
     id: row.id,
@@ -247,7 +247,7 @@ function replay(
   value.accepted.set(scoped, { fingerprint, result: structuredClone(result) });
   return result;
 }
-const response =
+export const paymentResponse =
   (
     task: (args: Args, actor: Employee) => unknown | Promise<unknown>,
     status = 200,
@@ -310,6 +310,10 @@ const response =
           message: failure.message,
           ...(failure.fieldErrors ? { fieldErrors: failure.fieldErrors } : {}),
           requestId: crypto.randomUUID(),
+          ...(failure.latestVersion
+            ? { latestVersion: failure.latestVersion }
+            : {}),
+          ...(failure.reloadUrl ? { reloadUrl: failure.reloadUrl } : {}),
         },
         { status: failure.status },
       );
@@ -319,7 +323,7 @@ const response =
 export const paymentHandlers = [
   http.get(
     "/api/payments",
-    response(({ request }, actor) => {
+    paymentResponse(({ request }, actor) => {
       const selected = branches(actor, request, true),
         q = new URL(request.url).searchParams,
         status = q.get("status"),
@@ -361,7 +365,7 @@ export const paymentHandlers = [
   ),
   http.get(
     "/api/payments/:id",
-    response(({ request, params }, actor) => {
+    paymentResponse(({ request, params }, actor) => {
       const selected = branches(actor, request, true),
         row = store.db.payments.find(
           (p) =>
@@ -376,7 +380,7 @@ export const paymentHandlers = [
   ),
   http.post(
     "/api/payments",
-    response(async ({ request }, actor) => {
+    paymentResponse(async ({ request }, actor) => {
       const body = paymentInput.parse(await request.json());
       assert(
         can(actor, body.branchId, "payments:write"),
@@ -484,7 +488,7 @@ export const paymentHandlers = [
   ),
   http.post(
     "/api/payments/:id/refund",
-    response(async ({ request, params }, actor) => {
+    paymentResponse(async ({ request, params }, actor) => {
       const body = refundInput.parse(await request.json()),
         row = store.db.payments.find((p) => p.id === params.id);
       assert(
@@ -544,7 +548,7 @@ export const paymentHandlers = [
   ),
   http.get(
     "/api/passes",
-    response(({ request }, actor) => {
+    paymentResponse(({ request }, actor) => {
       const selected = branches(actor, request),
         q = new URL(request.url).searchParams,
         status = q.get("status"),
@@ -575,7 +579,7 @@ export const paymentHandlers = [
   ),
   http.get(
     "/api/passes/:id",
-    response(({ request, params }, actor) => {
+    paymentResponse(({ request, params }, actor) => {
       const selected = branches(actor, request),
         row = store.db.passes.find(
           (p) => p.id === params.id && selected.includes(p.branchId),

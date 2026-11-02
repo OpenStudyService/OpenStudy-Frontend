@@ -6,6 +6,7 @@ import type { components } from "../shared/api/foundation.generated";
 import { admin, can } from "../shared/domain/schema";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
+import { recordUsage } from "./pass-history";
 
 type Seat = components["schemas"]["Seat"];
 type Session = components["schemas"]["SeatSession"];
@@ -793,6 +794,7 @@ export const seatHandlers = [
           pass.kind === "정액권" ? saved.overageKrw : saved.overageMinutes;
         row.status = "완료";
         row.endedAt = now;
+        recordUsage(row, actor, input.reason);
         row.updatedAt = now;
         row.version++;
         if (pass.kind !== "기간권" && pass.remaining === 0)

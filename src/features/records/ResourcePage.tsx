@@ -48,6 +48,7 @@ import { CustomerPanel } from "../customers/CustomerPanel";
 import { Payments } from "../payments/Payments";
 import { Passes } from "../payments/Passes";
 import { Seats } from "../seats/Seats";
+import { SeatHistory } from "../pass-history/SeatHistory";
 import { PaymentPanel, PassPanel } from "../payments/PaymentPanels";
 
 export function format(
@@ -205,6 +206,8 @@ export function ResourcePage(props: {
     <Tasks />
   ) : props.resource === "seats" ? (
     <Seats embedded={props.embedded} />
+  ) : props.resource === "usage" ? (
+    <SeatHistory embedded={props.embedded} />
   ) : (
     <GenericResourcePage {...props} />
   );

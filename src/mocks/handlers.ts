@@ -34,6 +34,7 @@ import { customerHandlers } from "./customers";
 import { paymentHandlers } from "./payments";
 import { taskHandlers } from "./tasks";
 import { seatHandlers } from "./seats";
+import { passHistoryHandlers } from "./pass-history";
 import {
   allowedChatChannel,
   markChatRead,
@@ -349,6 +350,7 @@ export const handlers = [
   ...paymentHandlers,
   ...taskHandlers,
   ...seatHandlers,
+  ...passHistoryHandlers,
   http.get(
     "/api/auth/csrf",
     response(() => ({ token: csrf }), false),

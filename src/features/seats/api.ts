@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { api, ApiError, queryString } from "../../shared/api/client";
-import type { components } from "../../shared/api/foundation.generated";
+import type {
+  components,
+  operations,
+} from "../../shared/api/foundation.generated";
 
 type Schemas = components["schemas"];
 export type Seat = Schemas["Seat"];
@@ -165,6 +168,35 @@ const scoped = (path: string, scope: string) =>
   `${path}?${queryString({ scope })}`;
 
 export const seatApi = {
+  async history(
+    filters: NonNullable<operations["listSeatSessions"]["parameters"]["query"]>,
+    signal?: AbortSignal,
+  ) {
+    const result = requireResponse(
+      await api<Schemas["SeatSessionPage"]>(
+        `/seat-sessions?${queryString(filters)}`,
+        { signal },
+      ),
+      z.object({ items: z.array(sessionSchema), meta }),
+    );
+    if (
+      result.items.some(
+        (row) =>
+          (filters.scope &&
+            filters.scope !== "all" &&
+            row.branchId !== filters.scope) ||
+          (row.status === "종료" &&
+            (row.passRemainingMinutes !== null ||
+              row.passRemainingCreditKrw !== null)),
+      )
+    ) {
+      throw new ApiError(0, {
+        code: "INVALID_RESPONSE",
+        message: "이용 이력의 조회 범위를 확인해 주세요.",
+      });
+    }
+    return result;
+  },
   async board(branchId: string, kind: string, signal: AbortSignal) {
     const result = requireResponse(
       await api<SeatBoard>(`/seats/board?${queryString({ branchId, kind })}`, {

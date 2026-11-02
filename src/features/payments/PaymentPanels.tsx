@@ -17,6 +17,8 @@ import { getPass, getPayment, refundPayment } from "./api";
 import type { Pass, Payment, RefundCreate } from "./model";
 import { useSubmission } from "./useSubmission";
 import { MockPaymentNotice, dateTime, useSalesClock } from "./shared";
+import { AdjustmentForm } from "../pass-history/AdjustmentForm";
+import { canAdjust } from "../pass-history/model";
 
 export function passBalance(pass: Pass) {
   if (pass.kind === "시간권")
@@ -406,6 +408,7 @@ function PassPanelSession({
   const query = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [refunding, setRefunding] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [result, setResult] = useState<Payment>();
   const pass = useQuery({
     queryKey: ["data", session.user.id, scope, "passes", "detail", id],
@@ -414,6 +417,10 @@ function PassPanelSession({
   });
   const canRefund = useRefundAvailability(pass.data);
   const p = pass.data;
+  const denied =
+    pass.error instanceof ApiError &&
+    [401, 403, 404].includes(pass.error.status);
+  const keepEditor = adjusting && !!p && !denied;
   return (
     <Panel
       open
@@ -423,14 +430,34 @@ function PassPanelSession({
       }}
     >
       <MockPaymentNotice />
+      {keepEditor && pass.error && (
+        <ErrorState error={pass.error} retry={() => void pass.refetch()} />
+      )}
       {pass.isPending ? (
         <State loading />
-      ) : pass.error ? (
+      ) : pass.error && !keepEditor ? (
         <ErrorState error={pass.error} retry={() => void pass.refetch()} />
       ) : (
         p && (
           <>
             <PassFacts pass={p} />
+            {canAdjust(session.user, p) && !adjusting && !refunding && (
+              <Button className="my-3" onClick={() => setAdjusting(true)}>
+                이용권 조정
+              </Button>
+            )}
+            {adjusting && (
+              <AdjustmentForm
+                pass={p}
+                onCancel={() => setAdjusting(false)}
+                onSaved={() => {
+                  setAdjusting(false);
+                  void query.invalidateQueries({
+                    queryKey: ["data", session.user.id],
+                  });
+                }}
+              />
+            )}
             {can(session.user, p.purchaseBranchId, "payments:read") && (
               <Link
                 className="btn my-4"
@@ -439,7 +466,7 @@ function PassPanelSession({
                 원결제 상세
               </Link>
             )}
-            {canRefund && !refunding && (
+            {canRefund && !refunding && !adjusting && (
               <Button variant="danger" onClick={() => setRefunding(true)}>
                 전액 환불
               </Button>

@@ -133,7 +133,7 @@ function visible(
 function editable(actor: Employee, row: Row) {
   return actor.owner || related(row).some((id) => writable(actor, id));
 }
-function customer(actor: Employee, request: Request, id: string) {
+export function customer(actor: Employee, request: Request, id: string) {
   const scope = selected(actor, request),
     row = store.db.members.find((m) => m.id === id);
   assert(
