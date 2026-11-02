@@ -29,7 +29,9 @@
     "api:generate": "tsx scripts/generate-contract.ts && openapi-typescript docs/api/openapi.json -o src/shared/api/generated.ts && prettier --write src/shared/api/generated.ts",
     "api:foundation": "openapi-typescript ../openstudy-backend/docs/design/foundation/openapi.json -o src/shared/api/foundation.generated.ts && prettier --write src/shared/api/foundation.generated.ts",
     "test:e2e:real-mail": "tsx scripts/invitation-real-mail.ts",
-    "test:real-mail:tool": "tsx --test scripts/invitation-real-mail.test.ts"
+    "test:real-mail:tool": "tsx --test scripts/invitation-real-mail.test.ts",
+    "build:domainlenz": "tsx scripts/generate-domainlenz-docs.ts && tsx scripts/build-domainlenz-demo.ts",
+    "test:e2e:domainlenz": "playwright test --config playwright.domainlenz.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

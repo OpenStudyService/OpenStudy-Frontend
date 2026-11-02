@@ -28,6 +28,7 @@ coverage/
 .nyc_output/
 /test-results/
 /test-results-builds/
+/test-results-domainlenz/
 /playwright-report/
 /blob-report/
 /playwright/.cache/

@@ -1,0 +1,708 @@
+{
+  "backendRepository": "OpenStudyService/OpenStudy-Backend",
+  "backendRevision": "898ba3231e8e50209a7b891e177b4b742576a0d0",
+  "migrationPaths": [
+    "src/main/resources/db/migration/V1__init_schema.sql",
+    "src/main/resources/db/migration/V2__customer_branch_and_memo.sql"
+  ],
+  "apiSource": "docs/design/foundation/openapi.json",
+  "note": "Committed sources only. OpenAPI presence is not runtime implementation verification. Uncommitted work excluded.",
+  "domains": [
+    {
+      "id": "organization",
+      "name": "지점·직원",
+      "icon": "01",
+      "description": "지점, 소속과 초대",
+      "sources": [
+        {
+          "table": "branches",
+          "fields": [
+            "id",
+            "name",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "employees",
+          "fields": [
+            "id",
+            "name",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "branch_memberships",
+          "fields": [
+            "employee_id",
+            "branch_id",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "employee_invitations",
+          "fields": [
+            "id",
+            "branch_id",
+            "status",
+            "expires_at"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "branch_memberships.branch_id → branches.id",
+        "branch_memberships.employee_id → employees.id",
+        "employee_invitations.branch_id → branches.id"
+      ],
+      "apiPaths": [
+        "/branches",
+        "/employees",
+        "/invitations"
+      ],
+      "readiness": "원본 조회 API 있음 · 자연어 집계 연결 예정",
+      "policy": "OWNER 전용 시연 · 도메인별 AI 권한 정책 미확정",
+      "apiEvidence": [
+        {
+          "path": "/branches",
+          "definedInOpenApi": true
+        },
+        {
+          "path": "/employees",
+          "definedInOpenApi": true
+        },
+        {
+          "path": "/invitations",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "customers",
+      "name": "회원",
+      "icon": "02",
+      "description": "등록 추이와 회원 상태",
+      "sources": [
+        {
+          "table": "customers",
+          "fields": [
+            "id",
+            "member_no",
+            "name",
+            "status",
+            "registered_at",
+            "registered_branch_id"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "customers.registered_branch_id → branches.id (V2)"
+      ],
+      "apiPaths": [
+        "/customers"
+      ],
+      "readiness": "원본 조회 API 있음 · 자연어 집계 연결 예정",
+      "policy": "OWNER 전용 시연 · 이름은 가상·마스킹, 연락처 제외",
+      "apiEvidence": [
+        {
+          "path": "/customers",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "products",
+      "name": "상품·이용권",
+      "icon": "03",
+      "description": "판매 상품과 만료 예정",
+      "sources": [
+        {
+          "table": "products",
+          "fields": [
+            "id",
+            "name",
+            "kind",
+            "sale_status",
+            "price_krw"
+          ],
+          "verified": true
+        },
+        {
+          "table": "product_branches",
+          "fields": [
+            "product_id",
+            "branch_id"
+          ],
+          "verified": true
+        },
+        {
+          "table": "passes",
+          "fields": [
+            "id",
+            "customer_id",
+            "purchase_branch_id",
+            "kind",
+            "status",
+            "expires_at",
+            "remaining_minutes",
+            "remaining_credit_krw"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "product_branches.product_id → products.id",
+        "passes.customer_id → customers.id"
+      ],
+      "apiPaths": [
+        "/products",
+        "/passes"
+      ],
+      "readiness": "원본 조회 API 있음 · 자연어 집계 연결 예정",
+      "policy": "OWNER 전용 시연 · 기간권 시작 전은 만료 예정에서 제외",
+      "apiEvidence": [
+        {
+          "path": "/products",
+          "definedInOpenApi": true
+        },
+        {
+          "path": "/passes",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "sales",
+      "name": "결제·환불·매출",
+      "icon": "04",
+      "description": "지점별 수치와 거래 근거",
+      "sources": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ],
+          "verified": true
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "refunds.payment_id → payments.id",
+        "payments.branch_id → branches.id"
+      ],
+      "apiPaths": [
+        "/payments"
+      ],
+      "readiness": "결제 원본 API 있음 · M9 집계·M10 엔진 연결 예정",
+      "policy": "ai:read + 대상 모든 지점의 sales:read · 거래 상세에는 payments:read 추가",
+      "apiEvidence": [
+        {
+          "path": "/payments",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "seats",
+      "name": "좌석·입퇴실",
+      "icon": "05",
+      "description": "현재 이용과 완료 세션",
+      "sources": [
+        {
+          "table": "seats",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_no",
+            "zone",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "seat_sessions",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_id",
+            "status",
+            "effective_checked_in_at",
+            "effective_checked_out_at",
+            "billed_minutes",
+            "billed_krw"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "seat_sessions.seat_id + branch_id → seats.id + branch_id"
+      ],
+      "apiPaths": [
+        "/seats/occupancy",
+        "/seat-sessions"
+      ],
+      "readiness": "원본·좌석 현황 API 있음 · 자연어 연결 예정",
+      "policy": "OWNER 전용 시연 · 완료 이용은 유효 퇴실 시각 기준",
+      "apiEvidence": [
+        {
+          "path": "/seats/occupancy",
+          "definedInOpenApi": true
+        },
+        {
+          "path": "/seat-sessions",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "rooms",
+      "name": "스터디룸·예약",
+      "icon": "06",
+      "description": "오늘의 일정과 주간 예약",
+      "sources": [
+        {
+          "table": "rooms",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "capacity"
+          ],
+          "verified": true
+        },
+        {
+          "table": "room_reservations",
+          "fields": [
+            "id",
+            "room_id",
+            "branch_id",
+            "start_at",
+            "end_at",
+            "status"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "room_reservations.room_id + branch_id → rooms.id + branch_id"
+      ],
+      "apiPaths": [
+        "/rooms",
+        "/room-reservations"
+      ],
+      "readiness": "DB 정의 있음 · 정본 조회 API 준비 여부 별도 확인",
+      "policy": "OWNER 전용 시연 · 취소·결제 실패 제외, 예약 시작일 기준",
+      "apiEvidence": [
+        {
+          "path": "/rooms",
+          "definedInOpenApi": false
+        },
+        {
+          "path": "/room-reservations",
+          "definedInOpenApi": false
+        }
+      ]
+    },
+    {
+      "id": "lockers",
+      "name": "사물함",
+      "icon": "07",
+      "description": "배정 현황과 기간 종료",
+      "sources": [
+        {
+          "table": "lockers",
+          "fields": [
+            "id",
+            "branch_id",
+            "locker_no",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "locker_assignments",
+          "fields": [
+            "id",
+            "locker_id",
+            "start_date",
+            "end_date",
+            "status",
+            "returned_at"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "locker_assignments.locker_id → lockers.id"
+      ],
+      "apiPaths": [
+        "/lockers"
+      ],
+      "readiness": "DB 정의 있음 · 정본 조회 API 준비 여부 별도 확인",
+      "policy": "OWNER 전용 시연 · 배정 종료일 기준, 회원 연락처 제외",
+      "apiEvidence": [
+        {
+          "path": "/lockers",
+          "definedInOpenApi": false
+        }
+      ]
+    },
+    {
+      "id": "facilities",
+      "name": "시설·점검",
+      "icon": "08",
+      "description": "점검 지연과 진행 작업",
+      "sources": [
+        {
+          "table": "facilities",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "status",
+            "inspection_interval_days",
+            "last_inspected_on"
+          ],
+          "verified": true
+        },
+        {
+          "table": "facility_works",
+          "fields": [
+            "id",
+            "facility_id",
+            "kind",
+            "status",
+            "opened_at",
+            "completed_at"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "facility_works.facility_id → facilities.id"
+      ],
+      "apiPaths": [
+        "/facilities",
+        "/facilities/summary"
+      ],
+      "readiness": "원본·시설 요약 API 있음 · 자연어 연결 예정",
+      "policy": "OWNER 전용 시연 · 다음 점검일은 최근 점검일 + 점검 주기",
+      "apiEvidence": [
+        {
+          "path": "/facilities",
+          "definedInOpenApi": true
+        },
+        {
+          "path": "/facilities/summary",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "tasks",
+      "name": "업무·채팅",
+      "icon": "09",
+      "description": "기한과 채널 업무 공유",
+      "sources": [
+        {
+          "table": "work_tasks",
+          "fields": [
+            "id",
+            "branch_id",
+            "title",
+            "status",
+            "due_at",
+            "completed_at"
+          ],
+          "verified": true
+        },
+        {
+          "table": "messages",
+          "fields": [
+            "id",
+            "conversation_id",
+            "related_task_id",
+            "kind",
+            "sent_at"
+          ],
+          "verified": true
+        },
+        {
+          "table": "conversations",
+          "fields": [
+            "id",
+            "branch_id",
+            "kind",
+            "name"
+          ],
+          "verified": true
+        },
+        {
+          "table": "conversation_members",
+          "fields": [
+            "conversation_id",
+            "employee_id"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "messages.related_task_id → work_tasks.id",
+        "messages.conversation_id → conversations.id",
+        "conversation_members.conversation_id → conversations.id"
+      ],
+      "apiPaths": [
+        "/tasks",
+        "/channels/{id}/messages"
+      ],
+      "readiness": "업무 API 있음 · 채팅은 계약 정의, 실제 연결 후속",
+      "policy": "OWNER 전용 시연 · 현재 참여 채널만, DM 본문 조회 제외",
+      "apiEvidence": [
+        {
+          "path": "/tasks",
+          "definedInOpenApi": true
+        },
+        {
+          "path": "/channels/{id}/messages",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "support",
+      "name": "문의·공지",
+      "icon": "10",
+      "description": "미답변 문의와 게시 공지",
+      "sources": [
+        {
+          "table": "inquiries",
+          "fields": [
+            "id",
+            "branch_id",
+            "subject",
+            "status",
+            "created_at",
+            "answered_at"
+          ],
+          "verified": true
+        },
+        {
+          "table": "announcements",
+          "fields": [
+            "id",
+            "title",
+            "target",
+            "status",
+            "is_pinned",
+            "published_at"
+          ],
+          "verified": true
+        },
+        {
+          "table": "announcement_branches",
+          "fields": [
+            "announcement_id",
+            "branch_id"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "announcement_branches.announcement_id → announcements.id"
+      ],
+      "apiPaths": [
+        "/inquiries",
+        "/notices"
+      ],
+      "readiness": "계약 정의 확인 · 실제 구현 준비 상태 별도 확인",
+      "policy": "OWNER 전용 시연 · 문의 본문·답변 원문 제외",
+      "apiEvidence": [
+        {
+          "path": "/inquiries",
+          "definedInOpenApi": true
+        },
+        {
+          "path": "/notices",
+          "definedInOpenApi": true
+        }
+      ]
+    },
+    {
+      "id": "attendance",
+      "name": "근무·근태",
+      "icon": "11",
+      "description": "근무표와 정정 신청",
+      "sources": [
+        {
+          "table": "shifts",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "starts_at",
+            "ends_at",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "attendance_records",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "clock_in_at",
+            "clock_out_at"
+          ],
+          "verified": true
+        },
+        {
+          "table": "attendance_corrections",
+          "fields": [
+            "id",
+            "attendance_id",
+            "correction_kind",
+            "status",
+            "created_at"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "attendance_corrections.attendance_id → attendance_records.id",
+        "shifts.employee_id + branch_id → branch_memberships.employee_id + branch_id"
+      ],
+      "apiPaths": [
+        "/shifts",
+        "/attendance-corrections"
+      ],
+      "readiness": "DB 정의 있음 · 정본 조회 API 준비 여부 별도 확인",
+      "policy": "OWNER 전용 시연 · 정정 사유 원문 제외",
+      "apiEvidence": [
+        {
+          "path": "/shifts",
+          "definedInOpenApi": false
+        },
+        {
+          "path": "/attendance-corrections",
+          "definedInOpenApi": false
+        }
+      ]
+    },
+    {
+      "id": "leave",
+      "name": "휴가·대체근무",
+      "icon": "12",
+      "description": "승인 휴가와 교대 신청",
+      "sources": [
+        {
+          "table": "leave_requests",
+          "fields": [
+            "id",
+            "employee_id",
+            "starts_on",
+            "ends_on",
+            "requested_days",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "shift_swaps",
+          "fields": [
+            "id",
+            "original_shift_id",
+            "requested_by",
+            "replacement_employee_id",
+            "status"
+          ],
+          "verified": true
+        },
+        {
+          "table": "shifts",
+          "fields": [
+            "id",
+            "branch_id",
+            "employee_id"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "leave_requests.employee_id → employees.id",
+        "shift_swaps.original_shift_id → shifts.id"
+      ],
+      "apiPaths": [
+        "/leave-requests",
+        "/shift-swaps"
+      ],
+      "readiness": "DB 정의 있음 · 정본 조회 API 준비 여부 별도 확인",
+      "policy": "OWNER 전용 시연 · 휴가는 전사 직원 기준, 지점 귀속은 정책 협의 필요",
+      "apiEvidence": [
+        {
+          "path": "/leave-requests",
+          "definedInOpenApi": false
+        },
+        {
+          "path": "/shift-swaps",
+          "definedInOpenApi": false
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "name": "감사 이력",
+      "icon": "13",
+      "description": "업무와 결제의 처리 기록",
+      "sources": [
+        {
+          "table": "audit_events",
+          "fields": [
+            "id",
+            "actor_employee_id",
+            "branch_id",
+            "entity_type",
+            "entity_id",
+            "action",
+            "occurred_at",
+            "result"
+          ],
+          "verified": true
+        }
+      ],
+      "relations": [
+        "audit_events.branch_id → branches.id",
+        "audit_events.actor_employee_id → employees.id"
+      ],
+      "apiPaths": [
+        "/audit-events"
+      ],
+      "readiness": "DB 정의 있음 · 정본 조회 API 준비 여부 별도 확인",
+      "policy": "OWNER 전용 시연 · before_json·after_json·reason 원문 제외",
+      "apiEvidence": [
+        {
+          "path": "/audit-events",
+          "definedInOpenApi": false
+        }
+      ]
+    }
+  ]
+}
