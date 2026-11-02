@@ -93,9 +93,7 @@ export function Panel({
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             trigger.current = document.activeElement as HTMLElement | null;
-            requestAnimationFrame(() =>
-              document.getElementById(headingId)?.focus(),
-            );
+            document.getElementById(headingId)?.focus();
           }}
           onCloseAutoFocus={(e) => {
             e.preventDefault();
