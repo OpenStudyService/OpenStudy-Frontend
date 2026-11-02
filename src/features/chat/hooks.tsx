@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { chatApi } from "./api";
-import { mergeMessages, refreshFeed } from "./model";
+import { canonicalMessage } from "./canonical";
+import { compareMessages, mergeMessages, refreshFeed } from "./model";
 import type { MessageFeed } from "./model";
 
 export function useVisibleRefresh(
@@ -70,11 +71,21 @@ export function useChatFeed(
         (cursor) => chatApi.messages(channelId, parentId, signal, cursor),
       );
       const current = client.getQueryData<MessageFeed>(key);
+      const merged = mergeMessages(current?.items ?? [], refreshed.items);
+      // Old loaded pages can contain cards whose source task changed since
+      // the latest page. Refresh cards through the message endpoint so the
+      // server applies this viewer's channel and task access on every refresh.
+      const cards = await Promise.all(
+        merged
+          .filter((row) => canonicalMessage(row)?.taskCard)
+          .map((row) => chatApi.parent(row.id, scope, signal, channelId)),
+      );
       return {
-        items: mergeMessages(current?.items ?? [], refreshed.items),
+        items: mergeMessages(merged, cards),
         nextCursor:
           current?.items.length &&
-          current.items[0].sequence < (refreshed.items[0]?.sequence ?? Infinity)
+          (!refreshed.items.length ||
+            compareMessages(current.items[0], refreshed.items[0]) < 0)
             ? current.nextCursor
             : refreshed.nextCursor,
       };
@@ -114,6 +125,7 @@ export function useChatFeed(
         retry: false,
         staleTime: 0,
       });
+      requestSignal?.throwIfAborted();
       if (page.nextCursor === cursor)
         throw new Error("메시지 커서가 반복됩니다. 다시 조회해 주세요.");
       client.setQueryData<MessageFeed>(key, (old) => ({

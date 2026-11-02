@@ -18,6 +18,7 @@ import { Icon } from "../../shared/ui/Icon";
 import { RecordPanel } from "../records/ResourcePage";
 import { TaskCard } from "./TaskCard";
 import { chatApi } from "./api";
+import { canonicalChannel, canonicalMessage } from "./canonical";
 import { draftKey as sessionDraftKey } from "./model";
 import type { Channel } from "./model";
 import { useChatFeed, useVisibleRefresh } from "./hooks";
@@ -81,7 +82,7 @@ function ChatWorkspace() {
       "parent",
       threadId,
     ],
-    queryFn: ({ signal }) => chatApi.parent(threadId, scope, signal),
+    queryFn: ({ signal }) => chatApi.parent(threadId, scope, signal, channelId),
     enabled: enabled && !!threadId,
     retry: false,
   });
@@ -235,26 +236,42 @@ function ChatWorkspace() {
     );
   }
   function bubble(m: Message, inThread = false) {
+    const canonical = canonicalMessage(m);
+    const sender = canonical?.senderName ?? person(m.authorId);
+    const inaccessibleCard = canonical?.taskCard?.accessible === false;
     return (
       <article className="message" key={m.id} data-message-id={m.id}>
-        <Avatar name={person(m.authorId)} />
+        <Avatar name={sender} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <b className="text-xs">{person(m.authorId)}</b>
+            <b className="text-xs">{sender}</b>
             <time className="text-[10px] text-muted" dateTime={m.createdAt}>
               {displayDate(m.createdAt)}
             </time>
           </div>
-          <p>{m.taskId ? "업무를 공유했어요." : m.text}</p>
+          <p>{m.taskId || inaccessibleCard ? "업무를 공유했어요." : m.text}</p>
+          {inaccessibleCard && (
+            <div className="task-card" role="note">
+              접근 불가
+            </div>
+          )}
           {m.taskId && (
             <TaskCard
               id={m.taskId}
-              onOpen={() =>
+              snapshot={canonical?.taskCard}
+              onOpen={() => {
+                const taskBranch = canonical?.taskCard?.branchId;
+                if (taskBranch && scope !== "all" && taskBranch !== scope) {
+                  navigate(
+                    `/app/${encodeURIComponent(taskBranch)}/tasks?detail=${encodeURIComponent(m.taskId)}`,
+                  );
+                  return;
+                }
                 setParams((p) => {
                   p.set("detail", m.taskId);
                   return p;
-                })
-              }
+                });
+              }}
             />
           )}{" "}
           {!inThread && (
@@ -353,7 +370,7 @@ function ChatWorkspace() {
                 >
                   <span className="text-lg">#</span>
                   <span className="min-w-0 flex-1 truncate">{name(c)}</span>
-                  {c.unread > 0 && <Badge>{c.unread}</Badge>}
+                  {MOCK && c.unread > 0 && <Badge>{c.unread}</Badge>}
                 </Link>
               ))
           )}
@@ -451,9 +468,18 @@ function ChatWorkspace() {
                 </div>
               </div>
               <small className="shrink-0">
-                {channel?.participantIds.length}명 참여
+                {channel
+                  ? (canonicalChannel(channel)?.memberCount ??
+                    channel.participantIds.length)
+                  : 0}
+                명 참여
               </small>
             </header>
+            {!MOCK && (
+              <p className="px-4 py-2 text-xs text-muted" role="note">
+                본문·스레드별 읽음 처리를 준비 중이에요.
+              </p>
+            )}
             <MessageViewport
               key={`${channelId}:main`}
               feed={history}

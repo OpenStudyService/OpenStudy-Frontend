@@ -116,7 +116,7 @@ export async function transmit(job: Outgoing, query: QueryClient) {
     if (controller.signal.aborted || started !== epoch) return;
     if (
       error instanceof ApiError &&
-      [401, 403].includes(error.status) &&
+      [401, 403, 404].includes(error.status) &&
       error.detail.code !== "CSRF_INVALID"
     ) {
       clearChatChannel(job.userId, job.scope, job.channelId);

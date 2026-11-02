@@ -66,6 +66,21 @@ it("preserves a failed attempt and uses its original key on retry", async () => 
   ).toBe("");
   query.clear();
 });
+it("clears private drafts and retries when canonical channel participation ends with 404", async () => {
+  const query = new QueryClient();
+  const key = draftKey(job.userId, job.scope, job.channelId);
+  useChatSession.getState().setDraft(key, job.text);
+  vi.mocked(chatApi.send).mockRejectedValueOnce(
+    new ApiError(404, {
+      code: "NOT_FOUND",
+      message: "채널에 접근할 수 없습니다.",
+    }),
+  );
+  await transmit(job, query);
+  expect(useChatSession.getState().outgoing).toEqual([]);
+  expect(useChatSession.getState().drafts[key]).toBeUndefined();
+  query.clear();
+});
 it("locks the composer synchronously and preserves a newer draft when an older send completes", async () => {
   let done!: (value: never) => void;
   vi.mocked(chatApi.send).mockImplementation(
