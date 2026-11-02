@@ -30,6 +30,17 @@ test("login and all owner screens render", async ({ page }) => {
     await expect(page.locator("#main")).not.toContainText(
       "화면을 불러오지 못했습니다",
     );
+    if (route === "spaces") {
+      await expect(
+        page.getByRole("combobox", { name: "좌석 지점", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "강남점 배치도 보기", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "성수점 배치도 보기", exact: true }),
+      ).toBeVisible();
+    }
     await page.waitForTimeout(350);
   }
   expect(errors).toEqual([]);

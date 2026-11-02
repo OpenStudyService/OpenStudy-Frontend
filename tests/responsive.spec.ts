@@ -46,6 +46,16 @@ for (const width of [1440, 1024, 390])
       await expect(page.locator("#main")).not.toContainText(
         "화면을 불러오지 못했습니다",
       );
+      if (route === "spaces") {
+        await expect(page.locator('[aria-label="좌석 현황"]')).toBeVisible();
+        await expect(
+          page.getByRole("button", {
+            name: "A-01 일반 사용 가능",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await expect(page.locator("button.seat")).toHaveCount(32);
+      }
       await expect
         .poll(
           () =>

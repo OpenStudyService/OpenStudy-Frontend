@@ -23,6 +23,7 @@
     "test:e2e:customers:live": "playwright test --config playwright.customers.config.ts",
     "test:e2e:payments:live": "playwright test --config playwright.payments.config.ts",
     "test:e2e:tasks:live": "playwright test --config playwright.tasks.config.ts",
+    "test:e2e:seats:live": "playwright test --config playwright.seats.config.ts",
     "test:builds": "npm run build && npm run build:demo && playwright test --config playwright.build.config.ts",
     "check": "npm run typecheck && npm run lint && npm test && npm run test:real-mail:tool && npm run test:build:guard",
     "api:generate": "tsx scripts/generate-contract.ts && openapi-typescript docs/api/openapi.json -o src/shared/api/generated.ts && prettier --write src/shared/api/generated.ts",

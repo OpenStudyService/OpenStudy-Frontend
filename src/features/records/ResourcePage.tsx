@@ -47,6 +47,7 @@ import { Customers } from "../customers/Customers";
 import { CustomerPanel } from "../customers/CustomerPanel";
 import { Payments } from "../payments/Payments";
 import { Passes } from "../payments/Passes";
+import { Seats } from "../seats/Seats";
 import { PaymentPanel, PassPanel } from "../payments/PaymentPanels";
 
 export function format(
@@ -202,6 +203,8 @@ export function ResourcePage(props: {
     <ChannelManagement embedded={props.embedded} />
   ) : props.resource === "tasks" ? (
     <Tasks />
+  ) : props.resource === "seats" ? (
+    <Seats embedded={props.embedded} />
   ) : (
     <GenericResourcePage {...props} />
   );
