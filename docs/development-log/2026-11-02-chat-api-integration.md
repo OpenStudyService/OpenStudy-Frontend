@@ -51,3 +51,7 @@ Frontend #27의 기존 화면 준비 PR #48과 업무 연결 PR #54는 병합됐
 - graphify 갱신 1,904 nodes / 5,672 edges 확인. 그래프는 저장소 방침대로 로컬 출력이다.
 - 전용 Mock 포트의 Chrome 회귀 24개 전체 통과(5.1분): 독립 읽음 데모·참여 회수·전송 재시도·과거 메시지·카드 권한·공유·기존 DM·한글 조합·업무·세 테마·1440/1024/390px·전체 화면. 초기 Worker 준비/일부 테스트의 세션 전환 과정에서 Vite의 실제 API 프록시 ECONNREFUSED 로그가 있었지만 해당 회귀 단언은 모두 통과했다.
 - 마지막 카드 상세 지점 이동 보완 후 타입 검사와 카드 집중 검사 3개 및 live/mock 빌드·오염 검사를 재확인했다. 최종 그래프는 1,905 nodes / 5,673 edges다. `git diff --check` 통과.
+
+## PR 전달
+
+구현 커밋 `1f623d0`을 `feature/chat-api-integration`에 push하고 [PR #59](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/59)를 생성했다. main 병합은 사용자 검토 대기다. Frontend #27에 Backend #155의 독립 읽음 선행 조건과 이번 PR의 제한 범위를 추가했으며, #27을 닫지 않았다.
