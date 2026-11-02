@@ -205,15 +205,15 @@ test("MSW: mobile pass detail hides refunds after actual seat use", async ({
     .click();
   const seats = await api(page, "/seats?scope=gangnam&pageSize=100");
   const seat = seats.data.items.find(
-    (row: { status: string }) => row.status === "이용 가능",
+    (row: { status: string }) => row.status === "사용 가능",
   );
   expect(seat).toBeTruthy();
-  const assigned = await api(page, `/seats/${seat.id}/assign`, {
-    version: seat.version,
-    memberId: "member-6",
+  const assigned = await api(page, "/seat-sessions", {
+    seatId: seat.id,
+    customerId: "member-6",
     passId: payment.passId,
   });
-  expect(assigned.status).toBe(200);
+  expect(assigned.status).toBe(201);
   await page.goto(`/app/gangnam/members?tab=passes&detail=${payment.passId}`);
   const panel = page.getByRole("dialog");
   await expect(
