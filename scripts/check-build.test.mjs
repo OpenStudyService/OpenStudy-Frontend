@@ -74,6 +74,18 @@ async function changeManifest(directory, change) {
   await writeFile(file, JSON.stringify(manifest));
 }
 
+test("rejects DomainLenz demo data in a live asset even without mock module provenance", async () => {
+  const directory = await fixture();
+  await writeFile(
+    path.join(directory, "assets/app.js"),
+    'const contract="demo-v1-proposal";',
+  );
+  await assert.rejects(
+    checkBuild(directory, "live"),
+    /DomainLenz demonstration fixture/,
+  );
+});
+
 test("accepts a live payment bundle including official Mock outcomes and stale-worker cleanup URL", async () => {
   const directory = await fixture();
   await writeFile(

@@ -1,0 +1,509 @@
+:root {
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  color: #25372f;
+  background: #f6f7f3;
+  font-synthesis: none;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: -0.025em;
+  --primary: #346c53;
+  --surface: #fff;
+  --ink: #25372f;
+  --muted: #647267;
+  --line: #e4e8e0;
+  --soft: #eaf2e9;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #346c53;
+  outline-offset: 3px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dl-standalone {
+  height: 100dvh;
+  display: flex;
+  overflow: hidden;
+}
+.dl-rail {
+  width: 64px;
+  background: #163b31;
+  color: #c9d9cc;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 22px;
+  padding: 22px 0;
+  flex-shrink: 0;
+}
+.dl-rail > span {
+  font-size: 23px;
+  width: 36px;
+  height: 36px;
+  text-align: center;
+  border-radius: 9px;
+}
+.dl-rail .selected {
+  background: #ffffff24;
+  color: white;
+}
+.dl-brand {
+  position: relative;
+  font-size: 28px !important;
+  color: #f0f5df;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+.dl-brand > span {
+  position: absolute;
+  right: 0;
+  top: -8px;
+  color: #c6db99;
+  font-size: 18px;
+}
+.dl-rail .dl-rail-bottom {
+  margin-top: auto;
+  background: #c6db99;
+  color: #254f3e;
+  font-size: 15px;
+  line-height: 36px;
+}
+.dl-channel-sidebar {
+  width: 240px;
+  background: #edf2ed;
+  border-right: 1px solid #dce5dc;
+  display: flex;
+  flex-direction: column;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+.dl-workspace {
+  padding: 23px 10px 25px;
+}
+.dl-workspace > b {
+  display: flex;
+  font-size: 20px;
+  letter-spacing: -0.6px;
+}
+.dl-workspace b > span {
+  margin-left: auto;
+  font-size: 17px;
+}
+.dl-workspace > small {
+  font-size: 10px;
+  color: #728173;
+}
+.dl-side-heading {
+  font-size: 14px;
+  font-weight: 700;
+  padding: 14px 10px;
+  display: flex;
+  border-top: 1px solid #dce5dc;
+}
+.dl-side-heading > span {
+  margin-left: auto;
+  font-weight: 400;
+  color: #6c8071;
+}
+.dl-nav-label {
+  text-transform: uppercase;
+  font-size: 10px;
+  color: #6f8274;
+  padding: 0 10px;
+  margin: 10px 0;
+}
+.dl-channel-sidebar > button {
+  border: 0;
+  background: none;
+  border-radius: 7px;
+  padding: 10px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: #536c5c;
+  text-align: left;
+  margin-bottom: 4px;
+}
+.dl-channel-sidebar > button.active {
+  background: #dce9d9;
+  color: #28573f;
+  font-weight: 700;
+}
+.dl-channel-sidebar > button > span {
+  font-size: 19px;
+  font-weight: 400;
+  opacity: 0.65;
+}
+.dl-channel-sidebar > button > small {
+  margin-left: auto;
+  font-size: 9px;
+  background: #346c53;
+  color: white;
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.dl-sidebar-note {
+  border-top: 1px solid #dce5dc;
+  margin: 24px 8px 0;
+  padding-top: 20px;
+  font-size: 11px;
+  color: #54715d;
+}
+.dl-sidebar-note p {
+  font-size: 11px;
+  color: #7a897d;
+  line-height: 1.9;
+}
+.dl-sidebar-note > span {
+  font-size: 9px;
+  letter-spacing: 0.3px;
+}
+.dl-persona {
+  margin-top: auto;
+  padding: 20px 8px;
+  color: #6b7f70;
+  font-size: 10px;
+}
+.dl-persona label {
+  display: grid;
+  gap: 6px;
+}
+.dl-persona select {
+  border: 1px solid #cfddcf;
+  background: #f7faf5;
+  padding: 7px;
+  border-radius: 6px;
+  color: #3e5947;
+  font-size: 11px;
+  width: 100%;
+}
+.dl-persona small {
+  font-size: 9px;
+  display: block;
+  margin-top: 8px;
+}
+.dl-channel-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  background: #fff;
+}
+.dl-channel-header {
+  height: 85px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #e4e8e0;
+  gap: 16px;
+  padding: 17px 32px;
+  flex-shrink: 0;
+}
+.dl-channel-header h1 {
+  font-size: 19px;
+  letter-spacing: -0.7px;
+  margin: 0;
+}
+.dl-channel-header p {
+  font-size: 10px;
+  color: #7a877c;
+  margin: 2px 0 0;
+}
+.dl-demo-pill {
+  margin-left: auto;
+  background: #edf3e7;
+  color: #5b774e;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.dl-top-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: #e4ddca;
+  border-radius: 9px;
+  font-size: 12px;
+}
+.dl-offline-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #e4e8e0;
+  padding: 12px 32px;
+  background: #fafbf7;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.dl-offline-banner > span {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  color: #5f7c52;
+}
+.dl-offline-banner b {
+  font-weight: 400;
+  color: #5e6f5c;
+  letter-spacing: 0;
+  margin-left: 14px;
+  font-size: 10px;
+}
+.dl-offline-banner > small {
+  font-size: 9px;
+  color: #7e8d7c;
+}
+.dl-channel-feed {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  padding: 20px 32px 8px;
+}
+.dl-date-divider {
+  text-align: center;
+  font-size: 10px;
+  color: #8e9a8f;
+  margin: 0 0 24px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.dl-date-divider:before,
+.dl-date-divider:after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #edf0e9;
+}
+.dl-human {
+  display: flex;
+  gap: 12px;
+  margin: 15px 0 24px;
+  font-size: 12px;
+}
+.dl-human-avatar {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #e9dfce;
+  color: #6f664c;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.dl-human b {
+  font-size: 12px;
+}
+.dl-human time {
+  font-size: 9px;
+  color: #94a092;
+  font-weight: 400;
+  margin-left: 8px;
+}
+.dl-human p {
+  margin: 5px 0;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+.dl-standalone-composer {
+  border: 1px solid #dce5d8;
+  border-radius: 11px;
+  margin: 12px 32px 8px;
+  padding: 10px 14px;
+  background: #fff;
+  box-shadow: 0 2px 10px #193d2610;
+  flex-shrink: 0;
+}
+.dl-standalone-composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 48px;
+  max-height: 160px;
+  border: 0;
+  background: none;
+  outline: none;
+  font-size: 12px;
+  color: #2d4533;
+}
+.dl-standalone-composer > div {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.dl-standalone-composer small {
+  font-size: 9px;
+  color: #99a095;
+}
+.dl-standalone-composer button {
+  border: 0;
+  padding: 6px 11px;
+  border-radius: 6px;
+  background: #346c53;
+  color: white;
+  font-size: 11px;
+}
+.dl-standalone-composer .dl-ai-trigger {
+  background: #eaf2e5;
+  color: #346c53;
+  font-weight: 600;
+}
+.dl-standalone-composer button[type="submit"] {
+  margin-left: auto;
+}
+.dl-app-footer {
+  padding: 3px 32px 12px;
+  font-size: 9px;
+  color: #91a18e;
+  display: flex;
+  justify-content: space-between;
+}
+.dl-app-footer > span {
+  font-size: 9px;
+}
+@media (min-width: 1600px) {
+  .dl-channel-feed {
+    padding-left: max(32px, calc((100vw - 1400px) / 2));
+    padding-right: max(32px, calc((100vw - 1400px) / 2));
+  }
+}
+@media (max-width: 850px) {
+  .dl-channel-sidebar {
+    width: 190px;
+  }
+  .dl-channel-header,
+  .dl-offline-banner {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .dl-channel-feed {
+    padding: 20px;
+  }
+  .dl-standalone-composer {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+}
+@media (max-width: 600px) {
+  .dl-rail {
+    display: none;
+  }
+  .dl-channel-sidebar {
+    width: 56px;
+    padding: 12px 4px;
+  }
+  .dl-workspace,
+  .dl-side-heading,
+  .dl-nav-label,
+  .dl-sidebar-note {
+    display: none;
+  }
+  .dl-channel-sidebar > button {
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 7px;
+    min-height: 40px;
+    font-size: 0;
+    gap: 0;
+  }
+  .dl-channel-sidebar > button > span {
+    font-size: 20px;
+    margin-right: 3px;
+  }
+  .dl-channel-sidebar > button > small {
+    display: none;
+  }
+  .dl-channel-sidebar > button:after {
+    content: "전";
+    font-size: 9px;
+  }
+  .dl-channel-sidebar > button:nth-of-type(2):after {
+    content: "강";
+  }
+  .dl-channel-sidebar > button:nth-of-type(3):after {
+    content: "성";
+  }
+  .dl-persona {
+    padding: 12px 0;
+  }
+  .dl-persona label {
+    font-size: 0;
+  }
+  .dl-persona select {
+    font-size: 10px;
+    padding: 5px 0;
+  }
+  .dl-persona small {
+    display: none;
+  }
+  .dl-channel-header {
+    height: 70px;
+    padding: 13px 14px;
+    gap: 8px;
+  }
+  .dl-channel-header h1 {
+    font-size: 15px;
+  }
+  .dl-channel-header p {
+    font-size: 8px;
+  }
+  .dl-top-avatar {
+    display: none;
+  }
+  .dl-demo-pill {
+    font-size: 8px;
+    padding: 3px;
+  }
+  .dl-offline-banner {
+    padding: 10px 14px;
+    gap: 4px;
+  }
+  .dl-offline-banner b {
+    display: none;
+  }
+  .dl-offline-banner > span {
+    font-size: 8px;
+  }
+  .dl-offline-banner > small {
+    font-size: 8px;
+  }
+  .dl-channel-feed {
+    padding: 15px 12px;
+  }
+  .dl-standalone-composer {
+    margin: 8px 10px;
+    padding: 8px 10px;
+  }
+  .dl-standalone-composer small {
+    display: none;
+  }
+  .dl-app-footer {
+    padding: 2px 12px 8px;
+    font-size: 8px;
+  }
+  .dl-app-footer > span {
+    display: none;
+  }
+  .dl-standalone-composer textarea {
+    font-size: 11px;
+  }
+}

@@ -11,6 +11,7 @@ const forbiddenModules = [
   ["MSW dependency", /(?:^|\/)node_modules\/(?:msw(?:\/|$)|@mswjs\/)/i],
 ];
 const forbiddenRuntime = [
+  ["DomainLenz demonstration fixture", /demo-v1-proposal|고정 데이터 데모/],
   [
     "MSW runtime",
     /\[MSW\]|mswjs\.io|INTEGRITY_CHECK_REQUEST|MOCK_ACTIVATE|MOCK_DEACTIVATE|\bsetupWorker\b/,

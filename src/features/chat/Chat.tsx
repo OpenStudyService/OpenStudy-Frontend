@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, MOCK } from "../../shared/api/client";
@@ -29,6 +29,12 @@ import {
   useChatSession,
 } from "./session";
 
+// A constant build-time gate keeps the demonstration and its fixture out of live.
+const DomainLenzDemo =
+  import.meta.env.VITE_API_MODE === "mock"
+    ? lazy(() => import("../../mocks/domainlenz/ChannelDemo"))
+    : null;
+
 export function Chat() {
   const { session, scope } = useApp(),
     { channelId } = useParams();
@@ -58,7 +64,12 @@ function ChatWorkspace() {
     (j) => j.userId === user.id && j.scope === scope,
   );
   const [dmError, setDmError] = useState(""),
-    [denied, setDenied] = useState(false);
+    [denied, setDenied] = useState(false),
+    [demoGallery, setDemoGallery] = useState(false),
+    [demoRequest, setDemoRequest] = useState<{
+      id: string;
+      text: string;
+    } | null>(null);
   const channels = useQuery({
     queryKey: ["data", user.id, scope, "chat", "channels"],
     queryFn: ({ signal }) => chatApi.channels(scope, signal),
@@ -157,6 +168,16 @@ function ChatWorkspace() {
       )
     )
       return;
+    if (
+      MOCK &&
+      channel?.kind === "channel" &&
+      !parentId &&
+      /^@DomainLenz(?:\s|$)/i.test(text)
+    ) {
+      setDemoRequest({ id: crypto.randomUUID(), text });
+      setDraft(draftKey(parentId), "");
+      return;
+    }
     const retry = outgoing.find(
       (j) =>
         j.channelId === channelId &&
@@ -214,7 +235,16 @@ function ChatWorkspace() {
           }}
         />
         <div className="flex items-center justify-between gap-2">
-          <small className="text-[9px]">Enter 전송 · Shift+Enter 줄바꿈</small>
+          <div className="flex items-center gap-3">
+            {MOCK && !parentId && channel?.kind === "channel" && (
+              <Button type="button" onClick={() => setDemoGallery(true)}>
+                ✦ AI 질문
+              </Button>
+            )}
+            <small className="text-[9px]">
+              Enter 전송 · Shift+Enter 줄바꿈
+            </small>
+          </div>
           <Button
             variant="primary"
             type="submit"
@@ -408,7 +438,9 @@ function ChatWorkspace() {
           )}
         </div>
         <div className="border-t border-line p-4 text-[10px] text-muted">
-          업무 AI는 별도 메뉴에서 이용해요.
+          {MOCK
+            ? "채널에서 AI 질문으로 업무 조회를 시연해 보세요."
+            : "업무 AI는 별도 메뉴에서 이용해요."}
         </div>
       </aside>
       <section className={`chat-main ${threadId ? "thread-open" : ""}`}>
@@ -471,6 +503,54 @@ function ChatWorkspace() {
                 <State title="첫 이야기를 남겨 주세요" />
               )}
               {pending("")}
+              {DomainLenzDemo && enabled && channel?.kind === "channel" && (
+                <Suspense fallback={<small>AI 데모 준비 중…</small>}>
+                  <DomainLenzDemo
+                    viewer={{
+                      id: user.id,
+                      name: user.name,
+                      owner: user.owner,
+                      active: user.status === "활성",
+                      aiBranches: user.memberships
+                        .filter(
+                          (m) =>
+                            (!m.status || m.status === "활성") &&
+                            m.permissions.includes("ai:read"),
+                        )
+                        .map((m) => m.branchId),
+                      salesBranches: user.memberships
+                        .filter(
+                          (m) =>
+                            (!m.status || m.status === "활성") &&
+                            m.permissions.includes("sales:read"),
+                        )
+                        .map((m) => m.branchId),
+                      paymentBranches: user.memberships
+                        .filter(
+                          (m) =>
+                            (!m.status || m.status === "활성") &&
+                            m.permissions.includes("payments:read"),
+                        )
+                        .map((m) => m.branchId),
+                    }}
+                    scope={
+                      channel.branchId === "all" ? scope : channel.branchId
+                    }
+                    channelId={channelId}
+                    channelName={channel.name}
+                    request={demoRequest}
+                    galleryOpen={demoGallery}
+                    onGalleryOpen={setDemoGallery}
+                    onPick={(prompt) => {
+                      setDraft(draftKey(""), `@DomainLenz ${prompt}`);
+                      setTimeout(
+                        () => document.getElementById("composer-main")?.focus(),
+                        0,
+                      );
+                    }}
+                  />
+                </Suspense>
+              )}
             </MessageViewport>
             {composer("")}
           </>

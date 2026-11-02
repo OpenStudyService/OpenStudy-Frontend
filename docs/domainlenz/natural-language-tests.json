@@ -1,0 +1,6044 @@
+{
+  "schemaVersion": "demo-v1-proposal",
+  "asOf": "2026-10-17T02:00:00.000Z",
+  "scope": "all",
+  "channelId": "general",
+  "dataMode": "synthetic-fixed",
+  "cases": [
+    {
+      "id": "org-active",
+      "domainId": "organization",
+      "prompt": "지점별 활성 직원 수를 보여줘",
+      "outcome": "ready",
+      "metric": "활성 소속과 활성 직원의 지점별 DISTINCT 직원 수. OWNER는 소속 레코드가 있을 때만 포함.",
+      "grain": "지점",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "branches",
+            "fields": [
+              "id",
+              "name",
+              "status"
+            ]
+          },
+          {
+            "table": "employees",
+            "fields": [
+              "id",
+              "name",
+              "status"
+            ]
+          },
+          {
+            "table": "branch_memberships",
+            "fields": [
+              "employee_id",
+              "branch_id",
+              "status"
+            ]
+          },
+          {
+            "table": "employee_invitations",
+            "fields": [
+              "id",
+              "branch_id",
+              "status",
+              "expires_at"
+            ]
+          }
+        ],
+        "grain": "지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.org-active",
+            "definition": "활성 소속과 활성 직원의 지점별 DISTINCT 직원 수. OWNER는 소속 레코드가 있을 때만 포함."
+          }
+        ],
+        "filters": [
+          {
+            "field": "employees.status",
+            "op": "EQ",
+            "value": "ACTIVE"
+          },
+          {
+            "field": "branch_memberships.status",
+            "op": "EQ",
+            "value": "ACTIVE"
+          }
+        ],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "org-active",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "value",
+                "label": "활성 직원",
+                "unit": "명"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 14,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남점",
+            "value": 8
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수점",
+            "value": 6
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "branches",
+          "fields": [
+            "id",
+            "name",
+            "status"
+          ]
+        },
+        {
+          "table": "employees",
+          "fields": [
+            "id",
+            "name",
+            "status"
+          ]
+        },
+        {
+          "table": "branch_memberships",
+          "fields": [
+            "employee_id",
+            "branch_id",
+            "status"
+          ]
+        },
+        {
+          "table": "employee_invitations",
+          "fields": [
+            "id",
+            "branch_id",
+            "status",
+            "expires_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "org-pending",
+      "domainId": "organization",
+      "prompt": "승인 대기 소속과 초대 현황을 보여줘",
+      "outcome": "ready",
+      "metric": "소속 PENDING 및 초대 PENDING/ACCEPTED, 만료되지 않은 초대를 별도 종류로 UNION. 중복 직원 합산 안 함.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "branches",
+            "fields": [
+              "id",
+              "name",
+              "status"
+            ]
+          },
+          {
+            "table": "employees",
+            "fields": [
+              "id",
+              "name",
+              "status"
+            ]
+          },
+          {
+            "table": "branch_memberships",
+            "fields": [
+              "employee_id",
+              "branch_id",
+              "status"
+            ]
+          },
+          {
+            "table": "employee_invitations",
+            "fields": [
+              "id",
+              "branch_id",
+              "status",
+              "expires_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.org-pending",
+            "definition": "소속 PENDING 및 초대 PENDING/ACCEPTED, 만료되지 않은 초대를 별도 종류로 UNION. 중복 직원 합산 안 함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "org-pending",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "list",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "항목"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "date",
+                "label": "만료·신청일"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "소속 신청 001",
+            "status": "승인 대기",
+            "date": "2026-10-17"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "초대 002",
+            "status": "수락 대기",
+            "date": "2026-10-20"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "초대 003",
+            "status": "승인 대기",
+            "date": "2026-10-21"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "branches",
+          "fields": [
+            "id",
+            "name",
+            "status"
+          ]
+        },
+        {
+          "table": "employees",
+          "fields": [
+            "id",
+            "name",
+            "status"
+          ]
+        },
+        {
+          "table": "branch_memberships",
+          "fields": [
+            "employee_id",
+            "branch_id",
+            "status"
+          ]
+        },
+        {
+          "table": "employee_invitations",
+          "fields": [
+            "id",
+            "branch_id",
+            "status",
+            "expires_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "customers-new",
+      "domainId": "customers",
+      "prompt": "이번 달 신규 회원 추이를 보여줘",
+      "outcome": "ready",
+      "metric": "등록일의 KST 날짜별 신규 회원 수. 등록 지점 없는 기존 회원의 지점 집계 귀속은 별도 협의.",
+      "grain": "등록일·등록 지점",
+      "period": "이번 달 · 10.01–10.17",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "customers",
+            "fields": [
+              "id",
+              "member_no",
+              "name",
+              "status",
+              "registered_at",
+              "registered_branch_id"
+            ]
+          }
+        ],
+        "grain": "등록일·등록 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.customers-new",
+            "definition": "등록일의 KST 날짜별 신규 회원 수. 등록 지점 없는 기존 회원의 지점 집계 귀속은 별도 협의."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "customers.registered_at",
+            "op": "GTE",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "customers.registered_at",
+            "op": "LT",
+            "value": "2026-10-18T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "customers-new",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "line",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "등록일"
+              },
+              {
+                "key": "value",
+                "label": "신규 회원",
+                "unit": "명"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 10,
+        "total": 140,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "10.01",
+            "value": 12
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "10.01",
+            "value": 8
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "10.05",
+            "value": 17
+          },
+          {
+            "id": "row-4",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "10.05",
+            "value": 11
+          },
+          {
+            "id": "row-5",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "10.09",
+            "value": 14
+          },
+          {
+            "id": "row-6",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "10.09",
+            "value": 10
+          },
+          {
+            "id": "row-7",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "10.13",
+            "value": 22
+          },
+          {
+            "id": "row-8",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "10.13",
+            "value": 16
+          },
+          {
+            "id": "row-9",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "10.17",
+            "value": 18
+          },
+          {
+            "id": "row-10",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "10.17",
+            "value": 12
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "customers",
+          "fields": [
+            "id",
+            "member_no",
+            "name",
+            "status",
+            "registered_at",
+            "registered_branch_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "customers-restricted",
+      "domainId": "customers",
+      "prompt": "이용 제한 회원 목록을 보여줘",
+      "outcome": "ready",
+      "metric": "customers.status = RESTRICTED. 연락처·메모·상태 변경 사유 제외.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "customers",
+            "fields": [
+              "id",
+              "member_no",
+              "name",
+              "status",
+              "registered_at",
+              "registered_branch_id"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.customers-restricted",
+            "definition": "customers.status = RESTRICTED. 연락처·메모·상태 변경 사유 제외."
+          }
+        ],
+        "filters": [
+          {
+            "field": "customers.status",
+            "op": "EQ",
+            "value": "RESTRICTED"
+          }
+        ],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "customers-restricted",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "회원"
+              },
+              {
+                "key": "number",
+                "label": "회원번호"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "date",
+                "label": "등록일"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 12,
+        "total": 12,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상회원 1**",
+            "number": "M-DEMO-001",
+            "status": "이용 제한",
+            "date": "2026-10-01"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상회원 2**",
+            "number": "M-DEMO-002",
+            "status": "이용 제한",
+            "date": "2026-10-02"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상회원 3**",
+            "number": "M-DEMO-003",
+            "status": "이용 제한",
+            "date": "2026-10-03"
+          },
+          {
+            "id": "row-4",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상회원 4**",
+            "number": "M-DEMO-004",
+            "status": "이용 제한",
+            "date": "2026-10-04"
+          },
+          {
+            "id": "row-5",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상회원 5**",
+            "number": "M-DEMO-005",
+            "status": "이용 제한",
+            "date": "2026-10-05"
+          },
+          {
+            "id": "row-6",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상회원 6**",
+            "number": "M-DEMO-006",
+            "status": "이용 제한",
+            "date": "2026-10-06"
+          },
+          {
+            "id": "row-7",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상회원 7**",
+            "number": "M-DEMO-007",
+            "status": "이용 제한",
+            "date": "2026-10-07"
+          },
+          {
+            "id": "row-8",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상회원 8**",
+            "number": "M-DEMO-008",
+            "status": "이용 제한",
+            "date": "2026-10-08"
+          },
+          {
+            "id": "row-9",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상회원 9**",
+            "number": "M-DEMO-009",
+            "status": "이용 제한",
+            "date": "2026-10-09"
+          },
+          {
+            "id": "row-10",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상회원 10**",
+            "number": "M-DEMO-010",
+            "status": "이용 제한",
+            "date": "2026-10-10"
+          },
+          {
+            "id": "row-11",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상회원 11**",
+            "number": "M-DEMO-011",
+            "status": "이용 제한",
+            "date": "2026-10-11"
+          },
+          {
+            "id": "row-12",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상회원 12**",
+            "number": "M-DEMO-012",
+            "status": "이용 제한",
+            "date": "2026-10-12"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "customers",
+          "fields": [
+            "id",
+            "member_no",
+            "name",
+            "status",
+            "registered_at",
+            "registered_branch_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "products-active",
+      "domainId": "products",
+      "prompt": "판매 중 상품의 유형별 현황을 보여줘",
+      "outcome": "ready",
+      "metric": "판매 중 상품을 판매 지점별 DISTINCT products.id로 집계. 전체 지점 선택 시 같은 상품의 지점 중복 제거가 필요하며, 이 fixture의 상품은 서로 다름.",
+      "grain": "상품 유형·판매 지점",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "products",
+            "fields": [
+              "id",
+              "name",
+              "kind",
+              "sale_status",
+              "price_krw"
+            ]
+          },
+          {
+            "table": "product_branches",
+            "fields": [
+              "product_id",
+              "branch_id"
+            ]
+          },
+          {
+            "table": "passes",
+            "fields": [
+              "id",
+              "customer_id",
+              "purchase_branch_id",
+              "kind",
+              "status",
+              "expires_at",
+              "remaining_minutes",
+              "remaining_credit_krw"
+            ]
+          }
+        ],
+        "grain": "상품 유형·판매 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.products-active",
+            "definition": "판매 중 상품을 판매 지점별 DISTINCT products.id로 집계. 전체 지점 선택 시 같은 상품의 지점 중복 제거가 필요하며, 이 fixture의 상품은 서로 다름."
+          }
+        ],
+        "filters": [
+          {
+            "field": "products.sale_status",
+            "op": "EQ",
+            "value": "ON_SALE"
+          }
+        ],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "products-active",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "donut",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "상품 유형"
+              },
+              {
+                "key": "value",
+                "label": "판매 상품",
+                "unit": "개"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 6,
+        "total": 18,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "시간권",
+            "value": 5
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "시간권",
+            "value": 3
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "기간권",
+            "value": 4
+          },
+          {
+            "id": "row-4",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "기간권",
+            "value": 3
+          },
+          {
+            "id": "row-5",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "정액권",
+            "value": 2
+          },
+          {
+            "id": "row-6",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "정액권",
+            "value": 1
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "products",
+          "fields": [
+            "id",
+            "name",
+            "kind",
+            "sale_status",
+            "price_krw"
+          ]
+        },
+        {
+          "table": "product_branches",
+          "fields": [
+            "product_id",
+            "branch_id"
+          ]
+        },
+        {
+          "table": "passes",
+          "fields": [
+            "id",
+            "customer_id",
+            "purchase_branch_id",
+            "kind",
+            "status",
+            "expires_at",
+            "remaining_minutes",
+            "remaining_credit_krw"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "passes-expiring",
+      "domainId": "products",
+      "prompt": "7일 안에 만료되는 이용권을 보여줘",
+      "outcome": "ready",
+      "metric": "활성 이용권 중 expires_at이 기준 시각 이후이고 종료 경계 미만. 시작 전·만료 없음 제외.",
+      "grain": "상세 레코드",
+      "period": "앞으로 7일 · 10.17–10.23",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "products",
+            "fields": [
+              "id",
+              "name",
+              "kind",
+              "sale_status",
+              "price_krw"
+            ]
+          },
+          {
+            "table": "product_branches",
+            "fields": [
+              "product_id",
+              "branch_id"
+            ]
+          },
+          {
+            "table": "passes",
+            "fields": [
+              "id",
+              "customer_id",
+              "purchase_branch_id",
+              "kind",
+              "status",
+              "expires_at",
+              "remaining_minutes",
+              "remaining_credit_krw"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.passes-expiring",
+            "definition": "활성 이용권 중 expires_at이 기준 시각 이후이고 종료 경계 미만. 시작 전·만료 없음 제외."
+          }
+        ],
+        "filters": [
+          {
+            "field": "passes.status",
+            "op": "EQ",
+            "value": "ACTIVE"
+          }
+        ],
+        "timeConstraints": [
+          {
+            "field": "passes.expires_at",
+            "op": "GTE",
+            "value": "2026-10-17T02:00:00.000Z"
+          },
+          {
+            "field": "passes.expires_at",
+            "op": "LT",
+            "value": "2026-10-24T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "passes-expiring",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "이용권"
+              },
+              {
+                "key": "customer",
+                "label": "회원"
+              },
+              {
+                "key": "date",
+                "label": "만료일"
+              },
+              {
+                "key": "remaining",
+                "label": "잔량"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "50시간권",
+            "customer": "가상회원 01**",
+            "date": "2026-10-19",
+            "remaining": "120분"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "4주 기간권",
+            "customer": "가상회원 02**",
+            "date": "2026-10-20",
+            "remaining": "기간형"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "10만원 정액권",
+            "customer": "가상회원 03**",
+            "date": "2026-10-22",
+            "remaining": "18,000원"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "products",
+          "fields": [
+            "id",
+            "name",
+            "kind",
+            "sale_status",
+            "price_krw"
+          ]
+        },
+        {
+          "table": "product_branches",
+          "fields": [
+            "product_id",
+            "branch_id"
+          ]
+        },
+        {
+          "table": "passes",
+          "fields": [
+            "id",
+            "customer_id",
+            "purchase_branch_id",
+            "kind",
+            "status",
+            "expires_at",
+            "remaining_minutes",
+            "remaining_credit_krw"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sales-net",
+      "domainId": "sales",
+      "prompt": "지난달 지점별 순매출을 보여줘",
+      "outcome": "ready",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.sales-net",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "sales-net",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 29200000,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남점",
+            "approved": 18400000,
+            "refunds": 1200000,
+            "net": 17200000
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수점",
+            "approved": 12600000,
+            "refunds": 600000,
+            "net": 12000000
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sales-refunds",
+      "domainId": "sales",
+      "prompt": "이번 달 환불 내역을 보여줘",
+      "outcome": "ready",
+      "metric": "refunded_at이 기간에 속하는 환불 원장. 처리 지점이 달라도 payments.branch_id로 귀속.",
+      "grain": "상세 레코드",
+      "period": "이번 달 · 10.01–10.17",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.sales-refunds",
+            "definition": "refunded_at이 기간에 속하는 환불 원장. 처리 지점이 달라도 payments.branch_id로 귀속."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-18T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "sales-refunds",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "환불"
+              },
+              {
+                "key": "payment",
+                "label": "원결제"
+              },
+              {
+                "key": "value",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "date",
+                "label": "처리일"
+              },
+              {
+                "key": "branch",
+                "label": "원결제 지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 250000,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "RF-001",
+            "payment": "PAY-120",
+            "value": 120000,
+            "date": "2026-10-03"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "RF-002",
+            "payment": "PAY-134",
+            "value": 80000,
+            "date": "2026-10-12"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "RF-003",
+            "payment": "PAY-152",
+            "value": 50000,
+            "date": "2026-10-16"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seats-now",
+      "domainId": "seats",
+      "prompt": "현재 지점별 좌석 이용 현황을 보여줘",
+      "outcome": "ready",
+      "metric": "활성 좌석 세션 기준 점유 좌석 수. 이용 가능 + 이용 중 + 사용 불가 = 전체 좌석. 점유율 분모 정책은 정본 API와 대조.",
+      "grain": "지점",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "seats",
+            "fields": [
+              "id",
+              "branch_id",
+              "seat_no",
+              "zone",
+              "status"
+            ]
+          },
+          {
+            "table": "seat_sessions",
+            "fields": [
+              "id",
+              "branch_id",
+              "seat_id",
+              "status",
+              "effective_checked_in_at",
+              "effective_checked_out_at",
+              "billed_minutes",
+              "billed_krw"
+            ]
+          }
+        ],
+        "grain": "지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.seats-now",
+            "definition": "활성 좌석 세션 기준 점유 좌석 수. 이용 가능 + 이용 중 + 사용 불가 = 전체 좌석. 점유율 분모 정책은 정본 API와 대조."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "seats-now",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "occupied"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "occupied",
+                "label": "이용 중",
+                "unit": "석"
+              },
+              {
+                "key": "available",
+                "label": "이용 가능",
+                "unit": "석"
+              },
+              {
+                "key": "blocked",
+                "label": "사용 불가",
+                "unit": "석"
+              },
+              {
+                "key": "total",
+                "label": "전체",
+                "unit": "석"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 53,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남점",
+            "occupied": 32,
+            "available": 14,
+            "blocked": 2,
+            "total": 48
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수점",
+            "occupied": 21,
+            "available": 10,
+            "blocked": 1,
+            "total": 32
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "seats",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_no",
+            "zone",
+            "status"
+          ]
+        },
+        {
+          "table": "seat_sessions",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_id",
+            "status",
+            "effective_checked_in_at",
+            "effective_checked_out_at",
+            "billed_minutes",
+            "billed_krw"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seats-completed",
+      "domainId": "seats",
+      "prompt": "오늘 완료된 좌석 이용 내역을 보여줘",
+      "outcome": "ready",
+      "metric": "유효 퇴실 시각이 오늘인 완료 세션. 보정된 시각을 사용하고 청구분은 billed_minutes를 별도로 표시.",
+      "grain": "상세 레코드",
+      "period": "오늘 · 10.17",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "seats",
+            "fields": [
+              "id",
+              "branch_id",
+              "seat_no",
+              "zone",
+              "status"
+            ]
+          },
+          {
+            "table": "seat_sessions",
+            "fields": [
+              "id",
+              "branch_id",
+              "seat_id",
+              "status",
+              "effective_checked_in_at",
+              "effective_checked_out_at",
+              "billed_minutes",
+              "billed_krw"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.seats-completed",
+            "definition": "유효 퇴실 시각이 오늘인 완료 세션. 보정된 시각을 사용하고 청구분은 billed_minutes를 별도로 표시."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "seat_sessions.effective_checked_out_at",
+            "op": "GTE",
+            "value": "2026-10-17T00:00:00+09:00"
+          },
+          {
+            "field": "seat_sessions.effective_checked_out_at",
+            "op": "LT",
+            "value": "2026-10-18T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "seats-completed",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "이용 기록"
+              },
+              {
+                "key": "seat",
+                "label": "좌석"
+              },
+              {
+                "key": "start",
+                "label": "입실"
+              },
+              {
+                "key": "end",
+                "label": "퇴실"
+              },
+              {
+                "key": "minutes",
+                "label": "이용 시간",
+                "unit": "분"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "SS-001",
+            "seat": "A-01",
+            "start": "2026-10-17 07:00",
+            "end": "2026-10-17 09:20",
+            "minutes": 140
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "SS-002",
+            "seat": "B-03",
+            "start": "2026-10-17 08:00",
+            "end": "2026-10-17 10:00",
+            "minutes": 120
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "SS-003",
+            "seat": "A-12",
+            "start": "2026-10-17 08:30",
+            "end": "2026-10-17 10:10",
+            "minutes": 100
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "seats",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_no",
+            "zone",
+            "status"
+          ]
+        },
+        {
+          "table": "seat_sessions",
+          "fields": [
+            "id",
+            "branch_id",
+            "seat_id",
+            "status",
+            "effective_checked_in_at",
+            "effective_checked_out_at",
+            "billed_minutes",
+            "billed_krw"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rooms-today",
+      "domainId": "rooms",
+      "prompt": "오늘의 스터디룸 예약을 보여줘",
+      "outcome": "ready",
+      "metric": "오늘과 시간 구간이 겹치는 예약. 취소·결제 실패 제외, 구간 겹침은 start < dayEnd AND end > dayStart.",
+      "grain": "상세 레코드",
+      "period": "오늘 · 10.17",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "rooms",
+            "fields": [
+              "id",
+              "branch_id",
+              "name",
+              "capacity"
+            ]
+          },
+          {
+            "table": "room_reservations",
+            "fields": [
+              "id",
+              "room_id",
+              "branch_id",
+              "start_at",
+              "end_at",
+              "status"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.rooms-today",
+            "definition": "오늘과 시간 구간이 겹치는 예약. 취소·결제 실패 제외, 구간 겹침은 start < dayEnd AND end > dayStart."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "room_reservations.start_at",
+            "op": "LT",
+            "value": "2026-10-18T00:00:00+09:00"
+          },
+          {
+            "field": "room_reservations.end_at",
+            "op": "GT",
+            "value": "2026-10-17T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "rooms-today",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "calendar",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "예약"
+              },
+              {
+                "key": "date",
+                "label": "날짜"
+              },
+              {
+                "key": "time",
+                "label": "시간"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "스터디룸 A · 4인",
+            "date": "2026-10-17",
+            "time": "10:00–12:00",
+            "status": "예약 확정"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "스터디룸 B · 6인",
+            "date": "2026-10-17",
+            "time": "13:00–15:00",
+            "status": "예약 확정"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "스터디룸 A · 4인",
+            "date": "2026-10-17",
+            "time": "16:00–18:00",
+            "status": "예약 확정"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "rooms",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "capacity"
+          ]
+        },
+        {
+          "table": "room_reservations",
+          "fields": [
+            "id",
+            "room_id",
+            "branch_id",
+            "start_at",
+            "end_at",
+            "status"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rooms-week",
+      "domainId": "rooms",
+      "prompt": "이번 주 룸별 예약 건수를 보여줘",
+      "outcome": "ready",
+      "metric": "예약 시작일이 이번 주인 예약의 COUNT. 취소·결제 실패 제외. 주 시작 월요일.",
+      "grain": "룸",
+      "period": "이번 주 · 10.12–10.18",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "rooms",
+            "fields": [
+              "id",
+              "branch_id",
+              "name",
+              "capacity"
+            ]
+          },
+          {
+            "table": "room_reservations",
+            "fields": [
+              "id",
+              "room_id",
+              "branch_id",
+              "start_at",
+              "end_at",
+              "status"
+            ]
+          }
+        ],
+        "grain": "룸",
+        "metrics": [
+          {
+            "id": "openstudy.demo.rooms-week",
+            "definition": "예약 시작일이 이번 주인 예약의 COUNT. 취소·결제 실패 제외. 주 시작 월요일."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "room_reservations.start_at",
+            "op": "GTE",
+            "value": "2026-10-12T00:00:00+09:00"
+          },
+          {
+            "field": "room_reservations.start_at",
+            "op": "LT",
+            "value": "2026-10-19T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "rooms-week",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "스터디룸"
+              },
+              {
+                "key": "value",
+                "label": "예약",
+                "unit": "건"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 4,
+        "total": 46,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남 A",
+            "value": 16
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수 A",
+            "value": 12
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남 B",
+            "value": 10
+          },
+          {
+            "id": "row-4",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수 B",
+            "value": 8
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "rooms",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "capacity"
+          ]
+        },
+        {
+          "table": "room_reservations",
+          "fields": [
+            "id",
+            "room_id",
+            "branch_id",
+            "start_at",
+            "end_at",
+            "status"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lockers-status",
+      "domainId": "lockers",
+      "prompt": "사물함 배정 현황을 보여줘",
+      "outcome": "ready",
+      "metric": "활성 배정의 사물함 수와 사용 불가 상태를 구분. 사물함당 중복 배정 없이 집계.",
+      "grain": "배정 상태·지점",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "lockers",
+            "fields": [
+              "id",
+              "branch_id",
+              "locker_no",
+              "status"
+            ]
+          },
+          {
+            "table": "locker_assignments",
+            "fields": [
+              "id",
+              "locker_id",
+              "start_date",
+              "end_date",
+              "status",
+              "returned_at"
+            ]
+          }
+        ],
+        "grain": "배정 상태·지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.lockers-status",
+            "definition": "활성 배정의 사물함 수와 사용 불가 상태를 구분. 사물함당 중복 배정 없이 집계."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "lockers-status",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "donut",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "배정 상태"
+              },
+              {
+                "key": "value",
+                "label": "사물함",
+                "unit": "개"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 6,
+        "total": 68,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "사용 중",
+            "value": 28
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "사용 중",
+            "value": 18
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "이용 가능",
+            "value": 10
+          },
+          {
+            "id": "row-4",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "이용 가능",
+            "value": 8
+          },
+          {
+            "id": "row-5",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "사용 불가",
+            "value": 2
+          },
+          {
+            "id": "row-6",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "사용 불가",
+            "value": 2
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "lockers",
+          "fields": [
+            "id",
+            "branch_id",
+            "locker_no",
+            "status"
+          ]
+        },
+        {
+          "table": "locker_assignments",
+          "fields": [
+            "id",
+            "locker_id",
+            "start_date",
+            "end_date",
+            "status",
+            "returned_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lockers-ending",
+      "domainId": "lockers",
+      "prompt": "7일 안에 배정 기간이 끝나는 사물함을 보여줘",
+      "outcome": "ready",
+      "metric": "미반납 배정의 end_date가 10월 17일 이상·24일 미만. DATE 종료일의 포함 규칙은 업무 계약 확인.",
+      "grain": "상세 레코드",
+      "period": "앞으로 7일 · 10.17–10.23",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "lockers",
+            "fields": [
+              "id",
+              "branch_id",
+              "locker_no",
+              "status"
+            ]
+          },
+          {
+            "table": "locker_assignments",
+            "fields": [
+              "id",
+              "locker_id",
+              "start_date",
+              "end_date",
+              "status",
+              "returned_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.lockers-ending",
+            "definition": "미반납 배정의 end_date가 10월 17일 이상·24일 미만. DATE 종료일의 포함 규칙은 업무 계약 확인."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "locker_assignments.end_date",
+            "op": "GTE",
+            "value": "2026-10-17"
+          },
+          {
+            "field": "locker_assignments.end_date",
+            "op": "LT",
+            "value": "2026-10-24"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "lockers-ending",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "list",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "사물함"
+              },
+              {
+                "key": "date",
+                "label": "종료일"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남 L-03",
+            "date": "2026-10-19",
+            "status": "사용 중"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수 L-12",
+            "date": "2026-10-21",
+            "status": "사용 중"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남 L-08",
+            "date": "2026-10-23",
+            "status": "사용 중"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "lockers",
+          "fields": [
+            "id",
+            "branch_id",
+            "locker_no",
+            "status"
+          ]
+        },
+        {
+          "table": "locker_assignments",
+          "fields": [
+            "id",
+            "locker_id",
+            "start_date",
+            "end_date",
+            "status",
+            "returned_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "facilities-overdue",
+      "domainId": "facilities",
+      "prompt": "점검 예정일이 지난 시설을 보여줘",
+      "outcome": "ready",
+      "metric": "last_inspected_on + inspection_interval_days < KST 오늘. 최초 점검일 없음은 별도 미점검 상태로 다룸.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "facilities",
+            "fields": [
+              "id",
+              "branch_id",
+              "name",
+              "status",
+              "inspection_interval_days",
+              "last_inspected_on"
+            ]
+          },
+          {
+            "table": "facility_works",
+            "fields": [
+              "id",
+              "facility_id",
+              "kind",
+              "status",
+              "opened_at",
+              "completed_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.facilities-overdue",
+            "definition": "last_inspected_on + inspection_interval_days < KST 오늘. 최초 점검일 없음은 별도 미점검 상태로 다룸."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "facilities-overdue",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "list",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "시설"
+              },
+              {
+                "key": "date",
+                "label": "점검 예정일"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "owner",
+                "label": "담당"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남 공기청정기",
+            "date": "2026-10-14",
+            "status": "점검 지연",
+            "owner": "가상직원 A"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수 출입 장치",
+            "date": "2026-10-15",
+            "status": "점검 지연",
+            "owner": "가상직원 B"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남 정수기",
+            "date": "2026-10-16",
+            "status": "점검 지연",
+            "owner": "가상직원 C"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "facilities",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "status",
+            "inspection_interval_days",
+            "last_inspected_on"
+          ]
+        },
+        {
+          "table": "facility_works",
+          "fields": [
+            "id",
+            "facility_id",
+            "kind",
+            "status",
+            "opened_at",
+            "completed_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "facilities-open",
+      "domainId": "facilities",
+      "prompt": "진행 중인 시설 작업을 보여줘",
+      "outcome": "ready",
+      "metric": "facility_works.status = IN_PROGRESS, facility_id로 지점 귀속.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "facilities",
+            "fields": [
+              "id",
+              "branch_id",
+              "name",
+              "status",
+              "inspection_interval_days",
+              "last_inspected_on"
+            ]
+          },
+          {
+            "table": "facility_works",
+            "fields": [
+              "id",
+              "facility_id",
+              "kind",
+              "status",
+              "opened_at",
+              "completed_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.facilities-open",
+            "definition": "facility_works.status = IN_PROGRESS, facility_id로 지점 귀속."
+          }
+        ],
+        "filters": [
+          {
+            "field": "facility_works.status",
+            "op": "EQ",
+            "value": "IN_PROGRESS"
+          }
+        ],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "facilities-open",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "작업"
+              },
+              {
+                "key": "kind",
+                "label": "구분"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "date",
+                "label": "접수일"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 2,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "출입 장치 부품 점검",
+            "kind": "수리",
+            "status": "진행 중",
+            "date": "2026-10-15"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "냉난방 필터 점검",
+            "kind": "점검",
+            "status": "진행 중",
+            "date": "2026-10-16"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "facilities",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "status",
+            "inspection_interval_days",
+            "last_inspected_on"
+          ]
+        },
+        {
+          "table": "facility_works",
+          "fields": [
+            "id",
+            "facility_id",
+            "kind",
+            "status",
+            "opened_at",
+            "completed_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tasks-overdue",
+      "domainId": "tasks",
+      "prompt": "기한이 지난 미완료 업무를 보여줘",
+      "outcome": "ready",
+      "metric": "due_at < asOf AND status != DONE. 단순 날짜 비교가 아닌 시각 기준.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "work_tasks",
+            "fields": [
+              "id",
+              "branch_id",
+              "title",
+              "status",
+              "due_at",
+              "completed_at"
+            ]
+          },
+          {
+            "table": "messages",
+            "fields": [
+              "id",
+              "conversation_id",
+              "related_task_id",
+              "kind",
+              "sent_at"
+            ]
+          },
+          {
+            "table": "conversations",
+            "fields": [
+              "id",
+              "branch_id",
+              "kind",
+              "name"
+            ]
+          },
+          {
+            "table": "conversation_members",
+            "fields": [
+              "conversation_id",
+              "employee_id"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.tasks-overdue",
+            "definition": "due_at < asOf AND status != DONE. 단순 날짜 비교가 아닌 시각 기준."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "tasks-overdue",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "list",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "업무"
+              },
+              {
+                "key": "date",
+                "label": "기한"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "priority",
+                "label": "우선순위"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "좌석 안내 표지 교체",
+            "date": "2026-10-15",
+            "status": "진행 중",
+            "priority": "높음"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "주간 물품 재고 확인",
+            "date": "2026-10-16",
+            "status": "할 일",
+            "priority": "보통"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "주말 운영 안내 게시",
+            "date": "2026-10-17 10:00",
+            "status": "할 일",
+            "priority": "긴급"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "work_tasks",
+          "fields": [
+            "id",
+            "branch_id",
+            "title",
+            "status",
+            "due_at",
+            "completed_at"
+          ]
+        },
+        {
+          "table": "messages",
+          "fields": [
+            "id",
+            "conversation_id",
+            "related_task_id",
+            "kind",
+            "sent_at"
+          ]
+        },
+        {
+          "table": "conversations",
+          "fields": [
+            "id",
+            "branch_id",
+            "kind",
+            "name"
+          ]
+        },
+        {
+          "table": "conversation_members",
+          "fields": [
+            "conversation_id",
+            "employee_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chat-task-shares",
+      "domainId": "tasks",
+      "prompt": "현재 채널의 업무 공유 메시지를 보여줘",
+      "outcome": "ready",
+      "metric": "현재 conversation_id의 TASK_CARD만 조회. 참여 여부·업무 원본 접근을 각각 확인.",
+      "grain": "현재 채널 메시지",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "work_tasks",
+            "fields": [
+              "id",
+              "branch_id",
+              "title",
+              "status",
+              "due_at",
+              "completed_at"
+            ]
+          },
+          {
+            "table": "messages",
+            "fields": [
+              "id",
+              "conversation_id",
+              "related_task_id",
+              "kind",
+              "sent_at"
+            ]
+          },
+          {
+            "table": "conversations",
+            "fields": [
+              "id",
+              "branch_id",
+              "kind",
+              "name"
+            ]
+          },
+          {
+            "table": "conversation_members",
+            "fields": [
+              "conversation_id",
+              "employee_id"
+            ]
+          }
+        ],
+        "grain": "현재 채널 메시지",
+        "metrics": [
+          {
+            "id": "openstudy.demo.chat-task-shares",
+            "definition": "현재 conversation_id의 TASK_CARD만 조회. 참여 여부·업무 원본 접근을 각각 확인."
+          }
+        ],
+        "filters": [
+          {
+            "field": "messages.conversation_id",
+            "op": "EQ",
+            "value": "general"
+          }
+        ],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "chat-task-shares",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "timeline",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "업무 카드"
+              },
+              {
+                "key": "date",
+                "label": "공유 시각"
+              },
+              {
+                "key": "status",
+                "label": "연결 상태"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 2,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "channel",
+            "branch": "강남점",
+            "label": "주말 운영 안내",
+            "date": "2026-10-17 09:20",
+            "status": "업무 카드"
+          },
+          {
+            "id": "row-2",
+            "branchId": "channel",
+            "branch": "성수점",
+            "label": "물품 점검 업무",
+            "date": "2026-10-17 10:05",
+            "status": "업무 카드"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "work_tasks",
+          "fields": [
+            "id",
+            "branch_id",
+            "title",
+            "status",
+            "due_at",
+            "completed_at"
+          ]
+        },
+        {
+          "table": "messages",
+          "fields": [
+            "id",
+            "conversation_id",
+            "related_task_id",
+            "kind",
+            "sent_at"
+          ]
+        },
+        {
+          "table": "conversations",
+          "fields": [
+            "id",
+            "branch_id",
+            "kind",
+            "name"
+          ]
+        },
+        {
+          "table": "conversation_members",
+          "fields": [
+            "conversation_id",
+            "employee_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "support-unanswered",
+      "domainId": "support",
+      "prompt": "아직 답변하지 않은 문의를 보여줘",
+      "outcome": "ready",
+      "metric": "answered_at IS NULL인 미종결 문의. 문의·답변 본문과 연락처는 결과에 포함하지 않음.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "inquiries",
+            "fields": [
+              "id",
+              "branch_id",
+              "subject",
+              "status",
+              "created_at",
+              "answered_at"
+            ]
+          },
+          {
+            "table": "announcements",
+            "fields": [
+              "id",
+              "title",
+              "target",
+              "status",
+              "is_pinned",
+              "published_at"
+            ]
+          },
+          {
+            "table": "announcement_branches",
+            "fields": [
+              "announcement_id",
+              "branch_id"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.support-unanswered",
+            "definition": "answered_at IS NULL인 미종결 문의. 문의·답변 본문과 연락처는 결과에 포함하지 않음."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "support-unanswered",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "list",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "문의 제목"
+              },
+              {
+                "key": "date",
+                "label": "접수일"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "룸 예약 시간 문의",
+            "date": "2026-10-16",
+            "status": "접수"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "사물함 배정 문의",
+            "date": "2026-10-17",
+            "status": "처리 중"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "상품 이용 기간 문의",
+            "date": "2026-10-17",
+            "status": "접수"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "inquiries",
+          "fields": [
+            "id",
+            "branch_id",
+            "subject",
+            "status",
+            "created_at",
+            "answered_at"
+          ]
+        },
+        {
+          "table": "announcements",
+          "fields": [
+            "id",
+            "title",
+            "target",
+            "status",
+            "is_pinned",
+            "published_at"
+          ]
+        },
+        {
+          "table": "announcement_branches",
+          "fields": [
+            "announcement_id",
+            "branch_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "notices-live",
+      "domainId": "support",
+      "prompt": "현재 게시 중인 지점 공지를 보여줘",
+      "outcome": "ready",
+      "metric": "게시 상태와 게시 시각을 확인하고 announcement_branches 또는 전체 공지 대상으로 조회.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "inquiries",
+            "fields": [
+              "id",
+              "branch_id",
+              "subject",
+              "status",
+              "created_at",
+              "answered_at"
+            ]
+          },
+          {
+            "table": "announcements",
+            "fields": [
+              "id",
+              "title",
+              "target",
+              "status",
+              "is_pinned",
+              "published_at"
+            ]
+          },
+          {
+            "table": "announcement_branches",
+            "fields": [
+              "announcement_id",
+              "branch_id"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.notices-live",
+            "definition": "게시 상태와 게시 시각을 확인하고 announcement_branches 또는 전체 공지 대상으로 조회."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "notices-live",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "list",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "공지 제목"
+              },
+              {
+                "key": "date",
+                "label": "게시일"
+              },
+              {
+                "key": "status",
+                "label": "게시 상태"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 2,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "주말 시설 점검 안내",
+            "date": "2026-10-15",
+            "status": "게시 중"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "스터디룸 이용 안내",
+            "date": "2026-10-16",
+            "status": "게시 중"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "inquiries",
+          "fields": [
+            "id",
+            "branch_id",
+            "subject",
+            "status",
+            "created_at",
+            "answered_at"
+          ]
+        },
+        {
+          "table": "announcements",
+          "fields": [
+            "id",
+            "title",
+            "target",
+            "status",
+            "is_pinned",
+            "published_at"
+          ]
+        },
+        {
+          "table": "announcement_branches",
+          "fields": [
+            "announcement_id",
+            "branch_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shifts-week",
+      "domainId": "attendance",
+      "prompt": "이번 주 직원 근무표를 보여줘",
+      "outcome": "ready",
+      "metric": "이번 주와 구간이 겹치는 취소되지 않은 근무. 직원 소속 지점이 아닌 shifts.branch_id 사용.",
+      "grain": "상세 레코드",
+      "period": "이번 주 · 10.12–10.18",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "shifts",
+            "fields": [
+              "id",
+              "employee_id",
+              "branch_id",
+              "starts_at",
+              "ends_at",
+              "status"
+            ]
+          },
+          {
+            "table": "attendance_records",
+            "fields": [
+              "id",
+              "employee_id",
+              "branch_id",
+              "clock_in_at",
+              "clock_out_at"
+            ]
+          },
+          {
+            "table": "attendance_corrections",
+            "fields": [
+              "id",
+              "attendance_id",
+              "correction_kind",
+              "status",
+              "created_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.shifts-week",
+            "definition": "이번 주와 구간이 겹치는 취소되지 않은 근무. 직원 소속 지점이 아닌 shifts.branch_id 사용."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "shifts.starts_at",
+            "op": "LT",
+            "value": "2026-10-19T00:00:00+09:00"
+          },
+          {
+            "field": "shifts.ends_at",
+            "op": "GT",
+            "value": "2026-10-12T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "shifts-week",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "calendar",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "직원"
+              },
+              {
+                "key": "date",
+                "label": "날짜"
+              },
+              {
+                "key": "time",
+                "label": "근무 시간"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 4,
+        "total": 4,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상직원 A",
+            "date": "2026-10-12",
+            "time": "09:00–18:00",
+            "status": "예정"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상직원 B",
+            "date": "2026-10-14",
+            "time": "13:00–21:00",
+            "status": "예정"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "가상직원 C",
+            "date": "2026-10-17",
+            "time": "09:00–18:00",
+            "status": "예정"
+          },
+          {
+            "id": "row-4",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "가상직원 D",
+            "date": "2026-10-18",
+            "time": "10:00–19:00",
+            "status": "예정"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "shifts",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "starts_at",
+            "ends_at",
+            "status"
+          ]
+        },
+        {
+          "table": "attendance_records",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "clock_in_at",
+            "clock_out_at"
+          ]
+        },
+        {
+          "table": "attendance_corrections",
+          "fields": [
+            "id",
+            "attendance_id",
+            "correction_kind",
+            "status",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attendance-pending",
+      "domainId": "attendance",
+      "prompt": "처리 대기 근태 정정 신청을 보여줘",
+      "outcome": "ready",
+      "metric": "REQUESTED 신청만 조회하고 attendance_records.branch_id로 범위를 제한. 개인 사유 원문 제외.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "shifts",
+            "fields": [
+              "id",
+              "employee_id",
+              "branch_id",
+              "starts_at",
+              "ends_at",
+              "status"
+            ]
+          },
+          {
+            "table": "attendance_records",
+            "fields": [
+              "id",
+              "employee_id",
+              "branch_id",
+              "clock_in_at",
+              "clock_out_at"
+            ]
+          },
+          {
+            "table": "attendance_corrections",
+            "fields": [
+              "id",
+              "attendance_id",
+              "correction_kind",
+              "status",
+              "created_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.attendance-pending",
+            "definition": "REQUESTED 신청만 조회하고 attendance_records.branch_id로 범위를 제한. 개인 사유 원문 제외."
+          }
+        ],
+        "filters": [
+          {
+            "field": "attendance_corrections.status",
+            "op": "EQ",
+            "value": "REQUESTED"
+          }
+        ],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "attendance-pending",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "정정 신청"
+              },
+              {
+                "key": "employee",
+                "label": "직원"
+              },
+              {
+                "key": "kind",
+                "label": "정정 구분"
+              },
+              {
+                "key": "date",
+                "label": "신청일"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 2,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "AC-001",
+            "employee": "가상직원 A",
+            "kind": "출퇴근 시각",
+            "date": "2026-10-16",
+            "status": "신청"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "AC-002",
+            "employee": "가상직원 B",
+            "kind": "휴게 시각",
+            "date": "2026-10-17",
+            "status": "신청"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "shifts",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "starts_at",
+            "ends_at",
+            "status"
+          ]
+        },
+        {
+          "table": "attendance_records",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "clock_in_at",
+            "clock_out_at"
+          ]
+        },
+        {
+          "table": "attendance_corrections",
+          "fields": [
+            "id",
+            "attendance_id",
+            "correction_kind",
+            "status",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "leave-approved",
+      "domainId": "leave",
+      "prompt": "이번 달 승인된 휴가를 보여줘",
+      "outcome": "ready",
+      "metric": "APPROVED이며 월간 구간과 겹치는 휴가. 전사 직원 기준, 합계는 신청 일수이며 월 경계 일할 계산 아님.",
+      "grain": "상세 레코드",
+      "period": "이번 달 휴가 · 10.01–10.31",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "leave_requests",
+            "fields": [
+              "id",
+              "employee_id",
+              "starts_on",
+              "ends_on",
+              "requested_days",
+              "status"
+            ]
+          },
+          {
+            "table": "shift_swaps",
+            "fields": [
+              "id",
+              "original_shift_id",
+              "requested_by",
+              "replacement_employee_id",
+              "status"
+            ]
+          },
+          {
+            "table": "shifts",
+            "fields": [
+              "id",
+              "branch_id",
+              "employee_id"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.leave-approved",
+            "definition": "APPROVED이며 월간 구간과 겹치는 휴가. 전사 직원 기준, 합계는 신청 일수이며 월 경계 일할 계산 아님."
+          }
+        ],
+        "filters": [
+          {
+            "field": "leave_requests.status",
+            "op": "EQ",
+            "value": "APPROVED"
+          }
+        ],
+        "timeConstraints": [
+          {
+            "field": "leave_requests.starts_on",
+            "op": "LT",
+            "value": "2026-11-01"
+          },
+          {
+            "field": "leave_requests.ends_on",
+            "op": "GTE",
+            "value": "2026-10-01"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "leave-approved",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "calendar",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "직원"
+              },
+              {
+                "key": "date",
+                "label": "시작일"
+              },
+              {
+                "key": "end",
+                "label": "종료일"
+              },
+              {
+                "key": "value",
+                "label": "일수",
+                "unit": "일"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3.5,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "global",
+            "branch": "강남점",
+            "label": "가상직원 A",
+            "date": "2026-10-19",
+            "end": "2026-10-20",
+            "value": 2,
+            "status": "승인"
+          },
+          {
+            "id": "row-2",
+            "branchId": "global",
+            "branch": "성수점",
+            "label": "가상직원 B",
+            "date": "2026-10-22",
+            "end": "2026-10-22",
+            "value": 1,
+            "status": "승인"
+          },
+          {
+            "id": "row-3",
+            "branchId": "global",
+            "branch": "강남점",
+            "label": "가상직원 C",
+            "date": "2026-10-26",
+            "end": "2026-10-26",
+            "value": 0.5,
+            "status": "승인"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "leave_requests",
+          "fields": [
+            "id",
+            "employee_id",
+            "starts_on",
+            "ends_on",
+            "requested_days",
+            "status"
+          ]
+        },
+        {
+          "table": "shift_swaps",
+          "fields": [
+            "id",
+            "original_shift_id",
+            "requested_by",
+            "replacement_employee_id",
+            "status"
+          ]
+        },
+        {
+          "table": "shifts",
+          "fields": [
+            "id",
+            "branch_id",
+            "employee_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "swaps-pending",
+      "domainId": "leave",
+      "prompt": "처리 대기 대체근무 신청을 보여줘",
+      "outcome": "ready",
+      "metric": "REQUESTED인 대체 신청. 원근무 shifts.branch_id로 지점 범위 적용.",
+      "grain": "상세 레코드",
+      "period": "기준 시각 현재",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "leave_requests",
+            "fields": [
+              "id",
+              "employee_id",
+              "starts_on",
+              "ends_on",
+              "requested_days",
+              "status"
+            ]
+          },
+          {
+            "table": "shift_swaps",
+            "fields": [
+              "id",
+              "original_shift_id",
+              "requested_by",
+              "replacement_employee_id",
+              "status"
+            ]
+          },
+          {
+            "table": "shifts",
+            "fields": [
+              "id",
+              "branch_id",
+              "employee_id"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.swaps-pending",
+            "definition": "REQUESTED인 대체 신청. 원근무 shifts.branch_id로 지점 범위 적용."
+          }
+        ],
+        "filters": [
+          {
+            "field": "shift_swaps.status",
+            "op": "EQ",
+            "value": "REQUESTED"
+          }
+        ],
+        "timeConstraints": [],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "swaps-pending",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "대체 신청"
+              },
+              {
+                "key": "requester",
+                "label": "신청 직원"
+              },
+              {
+                "key": "replacement",
+                "label": "대체 직원"
+              },
+              {
+                "key": "status",
+                "label": "상태"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 2,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "SW-001",
+            "requester": "가상직원 A",
+            "replacement": "가상직원 C",
+            "status": "신청"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "SW-002",
+            "requester": "가상직원 B",
+            "replacement": "가상직원 D",
+            "status": "신청"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "leave_requests",
+          "fields": [
+            "id",
+            "employee_id",
+            "starts_on",
+            "ends_on",
+            "requested_days",
+            "status"
+          ]
+        },
+        {
+          "table": "shift_swaps",
+          "fields": [
+            "id",
+            "original_shift_id",
+            "requested_by",
+            "replacement_employee_id",
+            "status"
+          ]
+        },
+        {
+          "table": "shifts",
+          "fields": [
+            "id",
+            "branch_id",
+            "employee_id"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "audit-today",
+      "domainId": "audit",
+      "prompt": "오늘의 업무 변경 이력을 보여줘",
+      "outcome": "ready",
+      "metric": "entity_type이 업무인 오늘의 감사 메타정보. before_json·after_json은 반환하지 않음.",
+      "grain": "상세 레코드",
+      "period": "오늘 · 10.17",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "audit_events",
+            "fields": [
+              "id",
+              "actor_employee_id",
+              "branch_id",
+              "entity_type",
+              "entity_id",
+              "action",
+              "occurred_at",
+              "result"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.audit-today",
+            "definition": "entity_type이 업무인 오늘의 감사 메타정보. before_json·after_json은 반환하지 않음."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "audit_events.occurred_at",
+            "op": "GTE",
+            "value": "2026-10-17T00:00:00+09:00"
+          },
+          {
+            "field": "audit_events.occurred_at",
+            "op": "LT",
+            "value": "2026-10-18T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "audit-today",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "timeline",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "대상"
+              },
+              {
+                "key": "action",
+                "label": "행위"
+              },
+              {
+                "key": "date",
+                "label": "발생 시각"
+              },
+              {
+                "key": "status",
+                "label": "결과"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "TASK-DEMO-01",
+            "action": "상태 변경",
+            "date": "2026-10-17 09:12",
+            "status": "성공"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "TASK-DEMO-02",
+            "action": "체크리스트 변경",
+            "date": "2026-10-17 10:02",
+            "status": "성공"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "TASK-DEMO-03",
+            "action": "담당자 변경",
+            "date": "2026-10-17 10:40",
+            "status": "성공"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "audit_events",
+          "fields": [
+            "id",
+            "actor_employee_id",
+            "branch_id",
+            "entity_type",
+            "entity_id",
+            "action",
+            "occurred_at",
+            "result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "audit-payments",
+      "domainId": "audit",
+      "prompt": "결제·환불 관련 처리 이력을 보여줘",
+      "outcome": "ready",
+      "metric": "결제·환불의 감사 메타정보만 조회. 현재 업무 원장의 성공 상태와 감사 실행 결과를 구분.",
+      "grain": "상세 레코드",
+      "period": "이번 달 · 10.01–10.17",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "audit_events",
+            "fields": [
+              "id",
+              "actor_employee_id",
+              "branch_id",
+              "entity_type",
+              "entity_id",
+              "action",
+              "occurred_at",
+              "result"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.audit-payments",
+            "definition": "결제·환불의 감사 메타정보만 조회. 현재 업무 원장의 성공 상태와 감사 실행 결과를 구분."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "audit_events.occurred_at",
+            "op": "GTE",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "audit_events.occurred_at",
+            "op": "LT",
+            "value": "2026-10-18T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "audit-payments",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "timeline",
+            "bindings": {
+              "label": "label"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "대상"
+              },
+              {
+                "key": "action",
+                "label": "행위"
+              },
+              {
+                "key": "date",
+                "label": "발생 시각"
+              },
+              {
+                "key": "status",
+                "label": "결과"
+              },
+              {
+                "key": "branch",
+                "label": "지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 3,
+        "total": 3,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "PAY-DEMO-01",
+            "action": "결제 승인",
+            "date": "2026-10-16 13:10",
+            "status": "성공"
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "RF-DEMO-01",
+            "action": "환불 처리",
+            "date": "2026-10-17 09:30",
+            "status": "성공"
+          },
+          {
+            "id": "row-3",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "PAY-DEMO-02",
+            "action": "결제 실패",
+            "date": "2026-10-17 10:20",
+            "status": "실패"
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "audit_events",
+          "fields": [
+            "id",
+            "actor_employee_id",
+            "branch_id",
+            "entity_type",
+            "entity_id",
+            "action",
+            "occurred_at",
+            "result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-clarification",
+      "domainId": "sales",
+      "prompt": "매출 현황을 비교해줘",
+      "outcome": "clarification",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "NEEDS_CLARIFICATION",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-clarification",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-clarification",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": false,
+        "rowCount": 0,
+        "total": null,
+        "rows": []
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-unsupported",
+      "domainId": "sales",
+      "prompt": "내년 현금흐름을 예측해줘",
+      "outcome": "unsupported",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "UNSUPPORTED",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-unsupported",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-unsupported",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": false,
+        "rowCount": 0,
+        "total": null,
+        "rows": []
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-empty",
+      "domainId": "sales",
+      "prompt": "이번 달 100만 원 이상 환불 내역을 보여줘",
+      "outcome": "empty",
+      "metric": "refunded_at이 기간에 속하는 환불 원장. 처리 지점이 달라도 payments.branch_id로 귀속.",
+      "grain": "상세 레코드",
+      "period": "이번 달 · 10.01–10.17",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "상세 레코드",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-empty",
+            "definition": "refunded_at이 기간에 속하는 환불 원장. 처리 지점이 달라도 payments.branch_id로 귀속."
+          }
+        ],
+        "filters": [
+          {
+            "field": "refunds.amount_krw",
+            "op": "GTE",
+            "value": 1000000
+          }
+        ],
+        "timeConstraints": [
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-18T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "AND",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-empty",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "table",
+            "bindings": {
+              "label": "label",
+              "value": "value"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "환불"
+              },
+              {
+                "key": "payment",
+                "label": "원결제"
+              },
+              {
+                "key": "value",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "date",
+                "label": "처리일"
+              },
+              {
+                "key": "branch",
+                "label": "원결제 지점"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 0,
+        "total": 0,
+        "rows": []
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-denied",
+      "domainId": "sales",
+      "prompt": "권한 없는 매출 조회를 시연해줘",
+      "outcome": "denied",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "NOT_EXECUTED",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-denied",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-denied",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": false,
+        "rowCount": 0,
+        "total": null,
+        "rows": []
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-scope",
+      "domainId": "sales",
+      "prompt": "접근 범위 밖 지점을 조회해줘",
+      "outcome": "scope",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "NOT_EXECUTED",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-scope",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-scope",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": false,
+        "rowCount": 0,
+        "total": null,
+        "rows": []
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-failed",
+      "domainId": "sales",
+      "prompt": "조회 실패를 시연해줘",
+      "outcome": "failed",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "NOT_EXECUTED",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-failed",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-failed",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": false,
+        "rowCount": 0,
+        "total": null,
+        "rows": []
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-canceled",
+      "domainId": "sales",
+      "prompt": "조회 취소를 시연해줘",
+      "outcome": "canceled",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "NOT_EXECUTED",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-canceled",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-canceled",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "bar",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": false,
+        "rowCount": 0,
+        "total": null,
+        "rows": []
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "state-fallback",
+      "domainId": "sales",
+      "prompt": "지원하지 않는 차트의 표 대체를 시연해줘",
+      "outcome": "fallback",
+      "metric": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함.",
+      "grain": "원결제 지점",
+      "period": "지난달 · 09.01–09.30",
+      "querySpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "status": "READY",
+        "sourceRefs": [
+          {
+            "table": "payments",
+            "fields": [
+              "id",
+              "branch_id",
+              "amount_krw",
+              "purpose",
+              "status",
+              "approved_at"
+            ]
+          },
+          {
+            "table": "refunds",
+            "fields": [
+              "id",
+              "payment_id",
+              "processing_branch_id",
+              "amount_krw",
+              "refunded_at"
+            ]
+          }
+        ],
+        "grain": "원결제 지점",
+        "metrics": [
+          {
+            "id": "openstudy.demo.state-fallback",
+            "definition": "승인액 − 환불액. 이용권·룸·사물함 모두 포함. 환불 처리일 기준, 원결제 지점 귀속. 환불 이후 상태가 REFUNDED인 승인 원거래도 승인액에 포함."
+          }
+        ],
+        "filters": [],
+        "timeConstraints": [
+          {
+            "field": "payments.approved_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "payments.approved_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "GTE",
+            "value": "2026-09-01T00:00:00+09:00"
+          },
+          {
+            "field": "refunds.refunded_at",
+            "op": "LT",
+            "value": "2026-10-01T00:00:00+09:00"
+          }
+        ],
+        "timeConstraintPolicy": "승인·환불 각각의 원장에서 독립 집계 후 지점별 결합",
+        "effectiveScope": {
+          "branch": "all",
+          "channelId": "general",
+          "origin": "demo-context; production scope must be server-owned"
+        },
+        "pagination": {
+          "page": 0,
+          "size": 5
+        },
+        "asOf": "2026-10-17T02:00:00.000Z",
+        "timeZone": "Asia/Seoul",
+        "currency": "KRW",
+        "refundBasis": "processed",
+        "note": "연동 협의용 초안. 물리 필드와 지표 정의를 설명하며 엔진 확정 계약이 아닙니다. 매출은 승인·환불을 별도 집계하여 일대다 조인의 중복 합계를 방지합니다."
+      },
+      "viewSpec": {
+        "schemaVersion": "demo-v1-proposal",
+        "layout": "stack",
+        "datasetId": "state-fallback",
+        "components": [
+          {
+            "type": "KpiGroup"
+          },
+          {
+            "type": "UnregisteredChart",
+            "bindings": {
+              "label": "label",
+              "value": "net"
+            }
+          },
+          {
+            "type": "PaginatedDataTable",
+            "columns": [
+              {
+                "key": "label",
+                "label": "지점"
+              },
+              {
+                "key": "approved",
+                "label": "승인액",
+                "unit": "원"
+              },
+              {
+                "key": "refunds",
+                "label": "환불액",
+                "unit": "원"
+              },
+              {
+                "key": "net",
+                "label": "순매출",
+                "unit": "원"
+              }
+            ],
+            "pageSize": 5
+          }
+        ],
+        "actions": [
+          "sort",
+          "page",
+          "drillDetail",
+          "refineFilter"
+        ],
+        "note": "허용 컴포넌트만 렌더링. 엔진 확정 스키마 아님."
+      },
+      "expected": {
+        "displayResult": true,
+        "rowCount": 2,
+        "total": 29200000,
+        "rows": [
+          {
+            "id": "row-1",
+            "branchId": "gangnam",
+            "branch": "강남점",
+            "label": "강남점",
+            "approved": 18400000,
+            "refunds": 1200000,
+            "net": 17200000
+          },
+          {
+            "id": "row-2",
+            "branchId": "seongsu",
+            "branch": "성수점",
+            "label": "성수점",
+            "approved": 12600000,
+            "refunds": 600000,
+            "net": 12000000
+          }
+        ]
+      },
+      "sourceRefs": [
+        {
+          "table": "payments",
+          "fields": [
+            "id",
+            "branch_id",
+            "amount_krw",
+            "purpose",
+            "status",
+            "approved_at"
+          ]
+        },
+        {
+          "table": "refunds",
+          "fields": [
+            "id",
+            "payment_id",
+            "processing_branch_id",
+            "amount_krw",
+            "refunded_at"
+          ]
+        }
+      ]
+    }
+  ]
+}
