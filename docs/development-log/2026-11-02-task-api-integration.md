@@ -47,3 +47,4 @@ Frontend #26은 기존 업무 화면의 실제 API 연결 작업이다. 이슈, 
 - 로컬 실제 Backend·DB 결과를 운영 환경 검증으로 간주하지 않는다. 빌드 브라우저의 HTTP fixture 검사도 실제 Backend 검증과 구분한다.
 - main 병합은 사용자가 수행한다.
 - 실제 검증 종료 후 PID·jar 경로·포트 및 컨테이너 ID를 대조하여 이번 작업의 Backend·일회용 DB만 제거했고 임시 자격 증명 파일을 삭제했다.
+- 구현 커밋 `6a3a616`을 `feature/task-api-integration`에 push하고 [PR #54](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/54)를 생성했다. 사용자 병합 대기 상태이며 main 변경·자동 병합은 수행하지 않았다.
