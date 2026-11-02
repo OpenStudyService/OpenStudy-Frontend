@@ -13,6 +13,7 @@ import type {
   Employee,
   Entity,
   Resource,
+  ResourceMap,
 } from "../shared/domain/schema";
 import { catalog, readPermission } from "../shared/domain/catalog";
 import { assert, DomainError, MockStore } from "./store";
@@ -22,11 +23,21 @@ import {
   allowedChatChannel,
   reconcileChannelParticipants,
 } from "./chat-policy";
-import {
-  canCreateTask,
-  canEditTask,
-  taskActions,
-} from "../features/tasks/model";
+
+// Keep the legacy demo ledger policy separate from canonical server DTOs.
+const canCreateTask = (user: Employee, branch: string) =>
+  !!branch && branch !== "all" && can(user, branch);
+const canEditTask = (user: Employee, task: ResourceMap["tasks"]) =>
+  canCreateTask(user, task.branchId) &&
+  (admin(user, task.branchId) ||
+    task.createdById === user.id ||
+    task.assigneeId === user.id);
+const taskActions = (task: ResourceMap["tasks"]) =>
+  task.status === "완료"
+    ? ["reopen"]
+    : task.status === "진행 중"
+      ? ["complete"]
+      : ["progress", "complete"];
 
 export const bodySchema = z.record(z.string(), z.unknown());
 const str = (p: Record<string, unknown>, k: string) => String(p[k] ?? "");

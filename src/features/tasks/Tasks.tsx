@@ -14,6 +14,17 @@ import { isAccessError } from "../../shared/api/read-model";
 import { canCreateTask } from "./model";
 import { taskApi } from "./api";
 import { TaskPanel } from "./TaskPanel";
+import { useTaskAssignees } from "./hooks";
+
+function localDateTime(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+}
 
 export function Tasks() {
   const { session, scope, lookups } = useApp(),
@@ -28,11 +39,15 @@ export function Tasks() {
     queryFn: ({ signal }) => taskApi.list(scope, search, signal),
     retry: false,
   });
-  const page = rows.data?.page ?? 1,
-    pageSize = rows.data?.pageSize ?? 10,
-    total = rows.data?.total ?? 0;
-  const person = (id: string) =>
-    lookups.employees.find((e) => e.id === id)?.name ?? id;
+  const summary = useQuery({
+    queryKey: ["data", session.user.id, scope, "tasks", "summary", search],
+    queryFn: ({ signal }) => taskApi.summary(scope, search, signal),
+    retry: false,
+  });
+  const candidates = useTaskAssignees(scope);
+  const page = rows.data?.meta.page ?? 1,
+    pageSize = rows.data?.meta.pageSize ?? 20,
+    total = rows.data?.meta.total ?? 0;
   const filter = (key: string, value: string) =>
     setParams(
       (p) => {
@@ -76,6 +91,28 @@ export function Tasks() {
           </Button>
         )}
       </Heading>
+      <div className="mb-4 flex flex-wrap gap-4" aria-label="업무 집계">
+        {summary.data && !summary.error && !summary.isPending ? (
+          [
+            ["전체", summary.data.totals.total],
+            ["할 일", summary.data.totals.todo],
+            ["진행 중", summary.data.totals.inProgress],
+            ["완료", summary.data.totals.done],
+            ["기한 초과", summary.data.totals.overdue],
+          ].map(([label, value]) => (
+            <span key={label}>
+              {label} {value}건
+            </span>
+          ))
+        ) : (
+          <DataNotice
+            label="업무 집계"
+            loading={summary.isPending}
+            error={summary.error}
+            retry={() => void summary.refetch()}
+          />
+        )}
+      </div>
       <div className="card overflow-hidden">
         <div className="filters">
           <input
@@ -101,34 +138,69 @@ export function Tasks() {
             onChange={(e) => filter("assigneeId", e.target.value)}
           >
             <option value="">전체 담당자</option>
-            {lookups.employees.map((p) => (
+            {(scope === "all"
+              ? lookups.employees
+              : (candidates.data ?? [])
+            ).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
           </select>
           <Button
-            variant={params.get("mine") ? "primary" : ""}
-            aria-pressed={!!params.get("mine")}
-            onClick={() => filter("mine", params.get("mine") ? "" : "1")}
+            variant={
+              ["true", "1"].includes(params.get("mine") ?? "") ? "primary" : ""
+            }
+            aria-pressed={["true", "1"].includes(params.get("mine") ?? "")}
+            onClick={() =>
+              filter(
+                "mine",
+                ["true", "1"].includes(params.get("mine") ?? "") ? "" : "true",
+              )
+            }
           >
             내 업무
           </Button>
           <input
-            type="date"
-            aria-label="날짜 필터"
-            value={params.get("date") ?? ""}
-            onChange={(e) => filter("date", e.target.value)}
+            type="datetime-local"
+            aria-label="기한 시작 필터"
+            value={localDateTime(params.get("dueFrom"))}
+            onChange={(e) =>
+              filter(
+                "dueFrom",
+                e.target.value ? new Date(e.target.value).toISOString() : "",
+              )
+            }
           />
+          <input
+            type="datetime-local"
+            aria-label="기한 종료 필터"
+            value={localDateTime(params.get("dueTo"))}
+            onChange={(e) =>
+              filter(
+                "dueTo",
+                e.target.value ? new Date(e.target.value).toISOString() : "",
+              )
+            }
+          />
+          <Button
+            variant={params.get("overdue") === "true" ? "primary" : ""}
+            aria-pressed={params.get("overdue") === "true"}
+            onClick={() =>
+              filter("overdue", params.get("overdue") === "true" ? "" : "true")
+            }
+          >
+            기한 초과
+          </Button>
           <select
             aria-label="정렬"
             value={params.get("sort") ?? "createdAt"}
             onChange={(e) => filter("sort", e.target.value)}
           >
             <option value="createdAt">등록일 순</option>
-            <option value="title">제목 순</option>
-            <option value="status">상태 순</option>
-            <option value="due">기한 순</option>
+            <option value="updatedAt">수정일 순</option>
+            <option value="priority">우선순위 순</option>
+            <option value="dueAt">기한 순</option>
           </select>
           <select
             aria-label="정렬 방향"
@@ -148,6 +220,9 @@ export function Tasks() {
                   "assigneeId",
                   "mine",
                   "date",
+                  "dueFrom",
+                  "dueTo",
+                  "overdue",
                   "sort",
                   "direction",
                   "page",
@@ -218,8 +293,13 @@ export function Tasks() {
                       {session.branches.find((b) => b.id === task.branchId)
                         ?.name ?? task.branchId}
                     </td>
-                    <td>{person(task.assigneeId)}</td>
-                    <td>{task.due}</td>
+                    <td>{task.assignee.name}</td>
+                    <td>
+                      {task.dueAt
+                        ? new Date(task.dueAt).toLocaleString("ko-KR")
+                        : "미지정"}
+                      {task.overdue && <Badge>기한 초과</Badge>}
+                    </td>
                     <td>
                       <Badge>{task.priority}</Badge>
                     </td>

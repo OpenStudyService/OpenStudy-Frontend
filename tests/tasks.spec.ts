@@ -40,7 +40,7 @@ test("staff creator can register, assign another employee, and edit the full tas
   await panel.getByLabel("업무 제목").fill("직원 등록 인수인계 E2E");
   await panel.getByLabel("내용", { exact: true }).fill("현장 확인");
   await panel.getByLabel("담당자", { exact: true }).selectOption("minji");
-  await panel.getByLabel("기한").fill("2026-10-30");
+  await panel.getByLabel("기한").fill("2026-10-30T18:00");
   await panel.getByRole("button", { name: "업무 등록", exact: true }).click();
   await expect(panel).not.toBeVisible();
   await page

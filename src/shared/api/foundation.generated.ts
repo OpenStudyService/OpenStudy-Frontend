@@ -848,6 +848,970 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/seats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 좌석 목록
+     * @description scope 지점의 좌석을 zone → seatNo → id 오름차순으로 반환한다. status의 사용 중은 활성 이용 기록으로 계산한다. 범위 밖 좌석은 total에 포함하지 않는다.
+     */
+    get: operations["listSeats"];
+    put?: never;
+    /**
+     * 좌석 등록
+     * @description 같은 지점의 좌석 번호 중복은 409 DUPLICATE_SEAT_NO. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createSeat"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seats/board": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 좌석 배치도와 현황
+     * @description 한 지점의 전체 좌석을 구역별로 묶고 같은 기준 시점의 현황을 함께 준다. 좌표는 없다(V1 스키마).
+     */
+    get: operations["getSeatBoard"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seats/occupancy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 지점별 좌석 현황·점유율
+     * @description scope 지점마다 전체·사용 중·사용 가능·운영 중단 수와 점유율, 기준 시점을 준다. 좌석이 없는 지점은 수치 0과 occupancyRate null.
+     */
+    get: operations["getSeatOccupancy"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seats/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 좌석 상세
+     * @description 범위 밖 좌석은 404.
+     */
+    get: operations["getSeat"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 좌석 정보 수정
+     * @description 구역·좌석 번호·유형만 수정한다. 사용 중 좌석도 수정할 수 있다. 감사에 전후 값을 남긴다.
+     */
+    patch: operations["updateSeat"];
+    trace?: never;
+  };
+  "/seats/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 좌석 운영 중단·재개
+     * @description 사용 중 좌석의 운영 중단은 409 SEAT_OCCUPIED. 전후 상태·사유·작업자·시각을 감사에 남긴다.
+     */
+    post: operations["changeSeatStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customer-lookups/check-in": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 입실용 정확 일치 고객 조회
+     * @description 회원번호 또는 연락처가 정확히 일치하는 고객(최대 10명)과 지금 쓸 수 있는 이용권만 반환한다. 일치 고객마다 customer_service_interactions에, 일치 없음은 audit_events에 기록한다. 일반 고객 조회 범위는 넓히지 않는다. 횟수 제한은 후속(M5-D08).
+     */
+    post: operations["lookupCheckInCustomer"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seat-sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 입퇴실 이력
+     * @description 이용 지점이 scope 안인 이용 기록. 고객 조회 범위와 무관하며 고객은 최소 정보만 담는다(M5-D06). 구매 지점과 이용 지점을 구분한다.
+     */
+    get: operations["listSeatSessions"];
+    put?: never;
+    /**
+     * 직원 예외 입실
+     * @description 좌석·고객·이용권을 잠근 뒤 검증하고 활성 이용 기록을 만든다. 같은 좌석·같은 고객의 동시 입실은 하나만 성공한다. 이용권은 모든 활성 지점에서 사용 가능하다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["checkIn"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seat-sessions/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 이용 기록 상세
+     * @description 이동 이력을 포함한다. 이용 지점이 범위 밖이면 404.
+     */
+    get: operations["getSeatSession"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seat-sessions/{id}/check-out": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 직원 예외 퇴실과 차감
+     * @description 이용 분(분 올림)과 구매 당시 조건으로 차감·초과량을 계산하고, 이용 기록 종료·USE 원장·잔량·좌석 해제를 한 트랜잭션으로 확정한다. 이미 종료된 기록은 다른 키면 409 SESSION_ALREADY_CLOSED. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["checkOut"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seat-sessions/{id}/move": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 이용 중 좌석 이동
+     * @description 같은 이용 기록·이용권·입실 시각을 유지하고 좌석만 바꾼다. 원래 좌석 해제와 목적 좌석 점유는 한 트랜잭션이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["moveSeatSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/passes/{id}/adjustments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 이용권 잔여량·유효기간 수동 조정
+     * @description 조정 후 값을 받아 ADJUST 원장(증감)과 감사(전후 값)를 남긴다. 환불 이용권은 재활성화하지 않는다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["adjustPass"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}/pass-history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 고객의 구매·사용 내역
+     * @description 고객 조회 범위(M4-D05) 안의 고객만. 구매 지점이 scope 안인 이용권의 구매·환불·이용·조정 사건과 원장 대조를 준다. 다른 지점에서의 이용도 이용 지점·시각·증감량을 담되 처리자·사유는 담지 않는다. 결제 금액은 담지 않는다.
+     */
+    get: operations["getCustomerPassHistory"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 업무 목록
+     * @description scope 지점의 업무를 반환한다. 범위 밖 지점은 total에 없다. dueAt 정렬에서 기한 없는 업무는 방향과 무관하게 마지막이다.
+     */
+    get: operations["listTasks"];
+    put?: never;
+    /**
+     * 업무 등록
+     * @description 지점 직원 누구나 등록한다. 담당자는 해당 지점의 활성 직원이어야 한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createTask"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 업무 수치 집계
+     * @description GET /tasks와 같은 필터로 지점별·전체 수치를 계산한다. 목록 건수와 같은 기준이다.
+     */
+    get: operations["getTaskSummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 업무 상세
+     * @description 내용·분류·체크리스트를 포함한다. 처리 이력은 GET /tasks/{id}/events.
+     */
+    get: operations["getTask"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 업무 수정
+     * @description 내용·담당자·기한을 수정하고 처리 이력을 남긴다. 담당자를 바꿀 때만 새 담당자의 자격을 검사한다.
+     */
+    patch: operations["updateTask"];
+    trace?: never;
+  };
+  "/tasks/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 업무 상태 변경
+     * @description 허용 전이만 처리하고 그 외는 409 INVALID_STATE. 완료로 바뀌면 completedAt을 기록하고 완료에서 벗어나면 지운다. 같은 상태는 현재 값을 돌려주며 이력을 만들지 않는다.
+     */
+    post: operations["changeTaskStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks/{id}/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 업무 처리 이력
+     * @description 최신 이력부터 반환한다. 업무 화면과 채널 카드에서 연 상세가 같은 이력을 쓴다.
+     */
+    get: operations["listTaskEvents"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks/{id}/checklist-items": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 체크 항목 추가
+     * @description 마지막 순서에 추가하고 변경된 업무 전체를 돌려준다.
+     */
+    post: operations["addTaskChecklistItem"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks/{id}/checklist-items/{itemId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * 체크 항목 삭제
+     * @description 체크 항목만 삭제한다. 삭제 전 내용은 처리 이력에 남는다. 본문이 없으므로 업무 version을 query로 받는다.
+     */
+    delete: operations["deleteTaskChecklistItem"];
+    options?: never;
+    head?: never;
+    /**
+     * 체크 항목 수정
+     * @description 내용·완료 여부를 수정하고 변경된 업무 전체를 돌려준다.
+     */
+    patch: operations["updateTaskChecklistItem"];
+    trace?: never;
+  };
+  "/assignee-candidates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 담당자 후보
+     * @description 한 지점의 활성 계정·유효 소속 직원을 이름순으로 반환한다. 업무·시설·문의 담당자가 같은 기준을 쓴다. 소속 행이 없는 OWNER는 담당자가 될 수 없다.
+     */
+    get: operations["listAssigneeCandidates"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 내 참여 채널
+     * @description 요청자가 참여 중인 전체 채널과 scope 지점 채널을 읽지 않은 수와 함께 반환한다. 페이지가 없다.
+     */
+    get: operations["listMyChannels"];
+    put?: never;
+    /**
+     * 채널 생성
+     * @description 참여자는 활성 자격이 있는 직원만 지정할 수 있다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createChannel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/manageable": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 관리 가능한 채널
+     * @description 요청자가 관리할 수 있는 채널을 참여 여부와 관계없이 반환한다. 메시지 접근 권한은 주지 않는다.
+     */
+    get: operations["listManageableChannels"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/member-candidates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 채널 참여자 후보
+     * @description branchId가 있으면 해당 지점의 유효 소속 직원과 활성 OWNER, 없으면 소속이 하나 이상 유효한 활성 직원과 활성 OWNER를 반환한다.
+     */
+    get: operations["listChannelMemberCandidates"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 채널 상세
+     * @description 참여자가 아니고 관리할 수도 없으면 404다. DM도 404다.
+     */
+    get: operations["getChannel"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 채널 수정
+     * @description 이름·설명만 수정한다.
+     */
+    patch: operations["updateChannel"];
+    trace?: never;
+  };
+  "/channels/{id}/members": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 채널 참여자
+     * @description 참여 중인 직원을 이름순으로 반환한다.
+     */
+    get: operations["listChannelMembers"];
+    /**
+     * 채널 참여자 변경
+     * @description 최종 참여자 전체로 바꾼다. 빠진 직원은 즉시 접근이 끝난다.
+     */
+    put: operations["replaceChannelMembers"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/{id}/read": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 읽음 위치 갱신
+     * @description 요청자의 해당 채널 읽음 위치만 앞으로 옮긴다. 현재 위치보다 앞선 값은 위치를 바꾸지 않고 현재 값을 돌려준다.
+     */
+    post: operations["markChannelRead"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/{id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 채널 메시지
+     * @description 원문 메시지를 메시지 ID 기준으로 잘라 반환한다. 답글은 GET .../replies. 비참여자는 404다.
+     */
+    get: operations["listChannelMessages"];
+    put?: never;
+    /**
+     * 메시지 전송
+     * @description clientMessageKey가 필수다. 처음이면 201, 같은 키·같은 입력의 재전송은 새 메시지 없이 원래 메시지를 200으로 돌려준다. 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["sendChannelMessage"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/{id}/task-cards": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 업무 카드 공유
+     * @description 요청자가 참여한 채널에 요청자가 접근할 수 있는 업무만 공유한다. 재전송 규칙은 메시지 전송과 같다.
+     */
+    post: operations["shareTaskCard"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/{id}/messages/{messageId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 메시지 단건
+     * @description 다른 채널의 메시지이거나 비참여자면 404다.
+     */
+    get: operations["getChannelMessage"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/{id}/messages/{messageId}/replies": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 스레드 답글
+     * @description 원문과 같은 참여자 권한을 적용하고 메시지 목록과 같은 커서 규칙을 쓴다.
+     */
+    get: operations["listMessageReplies"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/facility-types": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 시설 유형
+     * @description 전역 코드표를 이름순으로 반환한다.
+     */
+    get: operations["listFacilityTypes"];
+    put?: never;
+    /**
+     * 시설 유형 등록
+     * @description 전역 코드표이므로 OWNER 전역 명령이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createFacilityType"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/facilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 시설 목록
+     * @description scope 지점의 시설과 열린 점검 작업을 반환한다.
+     */
+    get: operations["listFacilities"];
+    put?: never;
+    /**
+     * 시설 점검 항목 등록
+     * @description 시설과 첫 점검 작업을 함께 만든다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createFacility"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/facilities/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 시설 수치 집계
+     * @description GET /facilities와 같은 필터로 지점별·전체 수치를 계산한다. 홈의 점검 필요 수치도 같은 기준이다.
+     */
+    get: operations["getFacilitySummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/facilities/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 시설 상세
+     * @description 내용과 마지막 점검 결과를 포함한다.
+     */
+    get: operations["getFacility"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 시설 수정
+     * @description 시설 정보와 열린 점검 작업의 담당자·처리 상태를 수정하고 감사에 전후 값을 남긴다.
+     */
+    patch: operations["updateFacility"];
+    trace?: never;
+  };
+  "/facilities/{id}/inspection/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 점검 완료
+     * @description 열린 작업을 닫고 시설 상태·마지막 점검일을 갱신한 뒤 같은 담당자로 다음 점검 작업을 연다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["completeFacilityInspection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/inquiries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 문의 목록
+     * @description scope 지점의 문의를 반환한다. 고객은 최소 정보만 담는다.
+     */
+    get: operations["listInquiries"];
+    put?: never;
+    /**
+     * 문의 대리 등록
+     * @description 대상 고객은 요청자의 고객 조회 범위 안이거나 같은 지점에서 요청자가 정확 일치 조회로 찾은 고객이어야 한다. 아니면 404. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createInquiry"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/inquiries/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 문의 수치 집계
+     * @description GET /inquiries와 같은 필터로 지점별·전체 수치를 계산한다. 홈의 미처리 수치도 같은 기준이다.
+     */
+    get: operations["getInquirySummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/inquiries/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 문의 상세
+     * @description 문의 내용과 답변을 포함한다.
+     */
+    get: operations["getInquiry"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/inquiries/{id}/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 문의 처리 이력
+     * @description 최신 이력부터 반환한다.
+     */
+    get: operations["listInquiryEvents"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/inquiries/{id}/assignee": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 문의 담당자 변경
+     * @description 같은 지점의 활성 직원만 지정한다. null은 담당자 해제다.
+     */
+    post: operations["changeInquiryAssignee"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/inquiries/{id}/answer": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 문의 답변
+     * @description 답변 내용·답변자·시각을 저장하고 상태를 답변 완료로 바꾼다. 다시 답변하면 답변을 교체하고 이전 답변은 처리 이력에 남는다.
+     */
+    post: operations["answerInquiry"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/inquiries/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 문의 상태 변경
+     * @description 접수·처리 중으로만 바꾼다. 답변 완료에서 처리 중으로 되돌릴 수 있고 답변은 유지한다. 같은 상태는 현재 값을 돌려주며 이력을 만들지 않는다.
+     */
+    post: operations["changeInquiryStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/notices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 공지 목록
+     * @description 게시 상태·지점 제한을 먼저 적용하고 pinned → publishedAt → id 내림차순으로 정렬한다. 임시 저장·게시 종료 공지는 관리할 수 있는 사용자에게만 보인다.
+     */
+    get: operations["listNotices"];
+    put?: never;
+    /**
+     * 공지 등록
+     * @description 임시 저장 또는 게시 중으로 등록한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createNotice"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/notices/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 공지 상세
+     * @description 보이지 않는 공지는 존재를 드러내지 않고 404다.
+     */
+    get: operations["getNotice"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 공지 수정
+     * @description 현재 대상과 변경 후 대상 모두의 권한을 검사한다.
+     */
+    patch: operations["updateNotice"];
+    trace?: never;
+  };
+  "/notices/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 공지 게시·게시 종료
+     * @description 임시 저장→게시 중, 게시 중→게시 종료, 게시 종료→게시 중만 허용한다. 게시할 때 publishedAt을 기록한다. 같은 상태는 현재 값을 돌려준다.
+     */
+    post: operations["changeNoticeStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1419,7 +2383,13 @@ export interface components {
         | "permissions"
         | "customers"
         | "payments"
-        | "passes";
+        | "passes"
+        | "seats"
+        | "seat-sessions"
+        | "tasks"
+        | "facilities"
+        | "inquiries"
+        | "notices";
       entityId: string | null;
       branchId: string | null;
       /** Format: date-time */
@@ -1693,6 +2663,869 @@ export interface components {
     PassPage: {
       items: components["schemas"]["Pass"][];
       meta: components["schemas"]["PageMeta"];
+    };
+    /** @enum {string} */
+    SeatKind: "일반" | "모니터" | "기타";
+    /**
+     * @description 사용 중은 저장 상태가 아니라 활성 이용 기록 유무로 계산한다. 세 상태는 겹치지 않는다.
+     * @enum {string}
+     */
+    SeatStatus: "사용 가능" | "사용 중" | "운영 중단";
+    /** @description 이용 기록·이동 이력에 쓰는 좌석 최소 정보. */
+    SeatRef: {
+      id: components["schemas"]["Id"];
+      zone: string;
+      seatNo: string;
+    };
+    /** @description 사용 중 좌석의 현재 이용. 고객 정보는 최소 정보(M5-D06). */
+    ActiveSessionSummary: {
+      id: components["schemas"]["Id"];
+      customer: components["schemas"]["CustomerSummary"];
+      /** Format: date-time */
+      checkedInAt: string;
+    };
+    /** @description 좌석. 좌표 열은 없으며 배치도는 구역·좌석 번호 순서로 그린다. */
+    Seat: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      branchId: components["schemas"]["Id"];
+      zone: string;
+      seatNo: string;
+      kind: components["schemas"]["SeatKind"];
+      status: components["schemas"]["SeatStatus"];
+      activeSession: components["schemas"]["ActiveSessionSummary"] | null;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    SeatPage: {
+      items: components["schemas"]["Seat"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /**
+     * @description 같은 지점의 좌석 번호는 유일하다(409 DUPLICATE_SEAT_NO).
+     * @example {
+     *       "branchId": "1",
+     *       "zone": "A",
+     *       "seatNo": "A-01",
+     *       "kind": "일반"
+     *     }
+     */
+    SeatCreate: {
+      branchId: components["schemas"]["Id"];
+      zone: string;
+      seatNo: string;
+      /** @enum {string} */
+      kind: "일반" | "모니터" | "기타";
+      /**
+       * @default 사용 가능
+       * @enum {string}
+       */
+      status: "사용 가능" | "운영 중단";
+    };
+    /** @description 누락 필드는 유지한다. status는 받지 않는다(422 IMMUTABLE_FIELD). 운영 상태는 POST /seats/{id}/status. */
+    SeatUpdate: {
+      version: components["schemas"]["Version"];
+      zone?: string;
+      seatNo?: string;
+      /** @enum {string} */
+      kind?: "일반" | "모니터" | "기타";
+    };
+    /** @description 사용 중 좌석의 운영 중단은 409 SEAT_OCCUPIED. 같은 상태 요청은 현재 값을 반환한다. */
+    SeatStatusChange: {
+      version: components["schemas"]["Version"];
+      /** @enum {string} */
+      status: "사용 가능" | "운영 중단";
+      reason: string;
+    };
+    /** @description 한 지점의 같은 기준 시점 좌석 현황. inUse + available + blocked = total. */
+    SeatCounts: {
+      branchId: components["schemas"]["Id"];
+      total: number;
+      inUse: number;
+      available: number;
+      blocked: number;
+      /** @description inUse ÷ total × 100, 소수 첫째 자리 HALF_UP. total이 0이면 null(해당 없음). */
+      occupancyRate: number | null;
+      /** Format: date-time */
+      asOf: string;
+    };
+    /** @description scope 안 지점마다 한 항목. 지점 ID 오름차순. */
+    SeatOccupancy: {
+      items: components["schemas"]["SeatCounts"][];
+    };
+    SeatZone: {
+      zone: string;
+      seats: components["schemas"]["Seat"][];
+    };
+    /** @description 한 지점의 전체 좌석(페이지 없음)을 구역 이름순으로 묶는다. kind 필터를 주면 좌석과 counts 모두 그 유형만 계산한다. */
+    SeatBoard: {
+      counts: components["schemas"]["SeatCounts"];
+      zones: components["schemas"]["SeatZone"][];
+    };
+    /**
+     * @description memberNo 또는 phone 중 정확히 하나. 부분 일치·이름 검색은 없다. 연락처가 URL에 남지 않도록 본문으로 받는다.
+     * @example {
+     *       "branchId": "2",
+     *       "phone": "010-1234-5678"
+     *     }
+     */
+    CheckInLookup: {
+      branchId: components["schemas"]["Id"];
+      memberNo?: string;
+      /** @description 하이픈·공백 제거 후 숫자 9~11자리. */
+      phone?: string;
+    } & (unknown | unknown);
+    /** @description 지금 입실에 쓸 수 있는 이용권(실효 상태 활성, 시간권·정액권은 잔량 > 0). 모든 활성 지점에서 사용 가능(M5-D01). */
+    UsablePass: {
+      id: components["schemas"]["Id"];
+      /** @enum {string} */
+      kind: "시간권" | "기간권" | "정액권";
+      productName: string;
+      remainingMinutes: number | null;
+      remainingCreditKrw: number | null;
+      /** Format: date-time */
+      expiresAt: string | null;
+      purchaseBranchId: components["schemas"]["Id"];
+    };
+    /** @description 입실에 필요한 최소 정보(M5-D05). 연락처·이메일·메모·결제 정보는 담지 않는다. */
+    CheckInCandidate: {
+      customer: components["schemas"]["CustomerSummary"];
+      status: components["schemas"]["CustomerStatus"];
+      activeSession: {
+        id: components["schemas"]["Id"];
+        branchId: components["schemas"]["Id"];
+        /** Format: date-time */
+        checkedInAt: string;
+      } | null;
+      usablePasses: components["schemas"]["UsablePass"][];
+    };
+    CheckInLookupResult: {
+      items: components["schemas"]["CheckInCandidate"][];
+    };
+    /** @description 구매 지점(purchaseBranchId)과 이용 지점(SeatSession.branchId)을 구분한다(FR-SEAT-18). */
+    SeatSessionPass: {
+      id: components["schemas"]["Id"];
+      /** @enum {string} */
+      kind: "시간권" | "기간권" | "정액권";
+      productName: string;
+      purchaseBranchId: components["schemas"]["Id"];
+    };
+    SeatMove: {
+      fromSeat: components["schemas"]["SeatRef"];
+      toSeat: components["schemas"]["SeatRef"];
+      /** Format: date-time */
+      movedAt: string;
+      movedBy: components["schemas"]["ActorSummary"] | null;
+      reason: string | null;
+    };
+    /** @description 좌석 이용 기록. 이용 중이면 사용량 필드가 0이다. 계산 규칙은 seat-usage-api.md "퇴실과 차감". */
+    SeatSession: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      /** @enum {string} */
+      status: "이용 중" | "종료";
+      branchId: components["schemas"]["Id"];
+      seat: components["schemas"]["SeatRef"];
+      customer: components["schemas"]["CustomerSummary"];
+      pass: components["schemas"]["SeatSessionPass"];
+      /** Format: date-time */
+      checkedInAt: string;
+      /** Format: date-time */
+      checkedOutAt: string | null;
+      usedMinutes: number;
+      deductedMinutes: number;
+      deductedKrw: number;
+      overageMinutes: number;
+      overageKrw: number;
+      /** @description 응답 시점 이용권 잔량. 시간권만 값이 있다. */
+      passRemainingMinutes: number | null;
+      /** @description 응답 시점 이용권 잔량. 정액권만 값이 있다. */
+      passRemainingCreditKrw: number | null;
+      checkedInBy: components["schemas"]["ActorSummary"] | null;
+      checkInReason: string | null;
+      /** @description 상세에서만 채우고 목록에서는 빈 배열. */
+      moves: components["schemas"]["SeatMove"][];
+    };
+    SeatSessionPage: {
+      items: components["schemas"]["SeatSession"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /**
+     * @description 직원 예외 입실. 이용권의 소유 고객이 customerId와 다르면 404.
+     * @example {
+     *       "seatId": "31",
+     *       "customerId": "10",
+     *       "passId": "55",
+     *       "reason": "QR 미연동 현장 배정"
+     *     }
+     */
+    CheckIn: {
+      seatId: components["schemas"]["Id"];
+      customerId: components["schemas"]["Id"];
+      passId: components["schemas"]["Id"];
+      reason?: string;
+    };
+    /**
+     * @description 분·금액 필드는 없다. 차감량은 서버가 계산한다(M5-D02·D03).
+     * @example {}
+     */
+    CheckOut: {
+      reason?: string;
+    };
+    /**
+     * @description 같은 지점의 사용 가능한 좌석으로만 이동한다.
+     * @example {
+     *       "toSeatId": "32"
+     *     }
+     */
+    SeatSessionMove: {
+      toSeatId: components["schemas"]["Id"];
+      reason?: string;
+    };
+    /**
+     * @description 증감량이 아니라 조정 후 값을 받는다. 환불 이용권은 409 PASS_REFUNDED.
+     * @example {
+     *       "version": 3,
+     *       "reason": "전산 오류 보정",
+     *       "remainingMinutes": 600
+     *     }
+     */
+    PassAdjustment:
+      | {
+          version: components["schemas"]["Version"];
+          reason: string;
+          /** @description 조정 후 남은 분. 시간권만. */
+          remainingMinutes?: number;
+          /** @description 조정 후 남은 금액. 정액권만. */
+          remainingCreditKrw?: number;
+          /**
+           * Format: date-time
+           * @description 조정 후 만료 시각. 시간권·정액권은 null로 만료 없음 지정. 기간권은 null 불가.
+           */
+          expiresAt?: string | null;
+        }
+      | unknown
+      | unknown
+      | unknown;
+    /** @description 결제 금액은 담지 않는다(NFR-SEC-06). */
+    PassHistoryEvent: {
+      /** Format: date-time */
+      at: string;
+      /** @enum {string} */
+      type: "구매" | "환불" | "이용" | "조정";
+      passId: components["schemas"]["Id"];
+      productName: string;
+      /** @description 원장 증감(분). 기간권 이용은 0, 이용 분은 usedMinutes. */
+      deltaMinutes: number;
+      deltaKrw: number;
+      usedMinutes: number | null;
+      /** @description 사건 지점. 요청자 scope 밖 지점에서의 이용도 지점 ID를 담는다(2026-10-30 결정). 이 경우 reason·actor는 null이다. */
+      branchId: components["schemas"]["Id"];
+      paymentId: components["schemas"]["Id"];
+      seatSessionId: components["schemas"]["Id"];
+      reason: string | null;
+      actor: components["schemas"]["ActorSummary"] | null;
+    };
+    /** @description 기간과 무관한 전체 원장 기준. issued + ledger = remaining(FR-PASS-09). */
+    PassLedgerCheck: {
+      passId: components["schemas"]["Id"];
+      /** @enum {string} */
+      kind: "시간권" | "기간권" | "정액권";
+      productName: string;
+      /** @enum {string} */
+      status: "활성" | "소진" | "만료" | "환불";
+      purchaseBranchId: components["schemas"]["Id"];
+      issuedMinutes: number | null;
+      issuedCreditKrw: number | null;
+      ledgerMinutes: number;
+      ledgerKrw: number;
+      remainingMinutes: number | null;
+      remainingCreditKrw: number | null;
+    };
+    CustomerPassHistory: {
+      customer: components["schemas"]["CustomerSummary"];
+      /** Format: date-time */
+      from: string | null;
+      /** Format: date-time */
+      to: string | null;
+      events: components["schemas"]["PassHistoryEvent"][];
+      passes: components["schemas"]["PassLedgerCheck"][];
+    };
+    /** @enum {string} */
+    TaskStatus: "할 일" | "진행 중" | "완료";
+    /** @enum {string} */
+    TaskPriority: "낮음" | "보통" | "높음" | "긴급";
+    /** @description canEdit은 화면 안내용이며 서버가 다시 검사한다. overdue는 기한이 지났고 완료가 아닌 업무다. */
+    TaskListItem: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      title: string;
+      category: string;
+      priority: components["schemas"]["TaskPriority"];
+      status: components["schemas"]["TaskStatus"];
+      assignee: components["schemas"]["ActorSummary"];
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      dueAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      overdue: boolean;
+      checklistTotal: number;
+      checklistDone: number;
+      canEdit: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    TaskChecklistItem: {
+      id: components["schemas"]["Id"];
+      body: string;
+      done: boolean;
+      sortOrder: number;
+      updatedBy: components["schemas"]["ActorSummary"] | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    Task: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      title: string;
+      category: string;
+      priority: components["schemas"]["TaskPriority"];
+      status: components["schemas"]["TaskStatus"];
+      assignee: components["schemas"]["ActorSummary"];
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      dueAt: string | null;
+      /** Format: date-time */
+      completedAt: string | null;
+      overdue: boolean;
+      checklistTotal: number;
+      checklistDone: number;
+      canEdit: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      body: string | null;
+      checklist: components["schemas"]["TaskChecklistItem"][];
+    };
+    TaskPage: {
+      items: components["schemas"]["TaskListItem"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 등록자는 세션 사용자다. priority 기본 보통, status 기본 할 일. */
+    TaskCreate: {
+      branchId: components["schemas"]["Id"];
+      title: string;
+      body?: string | null;
+      assigneeId: components["schemas"]["Id"];
+      /** Format: date-time */
+      dueAt?: string | null;
+      priority?: components["schemas"]["TaskPriority"];
+      category: string;
+      status?: components["schemas"]["TaskStatus"];
+      checklist?: string[];
+    };
+    /** @description 누락 필드는 유지한다. branchId·status·checklist는 받지 않는다(422 IMMUTABLE_FIELD). */
+    TaskUpdate: {
+      version: components["schemas"]["Version"];
+      title?: string;
+      body?: string | null;
+      assigneeId?: components["schemas"]["Id"];
+      /** Format: date-time */
+      dueAt?: string | null;
+      priority?: components["schemas"]["TaskPriority"];
+      category?: string;
+    };
+    TaskStatusChange: {
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["TaskStatus"];
+    };
+    /** @description version은 업무 version이다. */
+    TaskChecklistItemCreate: {
+      version: components["schemas"]["Version"];
+      body: string;
+    };
+    /** @description version은 업무 version이다. 누락 필드는 유지한다. */
+    TaskChecklistItemUpdate: {
+      version: components["schemas"]["Version"];
+      body?: string;
+      done?: boolean;
+    };
+    TaskEvent: {
+      id: components["schemas"]["Id"];
+      /** @enum {string} */
+      type:
+        | "CREATED"
+        | "CONTENT_CHANGED"
+        | "ASSIGNEE_CHANGED"
+        | "DUE_CHANGED"
+        | "STATUS_CHANGED"
+        | "CHECKLIST_ADDED"
+        | "CHECKLIST_CHANGED"
+        | "CHECKLIST_REMOVED";
+      actor: components["schemas"]["ActorSummary"] | null;
+      before: {
+        [key: string]: unknown;
+      } | null;
+      after: {
+        [key: string]: unknown;
+      } | null;
+      /** Format: date-time */
+      at: string;
+    };
+    TaskEventPage: {
+      items: components["schemas"]["TaskEvent"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    TaskCounts: {
+      total: number;
+      todo: number;
+      inProgress: number;
+      done: number;
+      overdue: number;
+    };
+    TaskBranchCounts: {
+      branchId: components["schemas"]["Id"];
+      total: number;
+      todo: number;
+      inProgress: number;
+      done: number;
+      overdue: number;
+    };
+    /** @description 각 수치는 같은 조건의 GET /tasks에 status 또는 overdue=true를 더한 total과 같다. */
+    TaskSummary: {
+      /** Format: date-time */
+      asOf: string;
+      totals: components["schemas"]["TaskCounts"];
+      branches: components["schemas"]["TaskBranchCounts"][];
+    };
+    AssigneeCandidateList: {
+      items: components["schemas"]["ActorSummary"][];
+    };
+    /** @enum {string} */
+    ChannelKind: "전체" | "지점";
+    /** @description DM은 이 계약의 범위가 아니다. 참여하지 않은 관리자에게 unreadCount는 0, lastMessageAt·lastReadMessageId는 null이다. */
+    Channel: {
+      id: components["schemas"]["Id"];
+      kind: components["schemas"]["ChannelKind"];
+      branchId: components["schemas"]["Id"] | null;
+      name: string;
+      description: string | null;
+      memberCount: number;
+      joined: boolean;
+      unreadCount: number;
+      lastReadMessageId: components["schemas"]["Id"] | null;
+      /** Format: date-time */
+      lastMessageAt: string | null;
+      canManage: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    ChannelList: {
+      items: components["schemas"]["Channel"][];
+    };
+    ChannelPage: {
+      items: components["schemas"]["Channel"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description kind=지점이면 branchId 필수, kind=전체면 branchId를 보낼 수 없다. 생성자는 자동으로 참여한다. */
+    ChannelCreate: {
+      kind: components["schemas"]["ChannelKind"];
+      branchId?: components["schemas"]["Id"] | null;
+      name: string;
+      description?: string | null;
+      memberIds: components["schemas"]["Id"][];
+    };
+    /** @description kind·branchId는 받지 않는다(422 IMMUTABLE_FIELD). */
+    ChannelUpdate: {
+      version: components["schemas"]["Version"];
+      name?: string;
+      description?: string | null;
+    };
+    ChannelMember: {
+      employee: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      joinedAt: string;
+    };
+    ChannelMemberList: {
+      items: components["schemas"]["ChannelMember"][];
+    };
+    /** @description 최종 참여자 전체를 보낸다. 빠진 직원은 참여가 종료되고 다시 넣으면 재참여한다. */
+    ChannelMembersReplace: {
+      version: components["schemas"]["Version"];
+      employeeIds: components["schemas"]["Id"][];
+    };
+    ChannelRead: {
+      messageId: components["schemas"]["Id"];
+    };
+    ChannelReadResult: {
+      lastReadMessageId: components["schemas"]["Id"] | null;
+      /** Format: date-time */
+      lastReadAt: string | null;
+      unreadCount: number;
+    };
+    /** @description 현재 업무 원본에서 조회한다. accessible=false면 나머지 필드는 모두 null이다. */
+    TaskCard: {
+      accessible: boolean;
+      taskId: components["schemas"]["Id"] | null;
+      branchId: components["schemas"]["Id"] | null;
+      title: string | null;
+      status: components["schemas"]["TaskStatus"] | null;
+      priority: components["schemas"]["TaskPriority"] | null;
+      assignee: components["schemas"]["ActorSummary"] | null;
+      /** Format: date-time */
+      dueAt: string | null;
+    };
+    /** @description body는 일반 텍스트다. 화면은 HTML로 해석하지 않는다. */
+    Message: {
+      id: components["schemas"]["Id"];
+      channelId: components["schemas"]["Id"];
+      sender: components["schemas"]["ActorSummary"];
+      parentId: components["schemas"]["Id"] | null;
+      /** @enum {string} */
+      kind: "텍스트" | "업무 카드";
+      body: string | null;
+      task: components["schemas"]["TaskCard"] | null;
+      clientMessageKey: string;
+      replyCount: number;
+      /** Format: date-time */
+      sentAt: string;
+    };
+    /** @description items는 오래된 메시지부터 최신 순서다. 더 과거를 읽으려면 nextCursor를 before로 보낸다. hasMore=false면 nextCursor는 null이다. */
+    MessageFeed: {
+      items: components["schemas"]["Message"][];
+      hasMore: boolean;
+      nextCursor: string | null;
+    };
+    /** @description text는 trim 후 공백만 남으면 422다. */
+    MessageCreate: {
+      clientMessageKey: string;
+      text: string;
+      parentId?: components["schemas"]["Id"] | null;
+    };
+    TaskCardCreate: {
+      clientMessageKey: string;
+      taskId: components["schemas"]["Id"];
+      text?: string;
+      parentId?: components["schemas"]["Id"] | null;
+    };
+    /** @enum {string} */
+    FacilityStatus: "정상" | "점검 필요" | "고장" | "사용 중지";
+    /** @enum {string} */
+    FacilityWorkStatus: "대기" | "진행 중";
+    FacilityType: {
+      id: components["schemas"]["Id"];
+      name: string;
+      defaultInspectionDays: number;
+    };
+    FacilityTypeList: {
+      items: components["schemas"]["FacilityType"][];
+    };
+    FacilityTypeCreate: {
+      name: string;
+      defaultInspectionDays: number;
+    };
+    /** @description 시설마다 하나뿐인 열린 점검 작업(M7-D03). 담당자와 처리 상태의 원천이다. */
+    FacilityOpenWork: {
+      id: components["schemas"]["Id"];
+      status: components["schemas"]["FacilityWorkStatus"];
+      assignee: components["schemas"]["ActorSummary"] | null;
+      /** Format: date-time */
+      openedAt: string;
+    };
+    FacilityLastInspection: {
+      /** Format: date */
+      completedOn: string;
+      result: string;
+      completedBy: components["schemas"]["ActorSummary"] | null;
+    };
+    /** @description status는 시설 상태, openWork.status는 처리 상태로 서로 별개다. */
+    FacilityListItem: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      type: components["schemas"]["FacilityType"];
+      name: string;
+      location: string | null;
+      status: components["schemas"]["FacilityStatus"];
+      inspectionIntervalDays: number;
+      /** Format: date */
+      lastInspectedOn: string | null;
+      /** Format: date */
+      nextInspectionOn: string;
+      inspectionDue: boolean;
+      openWork: components["schemas"]["FacilityOpenWork"];
+      canEdit: boolean;
+      canComplete: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    Facility: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      type: components["schemas"]["FacilityType"];
+      name: string;
+      location: string | null;
+      status: components["schemas"]["FacilityStatus"];
+      inspectionIntervalDays: number;
+      /** Format: date */
+      lastInspectedOn: string | null;
+      /** Format: date */
+      nextInspectionOn: string;
+      inspectionDue: boolean;
+      openWork: components["schemas"]["FacilityOpenWork"];
+      canEdit: boolean;
+      canComplete: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      description: string | null;
+      lastInspection: components["schemas"]["FacilityLastInspection"] | null;
+    };
+    FacilityPage: {
+      items: components["schemas"]["FacilityListItem"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description inspectionIntervalDays 기본은 유형의 defaultInspectionDays, status 기본은 정상이다. lastInspectionResult는 lastInspectedOn이 있을 때만 받는다. */
+    FacilityCreate: {
+      branchId: components["schemas"]["Id"];
+      typeId: components["schemas"]["Id"];
+      name: string;
+      location?: string | null;
+      description?: string | null;
+      assigneeId?: components["schemas"]["Id"] | null;
+      inspectionIntervalDays?: number;
+      /** Format: date */
+      lastInspectedOn?: string | null;
+      lastInspectionResult?: string | null;
+      status?: components["schemas"]["FacilityStatus"];
+    };
+    /** @description 누락 필드는 유지한다. branchId·lastInspectedOn은 받지 않는다(422 IMMUTABLE_FIELD). */
+    FacilityUpdate: {
+      version: components["schemas"]["Version"];
+      typeId?: components["schemas"]["Id"];
+      name?: string;
+      location?: string | null;
+      description?: string | null;
+      inspectionIntervalDays?: number;
+      status?: components["schemas"]["FacilityStatus"];
+      assigneeId?: components["schemas"]["Id"] | null;
+      workStatus?: components["schemas"]["FacilityWorkStatus"];
+    };
+    FacilityInspectionComplete: {
+      version: components["schemas"]["Version"];
+      result: string;
+      /** Format: date */
+      completedOn: string;
+      facilityStatus: components["schemas"]["FacilityStatus"];
+    };
+    FacilityCounts: {
+      total: number;
+      normal: number;
+      checkNeeded: number;
+      broken: number;
+      outOfService: number;
+      inspectionDue: number;
+    };
+    FacilityBranchCounts: {
+      branchId: components["schemas"]["Id"];
+      total: number;
+      normal: number;
+      checkNeeded: number;
+      broken: number;
+      outOfService: number;
+      inspectionDue: number;
+    };
+    /** @description 각 수치는 같은 조건의 GET /facilities에 status 또는 inspectionDue=true를 더한 total과 같다. */
+    FacilitySummary: {
+      /** Format: date-time */
+      asOf: string;
+      totals: components["schemas"]["FacilityCounts"];
+      branches: components["schemas"]["FacilityBranchCounts"][];
+    };
+    /** @enum {string} */
+    InquiryStatus: "접수" | "처리 중" | "답변 완료";
+    /** @enum {string} */
+    InquirySource: "방문" | "전화" | "기타";
+    InquiryListItem: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      customer: components["schemas"]["CustomerSummary"];
+      subject: string;
+      source: components["schemas"]["InquirySource"];
+      status: components["schemas"]["InquiryStatus"];
+      assignee: components["schemas"]["ActorSummary"] | null;
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      answeredAt: string | null;
+      canChangeAssignee: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    Inquiry: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      customer: components["schemas"]["CustomerSummary"];
+      subject: string;
+      source: components["schemas"]["InquirySource"];
+      status: components["schemas"]["InquiryStatus"];
+      assignee: components["schemas"]["ActorSummary"] | null;
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      answeredAt: string | null;
+      canChangeAssignee: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      body: string;
+      answer: string | null;
+      answeredBy: components["schemas"]["ActorSummary"] | null;
+    };
+    InquiryPage: {
+      items: components["schemas"]["InquiryListItem"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 등록자는 세션 사용자다. status 기본은 접수다. */
+    InquiryCreate: {
+      branchId: components["schemas"]["Id"];
+      customerId: components["schemas"]["Id"];
+      subject: string;
+      body: string;
+      source: components["schemas"]["InquirySource"];
+      assigneeId?: components["schemas"]["Id"] | null;
+      /** @enum {string} */
+      status?: "접수" | "처리 중";
+    };
+    InquiryAssigneeChange: {
+      version: components["schemas"]["Version"];
+      assigneeId: components["schemas"]["Id"] | null;
+    };
+    InquiryAnswer: {
+      version: components["schemas"]["Version"];
+      answer: string;
+    };
+    /** @description 답변 완료는 POST /inquiries/{id}/answer로만 된다. */
+    InquiryStatusChange: {
+      version: components["schemas"]["Version"];
+      /** @enum {string} */
+      status: "접수" | "처리 중";
+    };
+    InquiryEvent: {
+      id: components["schemas"]["Id"];
+      actor: components["schemas"]["ActorSummary"];
+      oldStatus: components["schemas"]["InquiryStatus"] | null;
+      newStatus: components["schemas"]["InquiryStatus"];
+      message: string | null;
+      /** Format: date-time */
+      at: string;
+    };
+    InquiryEventPage: {
+      items: components["schemas"]["InquiryEvent"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    InquiryCounts: {
+      total: number;
+      received: number;
+      inProgress: number;
+      answered: number;
+      unresolved: number;
+    };
+    InquiryBranchCounts: {
+      branchId: components["schemas"]["Id"];
+      total: number;
+      received: number;
+      inProgress: number;
+      answered: number;
+      unresolved: number;
+    };
+    /** @description unresolved는 접수 + 처리 중이다. 각 수치는 같은 조건의 GET /inquiries에 status를 더한 total과 같다. */
+    InquirySummary: {
+      /** Format: date-time */
+      asOf: string;
+      totals: components["schemas"]["InquiryCounts"];
+      branches: components["schemas"]["InquiryBranchCounts"][];
+    };
+    /** @enum {string} */
+    NoticeStatus: "임시 저장" | "게시 중" | "게시 종료";
+    /** @enum {string} */
+    NoticeTarget: "전체" | "선택 지점";
+    /** @description branchIds는 요청자에게 보이는 지점만 담는다. target=전체면 빈 배열이다. */
+    NoticeListItem: {
+      id: components["schemas"]["Id"];
+      title: string;
+      author: components["schemas"]["ActorSummary"];
+      target: components["schemas"]["NoticeTarget"];
+      branchIds: components["schemas"]["Id"][];
+      status: components["schemas"]["NoticeStatus"];
+      pinned: boolean;
+      /** Format: date-time */
+      publishedAt: string | null;
+      canEdit: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    Notice: {
+      id: components["schemas"]["Id"];
+      title: string;
+      author: components["schemas"]["ActorSummary"];
+      target: components["schemas"]["NoticeTarget"];
+      branchIds: components["schemas"]["Id"][];
+      status: components["schemas"]["NoticeStatus"];
+      pinned: boolean;
+      /** Format: date-time */
+      publishedAt: string | null;
+      canEdit: boolean;
+      version: components["schemas"]["Version"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      body: string;
+    };
+    NoticePage: {
+      items: components["schemas"]["NoticeListItem"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description target=선택 지점이면 branchIds 1개 이상 필수, target=전체면 branchIds를 보낼 수 없다. status 기본은 임시 저장이다. */
+    NoticeCreate: {
+      title: string;
+      body: string;
+      target: components["schemas"]["NoticeTarget"];
+      branchIds?: components["schemas"]["Id"][];
+      pinned?: boolean;
+      /** @enum {string} */
+      status?: "임시 저장" | "게시 중";
+    };
+    /** @description 누락 필드는 유지한다. status는 받지 않는다(422 IMMUTABLE_FIELD). */
+    NoticeUpdate: {
+      version: components["schemas"]["Version"];
+      title?: string;
+      body?: string;
+      target?: components["schemas"]["NoticeTarget"];
+      branchIds?: components["schemas"]["Id"][];
+      pinned?: boolean;
+    };
+    NoticeStatusChange: {
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["NoticeStatus"];
     };
   };
   responses: {
@@ -3768,6 +5601,2401 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Pass"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listSeats: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        zone?: string;
+        kind?: "일반" | "모니터" | "기타";
+        status?: components["schemas"]["SeatStatus"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createSeat: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SeatCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Seat"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getSeatBoard: {
+    parameters: {
+      query: {
+        branchId: components["schemas"]["Id"];
+        kind?: "일반" | "모니터" | "기타";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatBoard"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getSeatOccupancy: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatOccupancy"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getSeat: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Seat"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateSeat: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SeatUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Seat"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeSeatStatus: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SeatStatusChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Seat"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  lookupCheckInCustomer: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckInLookup"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckInLookupResult"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listSeatSessions: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+        /** @description 기본 checkedInAt. 같으면 id 순. */
+        sort?: "checkedInAt";
+        status?: "이용 중" | "종료";
+        /** @description 입실(내역은 사건) 시각 하한, 포함. */
+        from?: string;
+        /** @description 상한, 미포함. from < to. */
+        to?: string;
+        seatId?: components["schemas"]["Id"];
+        customerId?: components["schemas"]["Id"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatSessionPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  checkIn: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckIn"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatSession"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getSeatSession: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatSession"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  checkOut: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckOut"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatSession"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  moveSeatSession: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SeatSessionMove"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatSession"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  adjustPass: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PassAdjustment"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Pass"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getCustomerPassHistory: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        /** @description 입실(내역은 사건) 시각 하한, 포함. */
+        from?: string;
+        /** @description 상한, 미포함. from < to. */
+        to?: string;
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CustomerPassHistory"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listTasks: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        assigneeId?: components["schemas"]["Id"];
+        /** @description true면 담당자가 요청자인 업무 */
+        mine?: boolean;
+        /** @description dueAt ≥ dueFrom. 기한 없는 업무는 제외 */
+        dueFrom?: string;
+        /** @description dueAt < dueTo. 기한 없는 업무는 제외 */
+        dueTo?: string;
+        /** @description true면 기한이 지났고 완료가 아닌 업무 */
+        overdue?: boolean;
+        status?: components["schemas"]["TaskStatus"];
+        sort?: "dueAt" | "priority" | "createdAt" | "updatedAt";
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TaskPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createTask: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TaskCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Task"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getTaskSummary: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        assigneeId?: components["schemas"]["Id"];
+        /** @description true면 담당자가 요청자인 업무 */
+        mine?: boolean;
+        /** @description dueAt ≥ dueFrom. 기한 없는 업무는 제외 */
+        dueFrom?: string;
+        /** @description dueAt < dueTo. 기한 없는 업무는 제외 */
+        dueTo?: string;
+        /** @description true면 기한이 지났고 완료가 아닌 업무 */
+        overdue?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TaskSummary"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getTask: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Task"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateTask: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TaskUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Task"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeTaskStatus: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TaskStatusChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Task"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listTaskEvents: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TaskEventPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  addTaskChecklistItem: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TaskChecklistItemCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Task"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  deleteTaskChecklistItem: {
+    parameters: {
+      query: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        version: components["schemas"]["Version"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+        itemId: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Task"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateTaskChecklistItem: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+        itemId: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TaskChecklistItemUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Task"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listAssigneeCandidates: {
+    parameters: {
+      query: {
+        branchId: components["schemas"]["Id"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AssigneeCandidateList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listMyChannels: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ChannelList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createChannel: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChannelCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Channel"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listManageableChannels: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ChannelPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listChannelMemberCandidates: {
+    parameters: {
+      query?: {
+        branchId?: components["schemas"]["Id"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AssigneeCandidateList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getChannel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Channel"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateChannel: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChannelUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Channel"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listChannelMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ChannelMemberList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  replaceChannelMembers: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChannelMembersReplace"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ChannelMemberList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  markChannelRead: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChannelRead"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ChannelReadResult"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listChannelMessages: {
+    parameters: {
+      query?: {
+        /** @description 이전 응답의 nextCursor. 이 메시지보다 오래된 메시지만 반환 */
+        before?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MessageFeed"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  sendChannelMessage: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MessageCreate"];
+      };
+    };
+    responses: {
+      /** @description 같은 clientMessageKey·같은 입력의 재전송. 새 메시지 없이 원래 메시지를 돌려준다. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Message"];
+        };
+      };
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Message"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  shareTaskCard: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TaskCardCreate"];
+      };
+    };
+    responses: {
+      /** @description 같은 clientMessageKey·같은 입력의 재전송. 새 메시지 없이 원래 메시지를 돌려준다. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Message"];
+        };
+      };
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Message"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getChannelMessage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+        messageId: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Message"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listMessageReplies: {
+    parameters: {
+      query?: {
+        /** @description 이전 응답의 nextCursor. 이 메시지보다 오래된 메시지만 반환 */
+        before?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+        messageId: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MessageFeed"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listFacilityTypes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FacilityTypeList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createFacilityType: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FacilityTypeCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FacilityType"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listFacilities: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        typeId?: components["schemas"]["Id"];
+        assigneeId?: components["schemas"]["Id"];
+        workStatus?: components["schemas"]["FacilityWorkStatus"];
+        /** @description true면 점검 대상. 다음 점검일 ≤ 오늘(Asia/Seoul)이고 사용 중지가 아닌 시설 */
+        inspectionDue?: boolean;
+        status?: components["schemas"]["FacilityStatus"];
+        sort?: "nextInspectionOn" | "name" | "createdAt";
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FacilityPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createFacility: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FacilityCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Facility"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getFacilitySummary: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        typeId?: components["schemas"]["Id"];
+        assigneeId?: components["schemas"]["Id"];
+        workStatus?: components["schemas"]["FacilityWorkStatus"];
+        /** @description true면 점검 대상. 다음 점검일 ≤ 오늘(Asia/Seoul)이고 사용 중지가 아닌 시설 */
+        inspectionDue?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FacilitySummary"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getFacility: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Facility"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateFacility: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FacilityUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Facility"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  completeFacilityInspection: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FacilityInspectionComplete"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Facility"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listInquiries: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        assigneeId?: components["schemas"]["Id"];
+        customerId?: components["schemas"]["Id"];
+        status?: components["schemas"]["InquiryStatus"];
+        sort?: "createdAt" | "updatedAt";
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InquiryPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createInquiry: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InquiryCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Inquiry"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getInquirySummary: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        assigneeId?: components["schemas"]["Id"];
+        customerId?: components["schemas"]["Id"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InquirySummary"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getInquiry: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Inquiry"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listInquiryEvents: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InquiryEventPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeInquiryAssignee: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InquiryAssigneeChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Inquiry"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  answerInquiry: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InquiryAnswer"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Inquiry"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeInquiryStatus: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InquiryStatusChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Inquiry"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listNotices: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 허용한 name/code/email만 검색. SQL/필드명 직접 입력 아님. */
+        q?: components["parameters"]["Q"];
+        status?: components["schemas"]["NoticeStatus"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["NoticePage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createNotice: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NoticeCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Notice"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getNotice: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Notice"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateNotice: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NoticeUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Notice"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeNoticeStatus: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NoticeStatusChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Notice"];
         };
       };
       401: components["responses"]["Error401"];

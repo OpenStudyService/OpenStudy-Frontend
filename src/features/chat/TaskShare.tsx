@@ -11,7 +11,7 @@ export function TaskShare({
   task,
   onSaved,
 }: {
-  task: Task;
+  task: Pick<Task, "id">;
   onSaved: () => void;
 }) {
   const { session, scope } = useApp(),

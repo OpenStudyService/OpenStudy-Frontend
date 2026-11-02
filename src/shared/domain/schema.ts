@@ -84,17 +84,52 @@ export const schemas = {
   }),
   employees: person,
   tasks: base.extend({
-    // Demo metadata; the canonical collaboration DTO is not defined yet.
+    // Legacy demo ledger metadata; canonical task DTOs live in features/tasks.
     createdById: z.string().optional(),
     title: str.max(120),
     body: str,
     assigneeId: str,
     due: str,
-    priority: z.enum(["높음", "보통", "낮음"]),
+    priority: z.enum(["긴급", "높음", "보통", "낮음"]),
     category: str,
     status: z.enum(["할 일", "진행 중", "완료"]),
     checks: z.array(z.object({ text: str, done: z.boolean() })),
     history: z.array(z.object({ at: str, actorId: str, text: str })),
+    // Canonical demo metadata shares the task ledger; content remains in checks.
+    collaboration: z
+      .object({
+        completedAt: z.string().nullable(),
+        checklist: z.array(
+          z.object({
+            id: z.string(),
+            sortOrder: z.number(),
+            updatedAt: z.string(),
+            updatedBy: z
+              .object({ id: z.string(), name: z.string() })
+              .nullable(),
+          }),
+        ),
+        events: z.array(
+          z.object({
+            id: z.string(),
+            type: z.enum([
+              "CREATED",
+              "CONTENT_CHANGED",
+              "ASSIGNEE_CHANGED",
+              "DUE_CHANGED",
+              "STATUS_CHANGED",
+              "CHECKLIST_ADDED",
+              "CHECKLIST_CHANGED",
+              "CHECKLIST_REMOVED",
+            ]),
+            actor: z.object({ id: z.string(), name: z.string() }).nullable(),
+            before: z.record(z.string(), z.unknown()).nullable(),
+            after: z.record(z.string(), z.unknown()).nullable(),
+            at: z.string(),
+          }),
+        ),
+      })
+      .optional(),
   }),
   members: base.extend({
     name: str,
