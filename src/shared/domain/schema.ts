@@ -365,6 +365,7 @@ export const schemas = {
     employeeId: z.string(),
   }),
   channels: base.extend({
+    formerParticipantIds: z.array(z.string()).optional(),
     name: str,
     description: z.string(),
     kind: z.enum(["channel", "dm"]),

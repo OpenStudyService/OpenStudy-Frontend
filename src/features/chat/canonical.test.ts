@@ -22,6 +22,8 @@ const message = {
   task: null,
   clientMessageKey: "message-key",
   replyCount: 2,
+  threadUnreadCount: 2,
+  threadLastReadMessageId: null,
   sentAt: at,
 };
 const channel = {
@@ -33,6 +35,8 @@ const channel = {
   memberCount: 1,
   joined: true,
   unreadCount: 4,
+  mainUnreadCount: 2,
+  replyUnreadCount: 2,
   lastReadMessageId: "9007199254740992",
   lastMessageAt: at,
   canManage: true,
@@ -43,6 +47,79 @@ const members = {
   items: [{ employee: { id: "2", name: "발신자" }, joinedAt: at }],
 };
 beforeEach(() => request.mockReset());
+const receipt = {
+  lastReadMessageId: "9007199254740995",
+  lastReadAt: at,
+  unreadCount: 3,
+  mainUnreadCount: 1,
+  replyUnreadCount: 2,
+};
+it("sends an exact bigint root ID without an idempotency key and accepts a later comparison-only position", async () => {
+  request.mockResolvedValue(receipt);
+  await canonicalChatApi.read("1", "", "9007199254740993", signal);
+  expect(request).toHaveBeenCalledWith("/channels/1/read", {
+    method: "POST",
+    body: { messageId: "9007199254740993" },
+    signal,
+  });
+});
+it("addresses only the opened thread and sends its replyId", async () => {
+  request.mockResolvedValue({
+    ...receipt,
+    messageId: "9",
+    threadUnreadCount: 1,
+  });
+  await canonicalChatApi.read("1", "9", "9007199254740994", signal);
+  expect(request).toHaveBeenCalledWith("/channels/1/messages/9/read", {
+    method: "POST",
+    body: { replyId: "9007199254740994" },
+    signal,
+  });
+});
+it.each([
+  { ...receipt, unreadCount: 99, messageId: "9", threadUnreadCount: 1 },
+  { ...receipt, messageId: "8", threadUnreadCount: 1 },
+  { ...receipt, messageId: "9", threadUnreadCount: 3 },
+  { ...receipt, messageId: "9" },
+  {
+    ...receipt,
+    lastReadMessageId: "9007199254740992",
+    messageId: "9",
+    threadUnreadCount: 1,
+  },
+])(
+  "rejects malformed, mismatched or regressing thread receipts",
+  async (value) => {
+    request.mockResolvedValue(value);
+    await expect(
+      canonicalChatApi.read("1", "9", "9007199254740993", signal),
+    ).rejects.toMatchObject({ detail: { code: "INVALID_RESPONSE" } });
+  },
+);
+it("requires split channel counts instead of defaulting a partial old contract to zero", async () => {
+  request.mockResolvedValue({
+    items: [{ ...channel, mainUnreadCount: undefined }],
+  });
+  await expect(canonicalChatApi.channels("all", signal)).rejects.toThrow();
+  request.mockResolvedValue({ items: [{ ...channel, unreadCount: 7 }] });
+  await expect(canonicalChatApi.channels("all", signal)).rejects.toThrow();
+});
+it("requires null thread fields on replies and preserves a baseline from another thread as an opaque position", async () => {
+  request.mockResolvedValue({
+    ...message,
+    threadLastReadMessageId: "9007199254741999",
+  });
+  expect(
+    canonicalMessage(await canonicalChatApi.parent("1", message.id, signal))
+      ?.threadLastReadMessageId,
+  ).toBe("9007199254741999");
+  request.mockResolvedValue({
+    items: [{ ...message, parentId: "9" }],
+    hasMore: false,
+    nextCursor: null,
+  });
+  await expect(canonicalChatApi.messages("1", "9", signal)).rejects.toThrow();
+});
 it("maps canonical feed without precision loss and retains sender/reply metadata and plaintext", async () => {
   request.mockResolvedValue({
     items: [message],
@@ -65,7 +142,14 @@ it("maps canonical feed without precision loss and retains sender/reply metadata
 });
 it("routes thread pages and uses exact opaque before IDs", async () => {
   request.mockResolvedValue({
-    items: [{ ...message, parentId: "9" }],
+    items: [
+      {
+        ...message,
+        parentId: "9",
+        threadUnreadCount: null,
+        threadLastReadMessageId: null,
+      },
+    ],
     hasMore: true,
     nextCursor: message.id,
   });

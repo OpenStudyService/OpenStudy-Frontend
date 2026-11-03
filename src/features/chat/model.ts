@@ -30,11 +30,47 @@ export function reconcileChannels(db: Database, now: string) {
       return person && canJoinChannel(person, channel.branchId);
     });
     if (eligible.length !== channel.participantIds.length) {
+      channel.formerParticipantIds = [
+        ...new Set([
+          ...(channel.formerParticipantIds ?? []),
+          ...channel.participantIds.filter((id) => !eligible.includes(id)),
+        ]),
+      ];
       channel.participantIds = eligible;
       channel.version++;
       channel.updatedAt = now;
     }
   }
+}
+/** M7-D09: only a returning member starts at the latest channel position. */
+export function participationReads(
+  channel: ResourceMap["channels"],
+  ids: string[],
+  messages: Message[],
+) {
+  const former = new Set([
+    ...(channel.formerParticipantIds ?? []),
+    ...channel.participantIds.filter((id) => !ids.includes(id)),
+  ]);
+  const reads = { ...channel.reads };
+  const rows = messages.filter((m) => m.channelId === channel.id);
+  const latest = Math.max(0, ...rows.map((m) => m.sequence));
+  for (const userId of ids) {
+    if (
+      !channel.participantIds.includes(userId) &&
+      former.has(userId) &&
+      latest
+    ) {
+      for (const parentId of [
+        "",
+        ...rows.filter((m) => !m.parentId).map((m) => m.id),
+      ]) {
+        const key = readKey(userId, parentId);
+        reads[key] = Math.max(reads[key] ?? 0, latest);
+      }
+    }
+  }
+  return { formerParticipantIds: [...former], reads };
 }
 export const readKey = (userId: string, parentId = "") =>
   parentId ? JSON.stringify([userId, parentId]) : userId;

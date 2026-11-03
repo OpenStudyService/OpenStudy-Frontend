@@ -10,6 +10,64 @@ vi.mock("../../app/context", () => ({
 }));
 vi.mock("./api", () => ({ chatApi: { messages: vi.fn(), parent: vi.fn() } }));
 const clients: QueryClient[] = [];
+
+it.each([0, 2])(
+  "refreshes an old loaded root's thread state even if it previously had %i replies",
+  async (replyCount) => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    clients.push(client);
+    const root = {
+      id: "1",
+      canonicalId: "1",
+      sequence: 0,
+      channelId: "5",
+      parentId: "",
+      replyCount,
+      threadUnreadCount: replyCount,
+      threadLastReadMessageId: null,
+    } as CanonicalMessage;
+    const latest = { id: "99", sequence: 0 } as Message;
+    const key = [
+      "data",
+      "viewer",
+      "1",
+      "chat",
+      "channel",
+      "5",
+      "feed",
+      "main",
+      "",
+    ];
+    client.setQueryData(key, { items: [root, latest] });
+    vi.mocked(chatApi.messages).mockResolvedValue({ items: [latest] });
+    const readRoot: CanonicalMessage = {
+      ...root,
+      replyCount: 3,
+      threadUnreadCount: 1,
+      threadLastReadMessageId: "88",
+    };
+    vi.mocked(chatApi.parent).mockResolvedValue(readRoot);
+    const view = renderHook(() => useChatFeed("5", "", true), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() => expect(view.result.current.isFetching).toBe(false));
+    expect(chatApi.parent).toHaveBeenCalledWith(
+      "1",
+      "1",
+      expect.any(AbortSignal),
+      "5",
+    );
+    expect(view.result.current.messages[0]).toMatchObject({
+      replyCount: 3,
+      threadUnreadCount: 1,
+      threadLastReadMessageId: "88",
+    });
+  },
+);
 afterEach(() => {
   cleanup();
   clients.forEach((client) => client.clear());

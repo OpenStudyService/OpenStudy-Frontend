@@ -1281,7 +1281,7 @@ export interface paths {
     };
     /**
      * 내 참여 채널
-     * @description 요청자가 참여 중인 전체 채널과 scope 지점 채널을 읽지 않은 수와 함께 반환한다. 페이지가 없다.
+     * @description 요청자가 참여 중인 전체 채널과 scope 지점 채널을 읽지 않은 수와 함께 반환한다. unreadCount는 원문과 모든 스레드 답글의 합계다. 페이지가 없다.
      */
     get: operations["listMyChannels"];
     put?: never;
@@ -1374,7 +1374,7 @@ export interface paths {
     get: operations["listChannelMembers"];
     /**
      * 채널 참여자 변경
-     * @description 최종 참여자 전체로 바꾼다. 빠진 직원은 즉시 접근이 끝난다.
+     * @description 최종 참여자 전체로 바꾼다. 빠진 직원은 즉시 접근이 끝난다. 참여 종료 후 다시 넣은 직원은 그 시점의 채널 최신 메시지까지 본문·모든 스레드를 읽은 상태가 되고 이전 메시지를 다시 볼 수 있다. 채널에 메시지가 없으면 위치는 그대로다.
      */
     put: operations["replaceChannelMembers"];
     post?: never;
@@ -1394,8 +1394,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * 읽음 위치 갱신
-     * @description 요청자의 해당 채널 읽음 위치만 앞으로 옮긴다. 현재 위치보다 앞선 값은 위치를 바꾸지 않고 현재 값을 돌려준다.
+     * 본문 읽음 위치 갱신
+     * @description 요청자의 본문 위치를 앞으로 옮긴다. messageId는 같은 채널의 원문이어야 하고 답글이면 422 INVALID_READ_TARGET이다. 현재 위치 이하면 위치를 바꾸지 않고 현재 값을 돌려준다. 스레드 위치는 바뀌지 않으므로 열지 않은 답글은 미확인으로 남는다.
      */
     post: operations["markChannelRead"];
     delete?: never;
@@ -1482,6 +1482,26 @@ export interface paths {
     get: operations["listMessageReplies"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/channels/{id}/messages/{messageId}/read": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 스레드 읽음 위치 갱신
+     * @description 요청자의 원문별 스레드 위치를 앞으로 옮긴다. 본문 위치와 다른 스레드는 바뀌지 않는다. 현재 위치 이하면 위치를 바꾸지 않고 현재 값을 돌려준다. 비참여자·참여 종료·다른 채널의 원문이나 답글·없는 ID는 404다. 같은 채널이지만 경로가 답글이거나 replyId가 그 원문의 답글이 아니면 422 INVALID_READ_TARGET이다.
+     */
+    post: operations["markThreadRead"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3540,7 +3560,7 @@ export interface components {
     };
     /** @enum {string} */
     ChannelKind: "전체" | "지점";
-    /** @description DM은 이 계약의 범위가 아니다. 참여하지 않은 관리자에게 unreadCount는 0, lastMessageAt·lastReadMessageId는 null이다. */
+    /** @description DM은 이 목록의 대상이 아니다. 참여하지 않은 관리자에게 세 읽지 않은 수는 0, lastMessageAt·lastReadMessageId는 null이다. */
     Channel: {
       id: components["schemas"]["Id"];
       kind: components["schemas"]["ChannelKind"];
@@ -3549,7 +3569,13 @@ export interface components {
       description: string | null;
       memberCount: number;
       joined: boolean;
+      /** @description mainUnreadCount + replyUnreadCount. */
       unreadCount: number;
+      /** @description 위치 뒤의 읽지 않은 원문 수. 본인 메시지 제외. */
+      mainUnreadCount: number;
+      /** @description 모든 스레드의 읽지 않은 답글 합계. 본인 메시지 제외. */
+      replyUnreadCount: number;
+      /** @description 본문 위치. ID 비교 전용이다. 전환 전 값과 재참여로 정해진 값은 답글 ID일 수 있다. */
       lastReadMessageId: components["schemas"]["Id"] | null;
       /** Format: date-time */
       lastMessageAt: string | null;
@@ -3592,6 +3618,7 @@ export interface components {
       version: components["schemas"]["Version"];
       employeeIds: components["schemas"]["Id"][];
     };
+    /** @description 본문 읽음 위치. messageId는 같은 채널의 원문이다. 답글이면 422 INVALID_READ_TARGET이다. */
     ChannelRead: {
       messageId: components["schemas"]["Id"];
     };
@@ -3599,7 +3626,35 @@ export interface components {
       lastReadMessageId: components["schemas"]["Id"] | null;
       /** Format: date-time */
       lastReadAt: string | null;
+      /** @description mainUnreadCount + replyUnreadCount. */
       unreadCount: number;
+      /** @description 위치 뒤의 읽지 않은 원문 수. 본인 메시지 제외. */
+      mainUnreadCount: number;
+      /** @description 모든 스레드의 읽지 않은 답글 합계. 본인 메시지 제외. */
+      replyUnreadCount: number;
+    };
+    /** @description 스레드 읽음 위치. replyId는 경로의 원문에 달린 답글이다. */
+    ThreadRead: {
+      replyId: components["schemas"]["Id"];
+    };
+    ThreadReadResult: {
+      /** @description 스레드의 원문. */
+      messageId: components["schemas"]["Id"];
+      /** @description 이 스레드의 답글이 비교되는 위치. 원문의 threadLastReadMessageId와 같은 값이다. */
+      lastReadMessageId: components["schemas"]["Id"] | null;
+      /**
+       * Format: date-time
+       * @description 스레드 위치를 마지막으로 옮긴 시각. 기준 위치만으로 읽음인 스레드는 null이다.
+       */
+      lastReadAt: string | null;
+      /** @description 이 스레드의 읽지 않은 답글 수. */
+      threadUnreadCount: number;
+      /** @description 채널 전체. mainUnreadCount + replyUnreadCount. */
+      unreadCount: number;
+      /** @description 위치 뒤의 읽지 않은 원문 수. 본인 메시지 제외. */
+      mainUnreadCount: number;
+      /** @description 모든 스레드의 읽지 않은 답글 합계. 본인 메시지 제외. */
+      replyUnreadCount: number;
     };
     /** @description 현재 업무 원본에서 조회한다. accessible=false면 나머지 필드는 모두 null이다. */
     TaskCard: {
@@ -3613,7 +3668,7 @@ export interface components {
       /** Format: date-time */
       dueAt: string | null;
     };
-    /** @description body는 일반 텍스트다. 화면은 HTML로 해석하지 않는다. */
+    /** @description body는 일반 텍스트다. 화면은 HTML로 해석하지 않는다. 스레드 두 필드는 요청자별 값이며 원문에만 값이 있다. */
     Message: {
       id: components["schemas"]["Id"];
       channelId: components["schemas"]["Id"];
@@ -3625,6 +3680,10 @@ export interface components {
       task: components["schemas"]["TaskCard"] | null;
       clientMessageKey: string;
       replyCount: number;
+      /** @description 요청자 기준 이 원문 스레드의 읽지 않은 답글 수. 답글이면 null이다. */
+      threadUnreadCount: number | null;
+      /** @description 요청자 기준 이 스레드의 답글이 비교되는 위치. 이 스레드의 답글이 아닐 수 있다. 읽은 답글이 없거나 답글이면 null이다. */
+      threadLastReadMessageId: components["schemas"]["Id"] | null;
       /** Format: date-time */
       sentAt: string;
     };
@@ -7915,6 +7974,46 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["MessageFeed"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  markThreadRead: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+        messageId: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ThreadRead"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ThreadReadResult"];
         };
       };
       401: components["responses"]["Error401"];

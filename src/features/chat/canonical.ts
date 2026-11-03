@@ -42,13 +42,20 @@ const channel = z
     memberCount: count,
     joined: z.boolean(),
     unreadCount: count,
+    mainUnreadCount: count,
+    replyUnreadCount: count,
     lastReadMessageId: id.nullable(),
     lastMessageAt: instant.nullable(),
     canManage: z.boolean(),
     version: count,
     createdAt: instant,
   })
-  .refine((v) => (v.kind === "전체") === (v.branchId === null));
+  .refine((v) => (v.kind === "전체") === (v.branchId === null))
+  .refine(
+    (v) =>
+      Number.isSafeInteger(v.mainUnreadCount + v.replyUnreadCount) &&
+      v.unreadCount === v.mainUnreadCount + v.replyUnreadCount,
+  );
 const message = z
   .object({
     id,
@@ -60,13 +67,22 @@ const message = z
     task: card.nullable(),
     clientMessageKey: z.string().min(1),
     replyCount: count,
+    threadUnreadCount: count.nullable(),
+    threadLastReadMessageId: id.nullable(),
     sentAt: instant,
   })
-  .refine((v) => (v.kind === "업무 카드") === (v.task !== null));
+  .refine((v) => (v.kind === "업무 카드") === (v.task !== null))
+  .refine((v) =>
+    v.parentId === null
+      ? v.threadUnreadCount !== null && v.threadUnreadCount <= v.replyCount
+      : v.threadUnreadCount === null && v.threadLastReadMessageId === null,
+  );
 export type CanonicalMessage = Message & {
   canonicalId: string;
   senderName: string;
   replyCount: number;
+  threadUnreadCount: number | null;
+  threadLastReadMessageId: string | null;
   taskCard: z.infer<typeof card> | null;
 };
 export type CanonicalChannel = Channel & {
@@ -75,6 +91,8 @@ export type CanonicalChannel = Channel & {
   joined: boolean;
   canManage: boolean;
   lastReadMessageId: string | null;
+  mainUnreadCount: number;
+  replyUnreadCount: number;
 };
 export const canonicalMessage = (
   value: Message,
@@ -123,6 +141,8 @@ function mapMessage(value: z.infer<typeof message>): CanonicalMessage {
     clientMessageId: value.clientMessageKey,
     sequence: 0,
     replyCount: value.replyCount,
+    threadUnreadCount: value.threadUnreadCount,
+    threadLastReadMessageId: value.threadLastReadMessageId,
     taskCard: value.task,
   };
 }
@@ -159,9 +179,58 @@ async function mapChannel(
     joined: value.joined,
     canManage: value.canManage,
     lastReadMessageId: value.lastReadMessageId,
+    mainUnreadCount: value.mainUnreadCount,
+    replyUnreadCount: value.replyUnreadCount,
   };
 }
 export const canonicalChatApi = {
+  async read(
+    channelId: string,
+    parentId: string,
+    targetId: string,
+    signal: AbortSignal,
+  ) {
+    const result = checked(
+      z
+        .object({
+          lastReadMessageId: id,
+          lastReadAt: instant.nullable(),
+          unreadCount: count,
+          mainUnreadCount: count,
+          replyUnreadCount: count,
+          messageId: id.optional(),
+          threadUnreadCount: count.optional(),
+        })
+        .refine(
+          (v) =>
+            Number.isSafeInteger(v.mainUnreadCount + v.replyUnreadCount) &&
+            v.unreadCount === v.mainUnreadCount + v.replyUnreadCount,
+        ),
+      await api<unknown>(
+        parentId
+          ? `${channelPath(channelId)}/messages/${encodeURIComponent(parentId)}/read`
+          : `${channelPath(channelId)}/read`,
+        {
+          method: "POST",
+          body: parentId ? { replyId: targetId } : { messageId: targetId },
+          signal,
+        },
+      ),
+    );
+    if (
+      BigInt(result.lastReadMessageId) < BigInt(targetId) ||
+      (parentId &&
+        (result.messageId !== parentId ||
+          result.threadUnreadCount === undefined ||
+          result.threadUnreadCount > result.replyUnreadCount))
+    ) {
+      throw new ApiError(0, {
+        code: "INVALID_RESPONSE",
+        message: "읽음 위치와 응답이 일치하지 않아요. 다시 확인해 주세요.",
+      });
+    }
+    return result;
+  },
   async channel(value: string, signal: AbortSignal) {
     return mapChannel(
       checked(channel, await api<unknown>(channelPath(value), { signal })),

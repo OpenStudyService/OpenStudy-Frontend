@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -58,13 +59,23 @@ beforeEach(() => {
   ] as unknown as DOMRectList);
   vi.mocked(chatApi.read).mockResolvedValue({ ok: true });
 });
-it("does not send channel-level receipts in live mode while independent reads are pending", async () => {
+it("uses the exact bigint root ID in live mode", async () => {
   mode.mock = false;
-  mount(fixture());
-  fireEvent.scroll(document.querySelector(".messages")!);
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  expect(chatApi.read).not.toHaveBeenCalled();
+  const feed = fixture();
+  const message = {
+    ...feed.messages[0],
+    id: "9007199254740993",
+    canonicalId: "9007199254740993",
+  };
+  mount({ ...feed, messages: [message] });
+  await waitFor(() => expect(chatApi.read).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(chatApi.read).mock.calls[0].slice(0, 3)).toEqual([
+    "gangnam",
+    "",
+    "9007199254740993",
+  ]);
 });
+
 afterEach(() => {
   cleanup();
   clients.forEach((c) => c.clear());
@@ -160,6 +171,82 @@ it("preserves the viewport anchor when older messages are prepended", async () =
     </QueryClientProvider>,
   );
   expect(pane.scrollTop).toBe(500);
+});
+it("does not read content hidden behind an accessible modal", async () => {
+  const view = mount(fixture());
+  view.container.setAttribute("aria-hidden", "true");
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  expect(chatApi.read).not.toHaveBeenCalled();
+  view.container.removeAttribute("aria-hidden");
+  fireEvent.focusIn(view.container.querySelector(".messages")!);
+  await waitFor(() => expect(chatApi.read).toHaveBeenCalledTimes(1));
+});
+it("cancels an in-flight read when a newer snapshot arrives and does not let the old completion block the new receipt", async () => {
+  const complete: (() => void)[] = [];
+  vi.mocked(chatApi.read).mockImplementation(
+    () => new Promise((resolve) => complete.push(() => resolve({ ok: true }))),
+  );
+  const feed = fixture(),
+    view = mount(feed);
+  await waitFor(() => expect(chatApi.read).toHaveBeenCalledTimes(1));
+  const oldSignal = vi.mocked(chatApi.read).mock.calls[0][3];
+  const invalidated = vi.spyOn(clients[0], "invalidateQueries");
+  view.rerender(
+    <QueryClientProvider client={clients[0]}>
+      <MessageViewport
+        feed={{
+          ...feed,
+          messages: [{ ...feed.messages[0], sequence: 6 }],
+          dataUpdatedAt: 2,
+        }}
+        channelId="gangnam"
+        parentId=""
+        onDenied={vi.fn()}
+      >
+        <article>새 하단</article>
+      </MessageViewport>
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(chatApi.read).toHaveBeenCalledTimes(2));
+  expect(oldSignal.aborted).toBe(true);
+  await act(async () => complete[0]());
+  expect(invalidated).not.toHaveBeenCalled();
+  await act(async () => complete[1]());
+  expect(invalidated).toHaveBeenCalledTimes(1);
+});
+it("uses the exact reply ID for live threads and clears private content on a 404 participation loss", async () => {
+  mode.mock = false;
+  const denied = vi.fn();
+  const feed = fixture(),
+    message = {
+      ...feed.messages[0],
+      id: "9007199254740997",
+      canonicalId: "9007199254740997",
+    };
+  const { ApiError } = await import("../../shared/api/client");
+  vi.mocked(chatApi.read).mockRejectedValue(
+    new ApiError(404, { code: "NOT_FOUND", message: "참여 종료" }),
+  );
+  const client = new QueryClient();
+  clients.push(client);
+  render(
+    <QueryClientProvider client={client}>
+      <MessageViewport
+        feed={{ ...feed, messages: [message] }}
+        channelId="10"
+        parentId="9007199254740993"
+        onDenied={denied}
+      >
+        <article>답글</article>
+      </MessageViewport>
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(denied).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(chatApi.read).mock.calls[0].slice(0, 3)).toEqual([
+    "10",
+    "9007199254740993",
+    "9007199254740997",
+  ]);
 });
 it("does not acknowledge newly loaded messages below a scrolled-up viewport", async () => {
   const feed = fixture(),

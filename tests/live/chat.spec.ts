@@ -6,6 +6,10 @@ import {
   type BrowserContext,
 } from "@playwright/test";
 const password = process.env.CHAT_LIVE_PASSWORD;
+const sessions = new Map<
+  string,
+  Awaited<ReturnType<BrowserContext["storageState"]>>
+>();
 test.beforeAll(() => {
   if (!password)
     throw new Error(
@@ -13,16 +17,21 @@ test.beforeAll(() => {
     );
 });
 async function login(browser: Browser, email = "owner@chat.test") {
+  const state = sessions.get(email);
   const context = await browser.newContext({
-    baseURL: "http://127.0.0.1:15185",
+    baseURL: test.info().project.use.baseURL || "http://127.0.0.1:15185",
     serviceWorkers: "block",
+    storageState: state,
   });
   const page = await context.newPage();
-  await page.goto("/login");
-  await page.getByLabel("이메일", { exact: true }).fill(email);
-  await page.getByLabel("비밀번호", { exact: true }).fill(password!);
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/login$/);
+  if (!state) {
+    await page.goto("/login");
+    await page.getByLabel("이메일", { exact: true }).fill(email);
+    await page.getByLabel("비밀번호", { exact: true }).fill(password!);
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    await expect(page).not.toHaveURL(/\/login$/);
+    sessions.set(email, await context.storageState());
+  }
   return { context, page };
 }
 async function api(
@@ -247,10 +256,10 @@ test("actual text/thread pagination, response loss replay and participation term
     staff = await login(browser, "staff@chat.test");
   try {
     const c = await channel(owner.context);
-    const noReads: string[] = [];
+    const receipts: string[] = [];
     staff.page.on("request", (r) => {
       if (r.method() === "POST" && r.url().includes("/read"))
-        noReads.push(r.url());
+        receipts.push(r.url());
     });
     const html = "<script>window.chatXss=true</script>";
     const first = await (
@@ -339,7 +348,7 @@ test("actual text/thread pagination, response loss replay and participation term
     ).toBeVisible();
     expect(sent).toHaveLength(2);
     expect(sent[0]).toEqual(sent[1]);
-    expect(noReads).toHaveLength(0);
+    expect(receipts.length).toBeGreaterThan(0);
     const current = await (
       await api(owner.context, `/channels/${c.id}`)
     ).json();
