@@ -244,9 +244,23 @@ it("keeps default presets immutable, copies grants and never propagates later pr
   expect(
     defaults.items.find((p: Preset) => p.role === "staff").permissions,
   ).toEqual([]);
+  // Backend V4 leaves cross-branch lookup out of the immutable manager default.
   expect(
     defaults.items.find((p: Preset) => p.role === "admin").permissions,
-  ).toHaveLength(9);
+  ).toEqual([
+    "members:write",
+    "operations:write",
+    "payments:read",
+    "payments:write",
+    "sales:read",
+    "facilities:write",
+    "notices:write",
+    "people:manage",
+    "ai:read",
+  ]);
+  expect(
+    defaults.items.find((p: Preset) => p.role === "admin").permissions,
+  ).not.toContain("customers:cross-branch-read");
   expect(
     (
       await request("/permission-presets/system-staff", "PATCH", {

@@ -87,7 +87,10 @@ export function copyPreset(
 export function rolePermissions(
   role: Membership["role"],
 ): Membership["permissions"] {
-  return role === "admin" ? [...permissions] : [];
+  // Backend V4 grants cross-branch lookup individually; it is not a default preset grant.
+  return role === "admin"
+    ? permissions.filter((code) => code !== "customers:cross-branch-read")
+    : [];
 }
 export function membershipBody(
   employee: Employee,

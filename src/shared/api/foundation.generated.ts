@@ -799,7 +799,7 @@ export interface paths {
     put?: never;
     /**
      * 미사용 이용권 전액 환불
-     * @description 원결제·이용권을 잠근 뒤 승인 상태, 실제 사용 이력 없음, 미만료(expiresAt이 없거나 현재 < expiresAt)를 다시 확인한다. 환불 사건·결제 환불·이용권 환불·감사·멱등 결과를 한 트랜잭션으로 남긴다. 금액은 원결제 전액이며 처리 지점은 원결제 지점이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @description 원결제·이용권을 잠근 뒤 승인 상태, 실제 사용 이력 없음, 미만료(expiresAt이 없거나 현재 < expiresAt)를 다시 확인한다. 환불 사건·결제 환불·이용권 환불·감사·멱등 결과를 한 트랜잭션으로 남긴다. 금액은 원결제 전액이며 처리 지점은 원결제 지점이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 이용권 결제만 받는다. 스터디룸은 예약 취소로만 환불하고 사물함은 환불하지 않으므로 다른 목적의 결제는 409 PAYMENT_NOT_REFUNDABLE이다.
      */
     post: operations["refundPayment"];
     delete?: never;
@@ -1812,6 +1812,430 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/rooms": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 룸 목록
+     * @description scope 지점의 룸을 roomNo → id 오름차순으로 반환한다.
+     */
+    get: operations["listRooms"];
+    put?: never;
+    /**
+     * 룸 등록
+     * @description 같은 지점의 룸 번호 중복은 409 DUPLICATE_ROOM_NO. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createRoom"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/rooms/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 룸 상세
+     * @description 범위 밖 룸은 404다.
+     */
+    get: operations["getRoom"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 룸 수정
+     * @description 번호·이름·정원·시간당 요금을 수정하고 감사에 전후 값을 남긴다. 기존 예약의 스냅샷은 바뀌지 않는다.
+     */
+    patch: operations["updateRoom"];
+    trace?: never;
+  };
+  "/rooms/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 룸 운영 중단·재개
+     * @description 운영 중단해도 기존 예약은 유지한다. 같은 상태는 현재 값을 돌려주며 감사를 만들지 않는다.
+     */
+    post: operations["changeRoomStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/room-reservations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 예약 목록
+     * @description scope 지점의 예약을 startAt 내림차순으로 반환한다. 기간 필터는 구간이 겹치는 예약을 고른다.
+     */
+    get: operations["listRoomReservations"];
+    put?: never;
+    /**
+     * 예약 생성과 선결제
+     * @description 입력 오류(422)와 시간 중복(409 ROOM_TIME_CONFLICT)을 구분한다. 승인이면 결제·예약·슬롯을 한 트랜잭션으로 확정하고, 실패면 실패 결제와 결제 실패 예약만 남기며 슬롯을 점유하지 않는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createRoomReservation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/room-reservations/calendar": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 예약 달력
+     * @description 한 지점의 기간(최대 62일)과 겹치는 예약 전체를 startAt 오름차순으로 반환한다. 결제 실패 예약은 담지 않는다.
+     */
+    get: operations["getRoomReservationCalendar"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/room-reservations/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 예약 상세
+     * @description 범위 밖 예약은 404다.
+     */
+    get: operations["getRoomReservation"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/room-reservations/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 예약 취소·전액 환불
+     * @description 시작 시각 전의 확정 예약만 취소한다. 환불 사건·결제 환불·예약 취소·슬롯 해제를 한 트랜잭션으로 처리한다. 운영 중지 지점에서도 허용한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["cancelRoomReservation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/room-reservations/{id}/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 룸 이용 시작
+     * @description 확정 예약만 시작한다. 운영 중단 룸, 운영 중지 지점, 같은 룸의 다른 이용 중 예약이 있으면 거절한다.
+     */
+    post: operations["startRoomUsage"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/room-reservations/{id}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 룸 이용 완료
+     * @description 이용 중 예약만 완료한다. 운영 중단 룸과 운영 중지 지점에서도 허용한다. 처리 시각에 아직 시작하지 않은 시간의 슬롯을 삭제해 그 시간부터 다시 예약할 수 있고, 진행 중인 시간의 슬롯은 유지한다. 예: 14:00~17:00 예약을 15:30에 완료하면 16:00 슬롯만 삭제한다.
+     */
+    post: operations["completeRoomUsage"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/lockers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 사물함 목록
+     * @description scope 지점의 사물함을 lockerNo → id 오름차순으로 반환한다. 배정 상태는 활성 배정으로 계산한다.
+     */
+    get: operations["listLockers"];
+    put?: never;
+    /**
+     * 사물함 등록
+     * @description 같은 지점의 번호 중복은 409 DUPLICATE_LOCKER_NO. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createLocker"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/lockers/occupancy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 사물함 현황
+     * @description 지점별 사용 중·사용 가능·운영 중단 수를 같은 기준 시점으로 계산한다. 목록의 assignmentState와 일치한다.
+     */
+    get: operations["getLockerOccupancy"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/lockers/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 사물함 상세
+     * @description 범위 밖 사물함은 404다.
+     */
+    get: operations["getLocker"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 사물함 수정
+     * @description 번호·4주 요금을 수정하고 감사에 전후 값을 남긴다. 기존 배정의 스냅샷은 바뀌지 않는다.
+     */
+    patch: operations["updateLocker"];
+    trace?: never;
+  };
+  "/lockers/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 사물함 운영 중단·재개
+     * @description 활성 배정이 있어도 운영 중단할 수 있고 반납은 계속 허용한다. 같은 상태는 현재 값을 돌려준다.
+     */
+    post: operations["changeLockerStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/branches/{id}/locker-rate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 지점 사물함 요금 일괄 적용
+     * @description 지점의 모든 사물함 요금을 바꾼다. 기존 배정의 스냅샷은 바뀌지 않는다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["applyBranchLockerRate"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/locker-assignments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 사물함 배정 목록
+     * @description scope 지점의 배정을 createdAt 내림차순으로 반환한다.
+     */
+    get: operations["listLockerAssignments"];
+    put?: never;
+    /**
+     * 사물함 유료 배정
+     * @description 기간은 28일 배수이고, 승인이면 결제·배정·과금을 한 트랜잭션으로 확정한다. 실패면 실패 결제와 결제 실패 배정만 남는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createLockerAssignment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/locker-assignments/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 사물함 배정 상세
+     * @description 범위 밖 배정은 404다.
+     */
+    get: operations["getLockerAssignment"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/locker-assignments/{id}/extend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 사물함 유료 연장
+     * @description 현재 종료일부터 이어 붙인다. 승인이면 종료일과 과금을 함께 확정하고, 실패면 종료일을 바꾸지 않고 실패 과금을 남긴다. 두 결과 모두 200이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["extendLockerAssignment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/locker-assignments/{id}/return": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 사물함 반납
+     * @description 실제 반납 시각과 처리자를 기록한다. 잔여 이용료는 환불하지 않고 같은 사물함을 바로 배정할 수 있다. 운영 중지 지점과 운영 중단 사물함에서도 허용한다.
+     */
+    post: operations["returnLocker"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}/cross-branch-summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 타 지점 고객 최소 요약
+     * @description 응대 사유를 본문으로 받고 조회마다 기록한다. 조회 결과가 상태를 바꾸지 않아 Idempotency-Key는 받지 않는다. 거부도 감사에 남긴다.
+     */
+    post: operations["getCrossBranchSummary"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}/space-history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 고객 룸·사물함 이력
+     * @description 고객 조회 범위(M4-D05) 안의 고객만 조회한다. scope 지점의 기록만 담고 금액·결제 참조는 각 지점의 payments:read 또는 payments:write가 있을 때만 담는다.
+     */
+    get: operations["getCustomerSpaceHistory"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1836,7 +2260,8 @@ export interface components {
       | "facilities:write"
       | "notices:write"
       | "people:manage"
-      | "ai:read";
+      | "ai:read"
+      | "customers:cross-branch-read";
     Permissions: components["schemas"]["PermissionCode"][];
     /**
      * @example {
@@ -2389,7 +2814,11 @@ export interface components {
         | "tasks"
         | "facilities"
         | "inquiries"
-        | "notices";
+        | "notices"
+        | "rooms"
+        | "room-reservations"
+        | "lockers"
+        | "locker-assignments";
       entityId: string | null;
       branchId: string | null;
       /** Format: date-time */
@@ -2576,15 +3005,15 @@ export interface components {
        */
       mock: true;
       /**
-       * @description M4는 이용권 결제만 다룬다. 스터디룸·사물함은 M6.
+       * @description 결제 목적. 스터디룸·사물함은 M6에서 예약·배정 명령으로만 만든다.
        * @enum {string}
        */
-      purpose: "이용권";
+      purpose: "이용권" | "스터디룸" | "사물함";
       branchId: components["schemas"]["Id"];
       customer: components["schemas"]["CustomerSummary"];
-      productId: components["schemas"]["Id"];
+      productId: components["schemas"]["Id"] | null;
       /** @description 결제 당시 상품명 스냅샷 */
-      productName: string;
+      productName: string | null;
       /** @enum {string} */
       method: "현금" | "카드" | "계좌이체" | "기타";
       amountKrw: number;
@@ -2604,6 +3033,8 @@ export interface components {
       refund: components["schemas"]["Refund"] | null;
       /** @description 요청자에게 원결제 지점 payments:write가 있고 승인·미사용·미만료이면 true. 서버 검증을 대체하지 않는다. */
       canRefund: boolean;
+      roomReservationId: components["schemas"]["Id"] | null;
+      lockerAssignmentId: components["schemas"]["Id"] | null;
     };
     PaymentPage: {
       items: components["schemas"]["Payment"][];
@@ -3526,6 +3957,322 @@ export interface components {
     NoticeStatusChange: {
       version: components["schemas"]["Version"];
       status: components["schemas"]["NoticeStatus"];
+    };
+    /** @enum {string} */
+    SpaceStatus: "사용 가능" | "운영 중단";
+    Room: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      branchId: components["schemas"]["Id"];
+      roomNo: string;
+      name: string;
+      capacity: number;
+      ratePerHourKrw: number;
+      status: components["schemas"]["SpaceStatus"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    RoomPage: {
+      items: components["schemas"]["Room"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description status 기본은 사용 가능이다. */
+    RoomCreate: {
+      branchId: components["schemas"]["Id"];
+      roomNo: string;
+      name: string;
+      capacity: number;
+      ratePerHourKrw: number;
+      status?: components["schemas"]["SpaceStatus"];
+    };
+    /** @description 누락 필드는 유지한다. version 외 항목이 없으면 422. branchId·status는 받지 않는다(422 IMMUTABLE_FIELD). 요금을 바꿔도 기존 예약 스냅샷은 그대로다. */
+    RoomUpdate: {
+      version: components["schemas"]["Version"];
+      roomNo?: string;
+      name?: string;
+      capacity?: number;
+      ratePerHourKrw?: number;
+    };
+    SpaceStatusChange: {
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["SpaceStatus"];
+      reason: string;
+    };
+    /** @enum {string} */
+    RoomReservationStatus: "결제 실패" | "확정" | "이용 중" | "완료" | "취소";
+    RoomRef: {
+      id: components["schemas"]["Id"];
+      roomNo: string;
+      name: string;
+    };
+    RoomUsage: {
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      endedAt: string | null;
+      startedBy: components["schemas"]["ActorSummary"] | null;
+      endedBy: components["schemas"]["ActorSummary"] | null;
+    };
+    /** @description 예약 당시 스냅샷이다. 금액과 결제 참조는 예약 지점의 payments:read 또는 payments:write가 있어야 보인다. */
+    ReservationBilling: {
+      ratePerHourKrw: number;
+      hours: number;
+      amountKrw: number;
+      paymentId: components["schemas"]["Id"];
+      /** @enum {string} */
+      paymentStatus: "승인" | "실패" | "환불";
+    };
+    /** @description 목록·달력·상세가 같은 DTO와 같은 상태값을 쓴다. canCancel은 화면 안내용이며 서버가 다시 검사한다. */
+    RoomReservation: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["RoomReservationStatus"];
+      branchId: components["schemas"]["Id"];
+      room: components["schemas"]["RoomRef"];
+      customer: components["schemas"]["CustomerSummary"];
+      /** Format: date-time */
+      startAt: string;
+      /** Format: date-time */
+      endAt: string;
+      billing: components["schemas"]["ReservationBilling"] | null;
+      usage: components["schemas"]["RoomUsage"] | null;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      cancelledBy: components["schemas"]["ActorSummary"] | null;
+      cancelReason: string | null;
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      createdAt: string;
+      canCancel: boolean;
+    };
+    RoomReservationPage: {
+      items: components["schemas"]["RoomReservation"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 기간과 겹치는 예약 전체다. 페이지가 없고 결제 실패 예약은 담지 않는다. */
+    RoomReservationCalendar: {
+      /** Format: date-time */
+      from: string;
+      /** Format: date-time */
+      to: string;
+      items: components["schemas"]["RoomReservation"][];
+    };
+    /** @description 금액 필드는 없다. 서버가 룸의 현재 시간당 요금으로 계산한다. partySize는 정원 검증에만 쓰고 저장하지 않는다. */
+    RoomReservationCreate: {
+      branchId: components["schemas"]["Id"];
+      roomId: components["schemas"]["Id"];
+      customerId: components["schemas"]["Id"];
+      /** Format: date-time */
+      startAt: string;
+      /** Format: date-time */
+      endAt: string;
+      partySize: number;
+      /** @enum {string} */
+      method: "현금" | "카드" | "계좌이체" | "기타";
+      /**
+       * @description Mock 승인·실패 선택(M4-D07). 실제 결제사 호출이나 금전 이동은 없다.
+       * @default APPROVED
+       * @enum {string}
+       */
+      mockOutcome: "APPROVED" | "FAILED";
+    };
+    RoomReservationCancel: {
+      version: components["schemas"]["Version"];
+      reason: string;
+    };
+    RoomUsageChange: {
+      version: components["schemas"]["Version"];
+    };
+    /**
+     * @description 운영 상태와 활성 배정으로 계산한다.
+     * @enum {string}
+     */
+    LockerAssignmentState: "사용 가능" | "사용 중" | "운영 중단";
+    LockerActiveAssignment: {
+      id: components["schemas"]["Id"];
+      customer: components["schemas"]["CustomerSummary"];
+      /** Format: date */
+      startDate: string;
+      /** Format: date */
+      endDate: string;
+      overdue: boolean;
+    };
+    /** @description activeAssignment는 오늘 사용 중인 배정이다. 시작 전 배정은 담지 않는다. */
+    Locker: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      branchId: components["schemas"]["Id"];
+      lockerNo: string;
+      ratePer4WeeksKrw: number;
+      status: components["schemas"]["SpaceStatus"];
+      assignmentState: components["schemas"]["LockerAssignmentState"];
+      activeAssignment: components["schemas"]["LockerActiveAssignment"] | null;
+    };
+    LockerPage: {
+      items: components["schemas"]["Locker"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description status 기본은 사용 가능이다. */
+    LockerCreate: {
+      branchId: components["schemas"]["Id"];
+      lockerNo: string;
+      ratePer4WeeksKrw: number;
+      status?: components["schemas"]["SpaceStatus"];
+    };
+    /** @description 누락 필드는 유지한다. version 외 항목이 없으면 422. branchId·status는 받지 않는다(422 IMMUTABLE_FIELD). 요금을 바꿔도 기존 배정 스냅샷은 그대로다. */
+    LockerUpdate: {
+      version: components["schemas"]["Version"];
+      lockerNo?: string;
+      ratePer4WeeksKrw?: number;
+    };
+    LockerRateApply: {
+      ratePer4WeeksKrw: number;
+    };
+    LockerRateApplyResult: {
+      updated: number;
+      ratePer4WeeksKrw: number;
+    };
+    /** @description inUse + available + blocked = total. 목록의 assignmentState와 같은 기준이다. */
+    LockerBranchOccupancy: {
+      branchId: components["schemas"]["Id"];
+      total: number;
+      inUse: number;
+      available: number;
+      blocked: number;
+      overdue: number;
+      /** Format: date-time */
+      asOf: string;
+    };
+    LockerOccupancy: {
+      items: components["schemas"]["LockerBranchOccupancy"][];
+    };
+    /** @enum {string} */
+    LockerAssignmentStatus: "결제 실패" | "배정" | "반납" | "취소";
+    LockerCharge: {
+      id: components["schemas"]["Id"];
+      /** @enum {string} */
+      kind: "최초" | "연장";
+      /** Format: date */
+      startDate: string;
+      /** Format: date */
+      endDate: string;
+      terms: number;
+      ratePer4WeeksKrw: number;
+      amountKrw: number;
+      /** @enum {string} */
+      status: "적용" | "실패";
+      paymentId: components["schemas"]["Id"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      appliedAt: string | null;
+    };
+    /** @description 기간은 [startDate, endDate)이다. endDate 당일부터 다음 배정이 가능하다. 결제 실패도 200/201 응답이며 status·charges로 구분한다. */
+    LockerAssignment: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["LockerAssignmentStatus"];
+      branchId: components["schemas"]["Id"];
+      locker: {
+        id: components["schemas"]["Id"];
+        lockerNo: string;
+      };
+      customer: components["schemas"]["CustomerSummary"];
+      /** Format: date */
+      startDate: string;
+      /** Format: date */
+      endDate: string;
+      overdue: boolean;
+      /** Format: date-time */
+      returnedAt: string | null;
+      assignedBy: components["schemas"]["ActorSummary"];
+      lastChangedBy: components["schemas"]["ActorSummary"] | null;
+      reason: string | null;
+      /** @description 과금 내역. 배정 지점의 payments:read 또는 payments:write가 없으면 null이다. */
+      charges: components["schemas"]["LockerCharge"][] | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    LockerAssignmentPage: {
+      items: components["schemas"]["LockerAssignment"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 금액 필드는 없다. 기간은 28일의 배수여야 한다. */
+    LockerAssignmentCreate: {
+      branchId: components["schemas"]["Id"];
+      lockerId: components["schemas"]["Id"];
+      customerId: components["schemas"]["Id"];
+      /** Format: date */
+      startDate: string;
+      /** Format: date */
+      endDate: string;
+      /** @enum {string} */
+      method: "현금" | "카드" | "계좌이체" | "기타";
+      /**
+       * @description Mock 승인·실패 선택(M4-D07). 실제 결제사 호출이나 금전 이동은 없다.
+       * @default APPROVED
+       * @enum {string}
+       */
+      mockOutcome: "APPROVED" | "FAILED";
+    };
+    /** @description endDate는 연장 후 새 종료일이다. 현재 종료일과의 차이가 28일의 배수여야 한다. */
+    LockerAssignmentExtend: {
+      version: components["schemas"]["Version"];
+      /** Format: date */
+      endDate: string;
+      /** @enum {string} */
+      method: "현금" | "카드" | "계좌이체" | "기타";
+      /**
+       * @description Mock 승인·실패 선택(M4-D07). 실제 결제사 호출이나 금전 이동은 없다.
+       * @default APPROVED
+       * @enum {string}
+       */
+      mockOutcome: "APPROVED" | "FAILED";
+    };
+    LockerAssignmentReturn: {
+      version: components["schemas"]["Version"];
+      reason?: string;
+    };
+    /** @description branchId는 요청자가 응대 중인 지점이다. */
+    CrossBranchSummaryRequest: {
+      branchId: components["schemas"]["Id"];
+      reason: string;
+    };
+    CrossBranchPass: {
+      /** @enum {string} */
+      kind: "시간권" | "기간권" | "정액권";
+      productName: string;
+      /** @enum {string} */
+      status: "활성" | "소진" | "만료" | "환불";
+      /** Format: date-time */
+      expiresAt: string | null;
+    };
+    CrossBranchUsage: {
+      /** @enum {string} */
+      kind: "좌석" | "스터디룸" | "사물함";
+      branchId: components["schemas"]["Id"];
+      /** Format: date-time */
+      startAt: string;
+      /** Format: date-time */
+      endAt: string | null;
+    };
+    /** @description 보유 이용권·유효 상태·이용 일시·이용 지점만 담는다(POL-01). 결제 금액·결제 상세·연락처·메모·처리자·사유는 없다. */
+    CrossBranchSummary: {
+      customerId: components["schemas"]["Id"];
+      passes: components["schemas"]["CrossBranchPass"][];
+      usages: components["schemas"]["CrossBranchUsage"][];
+      /** Format: date-time */
+      asOf: string;
+    };
+    /** @description 요청 scope 지점의 룸 예약·사물함 배정이다. 페이지가 없다. */
+    SpaceHistory: {
+      customerId: components["schemas"]["Id"];
+      reservations: components["schemas"]["RoomReservation"][];
+      assignments: components["schemas"]["LockerAssignment"][];
     };
   };
   responses: {
@@ -7996,6 +8743,1031 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Notice"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listRooms: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        status?: components["schemas"]["SpaceStatus"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createRoom: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RoomCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Room"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getRoom: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Room"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateRoom: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RoomUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Room"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeRoomStatus: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SpaceStatusChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Room"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listRoomReservations: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        roomId?: components["schemas"]["Id"];
+        customerId?: components["schemas"]["Id"];
+        status?: components["schemas"]["RoomReservationStatus"];
+        /** @description endAt > from */
+        from?: string;
+        /** @description startAt < to */
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomReservationPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createRoomReservation: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RoomReservationCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomReservation"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getRoomReservationCalendar: {
+    parameters: {
+      query: {
+        branchId: components["schemas"]["Id"];
+        roomId?: components["schemas"]["Id"];
+        from: string;
+        to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomReservationCalendar"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getRoomReservation: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomReservation"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelRoomReservation: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RoomReservationCancel"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomReservation"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  startRoomUsage: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RoomUsageChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomReservation"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  completeRoomUsage: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RoomUsageChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoomReservation"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listLockers: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        assignmentState?: components["schemas"]["LockerAssignmentState"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createLocker: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LockerCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Locker"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getLockerOccupancy: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerOccupancy"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getLocker: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Locker"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateLocker: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LockerUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Locker"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeLockerStatus: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SpaceStatusChange"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Locker"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  applyBranchLockerRate: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LockerRateApply"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerRateApplyResult"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listLockerAssignments: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        lockerId?: components["schemas"]["Id"];
+        customerId?: components["schemas"]["Id"];
+        status?: components["schemas"]["LockerAssignmentStatus"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerAssignmentPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createLockerAssignment: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LockerAssignmentCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerAssignment"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getLockerAssignment: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerAssignment"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  extendLockerAssignment: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LockerAssignmentExtend"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerAssignment"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  returnLocker: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LockerAssignmentReturn"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LockerAssignment"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getCrossBranchSummary: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CrossBranchSummaryRequest"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CrossBranchSummary"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getCustomerSpaceHistory: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SpaceHistory"];
         };
       };
       401: components["responses"]["Error401"];

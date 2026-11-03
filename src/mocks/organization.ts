@@ -17,6 +17,7 @@ import {
   canManageBranch,
   canManageMembership,
   defaultHours,
+  rolePermissions,
   hoursError,
 } from "../features/organization/model";
 import { assert, DomainError, store } from "./store";
@@ -26,6 +27,7 @@ const definitions = permissions.map((code) => ({
   code,
   description: {
     "members:write": "회원 정보 변경",
+    "customers:cross-branch-read": "타 지점 고객 최소 요약 조회",
     "operations:write": "운영 설정 변경",
     "payments:read": "결제 조회",
     "payments:write": "결제 및 환불",
@@ -73,7 +75,12 @@ function initialPresets() {
     presets = (
       [
         ["system-staff", "일반 직원 기본", "staff", []],
-        ["system-manager", "지점 관리자 기본", "admin", [...permissions]],
+        [
+          "system-manager",
+          "지점 관리자 기본",
+          "admin",
+          rolePermissions("admin"),
+        ],
       ] as const
     ).map(([id, name, role, permissions]) => ({
       id,

@@ -225,7 +225,21 @@ describe("organization policies", () => {
   });
   it("copies presets without sharing their arrays and sends only one membership with both versions", () => {
     expect(rolePermissions("staff")).toEqual([]);
-    expect(rolePermissions("admin")).toHaveLength(9);
+    // Backend V4 explicitly excludes cross-branch lookup from every default preset.
+    expect(rolePermissions("admin")).toEqual([
+      "members:write",
+      "operations:write",
+      "payments:read",
+      "payments:write",
+      "sales:read",
+      "facilities:write",
+      "notices:write",
+      "people:manage",
+      "ai:read",
+    ]);
+    expect(rolePermissions("admin")).not.toContain(
+      "customers:cross-branch-read",
+    );
     const copy = copyPreset(presets[1]);
     copy.permissions.push("sales:read");
     expect(presets[1].permissions).toEqual(["operations:write"]);

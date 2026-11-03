@@ -60,7 +60,13 @@ export function seed(): Database {
         (branchId) => ({
           branchId,
           role,
-          permissions: role === "admin" ? [...permissions] : [],
+          // M6 V4: cross-branch lookup is an individual grant, absent from default presets.
+          permissions:
+            role === "admin"
+              ? permissions.filter(
+                  (code) => code !== "customers:cross-branch-read",
+                )
+              : [],
         }),
       ),
     });

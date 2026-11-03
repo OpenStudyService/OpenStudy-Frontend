@@ -1,3 +1,6 @@
+import { Rooms, Reservations } from "../rooms/RoomPages";
+import { RoomPanel } from "../rooms/RoomPanel";
+import { ReservationPanel } from "../rooms/ReservationPanel";
 import { Records } from "../collaboration/Records";
 import { RecordDetail } from "../collaboration/RecordDetail";
 import { useEffect, useState } from "react";
@@ -196,7 +199,11 @@ export function ResourcePage(props: {
   resource: Resource;
   embedded?: boolean;
 }) {
-  return props.resource === "facilities" ||
+  return props.resource === "rooms" ? (
+    <Rooms embedded={props.embedded} />
+  ) : props.resource === "reservations" ? (
+    <Reservations embedded={props.embedded} />
+  ) : props.resource === "facilities" ||
     props.resource === "inquiries" ||
     props.resource === "notices" ? (
     <Records resource={props.resource} embedded={props.embedded} />
@@ -608,7 +615,15 @@ export function RecordPanel(props: {
   onClose: () => void;
   onReschedule?: () => void;
 }) {
-  return props.resource === "facilities" ||
+  return props.resource === "rooms" ? (
+    <RoomPanel id={props.id} onClose={props.onClose} />
+  ) : props.resource === "reservations" ? (
+    <ReservationPanel
+      id={props.id}
+      onClose={props.onClose}
+      onSelected={() => props.onReschedule?.()}
+    />
+  ) : props.resource === "facilities" ||
     props.resource === "inquiries" ||
     props.resource === "notices" ? (
     <RecordDetail
