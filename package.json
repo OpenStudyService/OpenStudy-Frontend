@@ -25,6 +25,8 @@
     "test:e2e:tasks:live": "playwright test --config playwright.tasks.config.ts",
     "test:e2e:seats:live": "playwright test --config playwright.seats.config.ts",
     "test:e2e:history:live": "playwright test --config playwright.history.config.ts",
+    "test:e2e:lockers:live": "playwright test --config playwright.lockers.config.ts",
+    "test:e2e:lockers:mock": "playwright test --config playwright.lockers-mock.config.ts",
     "test:e2e:rooms:live": "playwright test --config playwright.rooms.config.ts",
     "test:e2e:rooms:mock": "playwright test --config playwright.rooms-mock.config.ts",
     "test:e2e:collaboration:mock": "playwright test --config playwright.collaboration-mock.config.ts",

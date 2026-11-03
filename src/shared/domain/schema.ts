@@ -188,6 +188,7 @@ export const schemas = {
     status: z.enum(["활성", "소진", "만료", "환불"]),
   }),
   payments: base.extend({
+    canonical: z.custom<components["schemas"]["Payment"]>().optional(),
     memberId: str,
     productId: z.string(),
     reservationId: z.string(),
@@ -237,6 +238,10 @@ export const schemas = {
       .optional(),
   }),
   lockers: base.extend({
+    canonical: z.custom<components["schemas"]["Locker"]>().optional(),
+    assignments: z
+      .array(z.custom<components["schemas"]["LockerAssignment"]>())
+      .optional(),
     name: str,
     memberId: z.string(),
     startsOn: z.string(),
@@ -409,7 +414,7 @@ export interface Page<T> {
 export interface WorkspaceEvent {
   id: string;
   type: "changed" | "message" | "read" | "permissions";
-  resource: Resource | "customers" | "seat-sessions";
+  resource: Resource | "customers" | "seat-sessions" | "locker-assignments";
   entityId: string;
   branchId: string;
 }
