@@ -72,16 +72,18 @@ export function useChatFeed(
       );
       const current = client.getQueryData<MessageFeed>(key);
       const merged = mergeMessages(current?.items ?? [], refreshed.items);
-      // Old loaded pages can contain cards whose source task changed since
-      // the latest page. Refresh cards through the message endpoint so the
-      // server applies this viewer's channel and task access on every refresh.
-      const cards = await Promise.all(
+      // Loaded older roots can have new replies/read positions, and cards can
+      // change at their source. Revalidate their metadata through the server.
+      const metadata = await Promise.all(
         merged
-          .filter((row) => canonicalMessage(row)?.taskCard)
+          .filter((row) => {
+            const value = canonicalMessage(row);
+            return value?.taskCard || (value && !row.parentId);
+          })
           .map((row) => chatApi.parent(row.id, scope, signal, channelId)),
       );
       return {
-        items: mergeMessages(merged, cards),
+        items: mergeMessages(merged, metadata),
         nextCursor:
           current?.items.length &&
           (!refreshed.items.length ||

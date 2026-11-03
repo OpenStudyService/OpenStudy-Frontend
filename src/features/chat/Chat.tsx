@@ -286,6 +286,10 @@ function ChatWorkspace() {
             >
               <Icon name="chat" size={13} />
               답글 달기
+              {canonical && <span> · {canonical.replyCount}개</span>}
+              {canonical && (canonical.threadUnreadCount ?? 0) > 0 && (
+                <Badge>미확인 {canonical.threadUnreadCount}</Badge>
+              )}
             </button>
           )}
         </div>
@@ -370,7 +374,11 @@ function ChatWorkspace() {
                 >
                   <span className="text-lg">#</span>
                   <span className="min-w-0 flex-1 truncate">{name(c)}</span>
-                  {MOCK && c.unread > 0 && <Badge>{c.unread}</Badge>}
+                  {c.unread > 0 && (
+                    <span aria-label={`미확인 ${c.unread}개`}>
+                      <Badge>{c.unread}</Badge>
+                    </span>
+                  )}
                 </Link>
               ))
           )}
@@ -475,9 +483,10 @@ function ChatWorkspace() {
                 명 참여
               </small>
             </header>
-            {!MOCK && (
-              <p className="px-4 py-2 text-xs text-muted" role="note">
-                본문·스레드별 읽음 처리를 준비 중이에요.
+            {channel && canonicalChannel(channel) && (
+              <p className="px-4 py-2 text-xs text-muted" role="status">
+                미확인 본문 {canonicalChannel(channel)!.mainUnreadCount}개 ·
+                답글 {canonicalChannel(channel)!.replyUnreadCount}개
               </p>
             )}
             <MessageViewport

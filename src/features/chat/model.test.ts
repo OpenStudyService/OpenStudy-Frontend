@@ -125,6 +125,41 @@ it("rejects reusing a message key with a different task or thread", () => {
     /식별자/,
   );
 });
+it("marks only a returning member through the latest position while new and remaining members keep their independent unread", () => {
+  const store = fixture();
+  store.db.messages = [];
+  const c = create(store, "channels", {
+    ...channelInput,
+    participantIds: ["owner", "junho"],
+  }) as ResourceMap["channels"];
+  const send = (text: string, parentId = "") =>
+    sendMessage(store, {
+      channelId: c.id,
+      text,
+      parentId,
+      taskId: "",
+      clientMessageId: text,
+    });
+  const a = send("A");
+  send("B", a.id);
+  update(store, "channels", c.id, {
+    version: c.version,
+    participantIds: ["owner"],
+  });
+  const current = store.get("channels", c.id);
+  update(store, "channels", c.id, {
+    version: current.version,
+    participantIds: ["owner", "junho", "minji"],
+  });
+  store.persona = "junho";
+  expect(unreadMessages(store, c.id)).toBe(0);
+  store.persona = "minji";
+  expect(unreadMessages(store, c.id)).toBe(2);
+  store.persona = "owner";
+  send("새 답글", a.id);
+  store.persona = "junho";
+  expect(unreadMessages(store, c.id)).toBe(1);
+});
 it("fills a multi-page refresh gap without losing earlier history or duplicating messages", async () => {
   const store = fixture(),
     template = store.db.messages[0];

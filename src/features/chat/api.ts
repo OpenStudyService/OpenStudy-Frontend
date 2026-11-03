@@ -108,16 +108,17 @@ export const chatApi = {
   read(
     channel: string,
     parentId: string,
-    sequence: number,
+    position: number | string,
     signal: AbortSignal,
   ) {
-    // Independent root/thread reads remain required. A channel-wide receipt
-    // would mark unopened replies as read, so await the Backend extension.
-    if (!MOCK)
-      return Promise.reject(new Error("읽음 상태 API 연결을 준비 중입니다."));
+    if (!MOCK) {
+      if (typeof position !== "string")
+        return Promise.reject(new Error("정본 메시지 ID가 필요해요."));
+      return canonicalChatApi.read(channel, parentId, position, signal);
+    }
     return api(`/chat/${encodeURIComponent(channel)}/read`, {
       method: "POST",
-      body: { parentId, sequence },
+      body: { parentId, sequence: position },
       signal,
     });
   },

@@ -11,6 +11,7 @@ import {
   State,
 } from "../../shared/ui/primitives";
 import { chatApi } from "./api";
+import { canonicalMessage } from "./canonical";
 import type { ChatFeed } from "./hooks";
 
 export function MessageViewport({
@@ -35,9 +36,14 @@ export function MessageViewport({
   const [atBottom, setAtBottom] = useState(true),
     [readError, setReadError] = useState<Error | null>(null),
     [retryRead, setRetryRead] = useState(0);
-  const ack = useRef(0),
-    writing = useRef(false);
-  const highest = feed.messages.at(-1)?.sequence ?? 0;
+  const ack = useRef<{ address: string; position: bigint } | null>(null);
+  const newest = feed.messages.at(-1);
+  const highest = newest
+    ? MOCK
+      ? newest.sequence
+      : canonicalMessage(newest)?.canonicalId
+    : undefined;
+  const address = JSON.stringify([session.user.id, scope, channelId, parentId]);
   useEffect(() => {
     if (isAccessError(feed.error) || isAccessError(feed.olderError)) onDenied();
   }, [feed.error, feed.olderError, onDenied]);
@@ -55,7 +61,6 @@ export function MessageViewport({
     const element = viewport.current,
       sentinel = last.current;
     if (
-      !MOCK ||
       !element ||
       !sentinel ||
       !highest ||
@@ -65,6 +70,8 @@ export function MessageViewport({
     )
       return;
     const controller = new AbortController();
+    let writing = false;
+    let failed = false;
     const measure = () => {
       const box = element.getBoundingClientRect(),
         end = sentinel.getBoundingClientRect();
@@ -72,38 +79,56 @@ export function MessageViewport({
         document.visibilityState !== "visible" ||
         !element.clientHeight ||
         !element.getClientRects().length ||
+        element.closest('[aria-hidden="true"], [inert]') ||
         end.bottom > box.bottom + 1 ||
         end.top < box.top ||
-        ack.current >= highest ||
-        writing.current
+        (ack.current?.address === address &&
+          ack.current.position >= BigInt(highest)) ||
+        writing ||
+        failed
       )
         return;
-      writing.current = true;
+      writing = true;
       void chatApi
         .read(channelId, parentId, highest, controller.signal)
         .then(() => {
           controller.signal.throwIfAborted();
-          ack.current = Math.max(ack.current, highest);
+          ack.current = { address, position: BigInt(highest) };
           setReadError(null);
           void client.invalidateQueries({
             queryKey: ["data", session.user.id, scope, "chat", "channels"],
           });
+          if (parentId)
+            void client.invalidateQueries({
+              queryKey: [
+                "data",
+                session.user.id,
+                scope,
+                "chat",
+                "channel",
+                channelId,
+              ],
+            });
         })
         .catch((error) => {
           if (!controller.signal.aborted) {
+            failed = true;
             setReadError(error as Error);
             if (
-              isAccessError(error) &&
+              (isAccessError(error) ||
+                (error instanceof ApiError && error.status === 404)) &&
               !(
                 error instanceof ApiError &&
                 error.detail.code === "CSRF_INVALID"
               )
-            )
+            ) {
+              void client.invalidateQueries({ queryKey: ["session"] });
               onDenied();
+            }
           }
         })
         .finally(() => {
-          writing.current = false;
+          writing = false;
         });
     };
     const observer =
@@ -119,6 +144,7 @@ export function MessageViewport({
     const frame = requestAnimationFrame(measure);
     element.addEventListener("scroll", measure);
     document.addEventListener("visibilitychange", measure);
+    document.addEventListener("focusin", measure);
     window.addEventListener("focus", measure);
     return () => {
       controller.abort();
@@ -127,12 +153,14 @@ export function MessageViewport({
       resized?.disconnect();
       element.removeEventListener("scroll", measure);
       document.removeEventListener("visibilitychange", measure);
+      document.removeEventListener("focusin", measure);
       window.removeEventListener("focus", measure);
     };
   }, [
     channelId,
     parentId,
     highest,
+    address,
     feed.dataUpdatedAt,
     feed.isFetching,
     feed.error,

@@ -18,7 +18,11 @@ import type {
 import { catalog, readPermission } from "../shared/domain/catalog";
 import { assert, DomainError, MockStore } from "./store";
 import { expiresAfter, passValues } from "./terms";
-import { canManageChannel, canUseChannel } from "../features/chat/model";
+import {
+  canManageChannel,
+  canUseChannel,
+  participationReads,
+} from "../features/chat/model";
 import {
   allowedChatChannel,
   reconcileChannelParticipants,
@@ -619,6 +623,10 @@ export function update(
       .parse(schemas.channels.parse(merged).participantIds);
     ids.forEach((person) => channelParticipantOk(store, person, row.branchId));
     Object.assign(merged, { participantIds: [...new Set(ids)] });
+    Object.assign(
+      merged,
+      participationReads(store.get("channels", id), ids, store.db.messages),
+    );
   }
   if (resource === "tasks") {
     const t = schemas.tasks.parse(merged);
