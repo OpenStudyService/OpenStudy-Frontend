@@ -130,6 +130,7 @@ export function CustomerSelector({
       </Field>
       <Field label={allowAll ? "고객 필터" : "고객 선택"}>
         <select
+          aria-label={allowAll ? "고객 필터" : "고객 선택"}
           value={value}
           disabled={disabled || customers.isPending || !!customers.error}
           onChange={(e) => onChange(e.target.value)}

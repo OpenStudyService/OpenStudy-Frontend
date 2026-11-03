@@ -1,3 +1,4 @@
+import type { components } from "../api/foundation.generated";
 import { z } from "zod";
 
 export const permissions = [
@@ -260,6 +261,7 @@ export const schemas = {
     status: z.enum(["예약 확정", "결제 실패", "이용 중", "완료", "취소"]),
   }),
   facilities: base.extend({
+    collaboration: z.custom<components["schemas"]["Facility"]>().optional(),
     title: str,
     category: str,
     assigneeId: str,
@@ -272,6 +274,10 @@ export const schemas = {
     result: z.string(),
   }),
   inquiries: base.extend({
+    collaboration: z.custom<components["schemas"]["Inquiry"]>().optional(),
+    collaborationEvents: z
+      .array(z.custom<components["schemas"]["InquiryEvent"]>())
+      .optional(),
     title: str,
     memberId: str,
     assigneeId: str,
@@ -280,6 +286,7 @@ export const schemas = {
     status: z.enum(["접수", "처리 중", "답변 완료"]),
   }),
   notices: base.extend({
+    collaboration: z.custom<components["schemas"]["Notice"]>().optional(),
     title: str,
     body: str,
     pinned: z.boolean(),
