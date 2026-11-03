@@ -1,5 +1,6 @@
 import { Rooms, Reservations } from "../rooms/RoomPages";
 import { RoomPanel } from "../rooms/RoomPanel";
+import { Lockers } from "../lockers/Lockers";
 import { ReservationPanel } from "../rooms/ReservationPanel";
 import { Records } from "../collaboration/Records";
 import { RecordDetail } from "../collaboration/RecordDetail";
@@ -199,7 +200,9 @@ export function ResourcePage(props: {
   resource: Resource;
   embedded?: boolean;
 }) {
-  return props.resource === "rooms" ? (
+  return props.resource === "lockers" ? (
+    <Lockers embedded={props.embedded} />
+  ) : props.resource === "rooms" ? (
     <Rooms embedded={props.embedded} />
   ) : props.resource === "reservations" ? (
     <Reservations embedded={props.embedded} />

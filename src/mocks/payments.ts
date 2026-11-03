@@ -35,7 +35,8 @@ function state() {
     value = { metadata: new Map(), accepted: new Map() };
     states.set(store.events, value);
     for (const row of store.db.payments)
-      if (row.productId && !row.reservationId) metadata(row, value);
+      if (row.productId && !row.reservationId && !row.canonical)
+        metadata(row, value);
   }
   return value;
 }
@@ -136,6 +137,7 @@ export function passView(actor: Employee, row: PassRow): Pass {
   };
 }
 function paymentView(actor: Employee, row: PaymentRow): Payment {
+  if (row.canonical) return structuredClone(row.canonical);
   const saved = metadata(row, state()),
     pass = store.db.passes.find((p) => p.paymentId === row.id);
   return {
@@ -346,7 +348,7 @@ export const paymentHandlers = [
           : store.db.payments
               .filter(
                 (p) =>
-                  !!p.productId &&
+                  (!!p.productId || !!p.canonical) &&
                   !p.reservationId &&
                   selected.includes(p.branchId) &&
                   (!status || p.status === status) &&
@@ -372,7 +374,7 @@ export const paymentHandlers = [
         row = store.db.payments.find(
           (p) =>
             p.id === params.id &&
-            !!p.productId &&
+            (!!p.productId || !!p.canonical) &&
             !p.reservationId &&
             selected.includes(p.branchId),
         );
@@ -506,6 +508,12 @@ export const paymentHandlers = [
         "FORBIDDEN",
       );
       return replay(actor, request, row.id, body, () => {
+        assert(
+          !row.canonical || row.canonical.purpose !== "사물함",
+          "사물함은 반납해도 결제를 환불하지 않습니다.",
+          409,
+          "PAYMENT_NOT_REFUNDABLE",
+        );
         assert(
           row.status !== "환불",
           "이미 환불된 결제입니다.",
