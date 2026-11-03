@@ -64,6 +64,8 @@ beforeEach(() => {
     version: 1,
     mock: true,
     purpose: "이용권",
+    roomReservationId: null,
+    lockerAssignmentId: null,
     branchId: "gangnam",
     customer: { id: "c1", memberNo: "C001", name: "홍길동" },
     productId: "prod1",

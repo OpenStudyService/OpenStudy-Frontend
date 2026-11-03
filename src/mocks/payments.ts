@@ -143,6 +143,8 @@ function paymentView(actor: Employee, row: PaymentRow): Payment {
     version: row.version,
     mock: true,
     purpose: "이용권",
+    roomReservationId: null,
+    lockerAssignmentId: null,
     branchId: row.branchId,
     customer: customerSummary(row.memberId),
     productId: row.productId,

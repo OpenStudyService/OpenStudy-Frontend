@@ -1,3 +1,4 @@
+import { roomHandlers } from "./rooms";
 import { collaborationHandlers } from "./collaboration";
 import {
   invitationHandlers,
@@ -344,6 +345,7 @@ function executeAi(r: AiRequest) {
 }
 
 export const handlers = [
+  ...roomHandlers,
   ...collaborationHandlers,
   ...invitationHandlers,
   ...organizationHandlers,

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const permissions = [
   "members:write",
+  "customers:cross-branch-read",
   "operations:write",
   "payments:read",
   "payments:write",
@@ -244,12 +245,14 @@ export const schemas = {
     history: z.array(str),
   }),
   rooms: base.extend({
+    canonical: z.custom<components["schemas"]["Room"]>().optional(),
     name: str,
     capacity: money.positive(),
     hourlyRate: money.positive(),
     status: z.enum(["이용 가능", "사용 불가"]),
   }),
   reservations: base.extend({
+    canonical: z.custom<components["schemas"]["RoomReservation"]>().optional(),
     memberId: str,
     roomId: str,
     startsAt: str,
