@@ -42,7 +42,7 @@ function room(row: ResourceMap["rooms"]): S["Room"] {
     }
   );
 }
-function booking(
+export function booking(
   row: ResourceMap["reservations"],
   user: Employee,
   internal = false,

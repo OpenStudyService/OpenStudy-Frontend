@@ -89,6 +89,7 @@ export function Panel({
       <Dialog.Portal>
         <Dialog.Overlay className="panel-overlay" />
         <Dialog.Content
+          aria-labelledby={headingId}
           className={`panel ${wide ? "wide" : ""}`}
           onOpenAutoFocus={(e) => {
             e.preventDefault();

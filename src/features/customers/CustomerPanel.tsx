@@ -23,6 +23,7 @@ import {
 } from "./hooks";
 import { CustomerForm, LatestCustomer } from "./CustomerForm";
 import { CustomerHistory } from "../pass-history/CustomerHistory";
+import { CustomerSpaceHistory } from "./CustomerSpaceHistory";
 
 export function CustomerPanel(props: { id: string; onClose: () => void }) {
   const { session, scope } = useApp();
@@ -164,6 +165,7 @@ function CustomerPanelSession({
               </div>
             </dl>
             <CustomerHistory customerId={customer.id} />
+            <CustomerSpaceHistory customerId={customer.id} />
             {customer.canEdit && session.user.status === "활성" && (
               <div className="mt-6 flex flex-wrap gap-2">
                 <Button onClick={() => mode("edit", "1")}>수정하기</Button>
