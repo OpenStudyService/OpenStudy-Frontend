@@ -98,7 +98,7 @@ function stored(row: LockerRow): S["Locker"] {
   );
 }
 const assignments = () => store.db.lockers.flatMap((l) => l.assignments ?? []);
-function assignmentView(a: Assignment, u: Employee): Assignment {
+export function assignmentView(a: Assignment, u: Employee): Assignment {
   const l = stored(store.get("lockers", a.locker.id));
   return {
     ...structuredClone(a),
