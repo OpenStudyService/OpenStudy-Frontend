@@ -1,33 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
-import { api } from "../../shared/api/client";
-import { asPage, isAccessError } from "../../shared/api/read-model";
-import { DataNotice } from "../../shared/ui/DataNotice";
-import { businessDate, displayDate } from "../../shared/domain/schema";
+import { admin, businessDate } from "../../shared/domain/schema";
 import type { ResourceMap } from "../../shared/domain/schema";
-import { Badge, ErrorState, State } from "../../shared/ui/primitives";
+import { api, MOCK } from "../../shared/api/client";
+import { asPage } from "../../shared/api/read-model";
+import { DataNotice } from "../../shared/ui/DataNotice";
+import { weekly, weekDays, shiftTime as displayDate } from "./api";
 
 export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
   const { session, scope, lookups } = useApp();
   const [params, setParams] = useSearchParams();
   const selected = params.get("week") || businessDate(session.asOf);
-  const date = new Date(`${selected}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
-  const days = Array.from({ length: 7 }, (_, i) =>
-    new Date(date.getTime() + i * 86400000).toISOString().slice(0, 10),
-  );
-  const shifts = useQuery({
-    queryKey: ["data", session.user.id, scope, "shifts", "week", days[0]],
-    queryFn: async ({ signal }) =>
-      asPage<ResourceMap["shifts"]>(
-        await api<unknown>(
-          `/shifts?scope=${scope}&pageSize=100&from=${days[0]}&to=${days[6]}`,
-          { signal },
-        ),
-      ),
+  const days = weekDays(selected);
+  const data = useQuery({
+    queryKey: ["data", session.user.id, scope, "shifts", "weekly", selected],
+    queryFn: ({ signal }) => weekly(scope, selected, signal),
     retry: false,
   });
+  // Preserve the existing demo's M12 leave overlay only in the mock build.
   const leave = useQuery({
     queryKey: [
       "data",
@@ -39,19 +30,37 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
     ],
     queryFn: async ({ signal }) =>
       asPage<ResourceMap["leaveRequests"]>(
-        await api<unknown>(
+        await api(
           `/leaveRequests?scope=${scope}&pageSize=100&status=승인&from=${days[0]}&to=${days[6]}`,
           { signal },
         ),
       ),
+    enabled: MOCK,
     retry: false,
   });
-  const people = lookups.employees.filter(
-    (e) =>
-      !e.owner &&
-      (!e.memberships ||
-        e.memberships.some((m) => scope === "all" || m.branchId === scope)),
+  // Rows come only from the authorized response, never the staff lookup.
+  const people = new Map(
+    [...(data.data?.shifts ?? []), ...(data.data?.attendance ?? [])].map(
+      (r) => [r.employee.id, r.employee.name],
+    ),
   );
+  const leaves = MOCK
+    ? (leave.data?.items.filter(
+        (l) =>
+          (l.employeeId === session.user.id ||
+            admin(session.user, l.branchId)) &&
+          l.startsOn <= days[6] &&
+          l.endsOn >= days[0],
+      ) ?? [])
+    : [];
+  for (const l of leaves)
+    people.set(
+      l.employeeId,
+      lookups.employees.find((e) => e.id === l.employeeId)?.name ||
+        l.employeeId,
+    );
+  const branch = (id: string) =>
+    lookups.branches.find((b) => b.id === id)?.name || id;
   return (
     <section>
       <div className="flex flex-wrap items-center gap-3 p-4">
@@ -69,23 +78,23 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
           }}
         />
         <small>
-          {days[0]} ~ {days[6]} · 휴가는 승인 기록 기준
+          {days[0]} ~ {days[6]} · Asia/Seoul · 시작한 날짜 기준
         </small>
       </div>
       <DataNotice
         label="근무표 데이터"
-        loading={shifts.isPending}
-        error={shifts.error}
-        retry={() => void shifts.refetch()}
+        loading={data.isPending}
+        error={data.error}
+        retry={() => void data.refetch()}
       />
-      <DataNotice
-        label="휴가 일정"
-        error={leave.error}
-        retry={() => void leave.refetch()}
-      />
-      {isAccessError(shifts.error) ? (
-        <ErrorState error={shifts.error!} />
-      ) : (
+      {MOCK && (
+        <DataNotice
+          label="휴가 일정"
+          error={leave.error}
+          retry={() => void leave.refetch()}
+        />
+      )}
+      {!data.error && (
         <div className="data-scroll">
           <table className="data-table min-w-[980px]">
             <thead>
@@ -99,34 +108,20 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
               </tr>
             </thead>
             <tbody>
-              {!people.length && (
+              {!people.size && !data.isPending && (
                 <tr>
-                  <td colSpan={8}>
-                    <State
-                      title={
-                        shifts.error
-                          ? "근무표를 확인할 수 없어요"
-                          : shifts.isPending
-                            ? "근무표를 불러오고 있어요"
-                            : "등록된 근무 직원이 없어요"
-                      }
-                    />
-                  </td>
+                  <td colSpan={8}>등록된 근무와 출퇴근 기록이 없어요.</td>
                 </tr>
               )}
-              {people.map((person) => (
-                <tr key={person.id}>
-                  <th scope="row">{person.name}</th>
+              {[...people].map(([id, name]) => (
+                <tr key={id}>
+                  <th scope="row">{name}</th>
                   {days.map((d) => (
                     <td key={d} className="align-top">
                       <div className="flex min-h-20 flex-col gap-2">
-                        {shifts.data?.items
+                        {data.data?.shifts
                           .filter(
-                            (s) =>
-                              s.employeeId === person.id &&
-                              businessDate(s.startsAt) <= d &&
-                              businessDate(s.endsAt) >= d &&
-                              s.status !== "취소",
+                            (s) => s.employee.id === id && s.workDate === d,
                           )
                           .map((s) => (
                             <button
@@ -134,29 +129,47 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
                               key={s.id}
                               onClick={() => onSelect(s.id)}
                             >
-                              {
-                                lookups.branches.find(
-                                  (b) => b.id === s.branchId,
-                                )?.name
-                              }
+                              예정 근무 · {branch(s.branchId)}
                               <br />
-                              {displayDate(s.startsAt).slice(-5)} ~{" "}
-                              {displayDate(s.endsAt).slice(-5)}
+                              {displayDate(s.startsAt)} ~{" "}
+                              {displayDate(s.endsAt)}
                               <br />
                               <small>
-                                휴게 {s.breakMinutes}분 · {s.status}
+                                예정 휴게 {s.plannedBreakMinutes}분 · 예정
+                                실근무 {s.plannedWorkMinutes}분
                               </small>
                             </button>
                           ))}
-                        {leave.data?.items
+                        {data.data?.attendance
+                          .filter(
+                            (a) => a.employee.id === id && a.workDate === d,
+                          )
+                          .map((a) => (
+                            <div className="card p-2" key={a.id}>
+                              실제 출퇴근 · {branch(a.branchId)} · {a.status}
+                              <br />
+                              {displayDate(a.clockInAt)} ~{" "}
+                              {a.clockOutAt
+                                ? displayDate(a.clockOutAt)
+                                : "진행 중"}
+                              <br />
+                              실근무{" "}
+                              {a.workedMinutes === null
+                                ? "퇴근 후 확정"
+                                : `${a.workedMinutes}분`}
+                            </div>
+                          ))}
+                        {leaves
                           .filter(
                             (l) =>
-                              l.employeeId === person.id &&
+                              l.employeeId === id &&
                               l.startsOn <= d &&
                               l.endsOn >= d,
                           )
                           .map((l) => (
-                            <Badge key={l.id}>휴가 · {l.amount}일 승인</Badge>
+                            <span className="badge" key={l.id}>
+                              휴가 · {l.amount}일 승인
+                            </span>
                           ))}
                       </div>
                     </td>
@@ -167,7 +180,6 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
           </table>
         </div>
       )}
-      {leave.error && <ErrorState error={leave.error} />}
     </section>
   );
 }

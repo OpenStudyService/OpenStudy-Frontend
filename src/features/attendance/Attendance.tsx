@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../shared/api/client";
+import { api, MOCK } from "../../shared/api/client";
+import { AttendanceUnavailable } from "./Shifts";
 import { asArray } from "../../shared/api/read-model";
 import { DataNotice } from "../../shared/ui/DataNotice";
 import { useApp } from "../../app/context";
@@ -12,15 +13,22 @@ export function Attendance() {
     <ResourceGroup
       title="근무·근태"
       description="오늘의 근무부터 휴가와 인수인계까지, 우리 팀의 시간을 함께 관리해요."
-      intro={<AttendanceSummary />}
-      tabs={[
-        { resource: "shifts", label: "근무표" },
-        { resource: "attendance", label: "출퇴근·휴게" },
-        { resource: "corrections", label: "기록 정정" },
-        { resource: "leaveRequests", label: "휴가 신청·승인" },
-        { resource: "leaveGrants", label: "휴가 부여", admin: true },
-        { resource: "substitutions", label: "대체근무" },
-      ]}
+      intro={MOCK ? <AttendanceSummary /> : <AttendanceUnavailable />}
+      tabs={
+        MOCK
+          ? [
+              { resource: "shifts", label: "근무표" },
+              { resource: "attendance", label: "출퇴근·휴게" },
+              { resource: "corrections", label: "기록 정정" },
+              { resource: "leaveRequests", label: "휴가 신청·승인" },
+              { resource: "leaveGrants", label: "휴가 부여", admin: true },
+              { resource: "substitutions", label: "대체근무" },
+            ]
+          : [
+              { resource: "shifts", label: "근무표" },
+              { resource: "attendance", label: "출퇴근·휴게" },
+            ]
+      }
     />
   );
 }
