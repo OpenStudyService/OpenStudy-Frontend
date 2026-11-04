@@ -302,6 +302,7 @@ export const schemas = {
     status: z.enum(["게시 중", "게시 종료"]),
   }),
   shifts: base.extend({
+    canonical: z.custom<components["schemas"]["Shift"]>().optional(),
     employeeId: str,
     startsAt: str,
     endsAt: str,

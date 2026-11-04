@@ -1,42 +1,32 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { LookupEmployee } from "../../shared/domain/schema";
 import { api } from "../../shared/api/client";
 import { WeekSchedule } from "./WeekSchedule";
-
+import { seoulInput, seoulInstant, weekDays } from "./api";
 const state = vi.hoisted(() => ({
   scope: "1",
-  session: { user: { id: "viewer" }, asOf: "2026-10-26T00:00:00Z" },
-  lookups: { employees: [] as LookupEmployee[], branches: [] },
+  session: { user: { id: "staff" }, asOf: "2026-11-04T00:00:00Z" },
+  lookups: { employees: [{ id: "other", name: "다른 직원" }], branches: [] },
 }));
 vi.mock("../../app/context", () => ({ useApp: () => state }));
 vi.mock("../../shared/api/client", async (original) => ({
   ...(await original<typeof import("../../shared/api/client")>()),
   api: vi.fn(),
 }));
-const clients: QueryClient[] = [];
+let client: QueryClient;
 beforeEach(() => {
-  vi.mocked(api)
-    .mockReset()
-    .mockResolvedValue({
-      items: [],
-      meta: { page: 1, pageSize: 100, total: 0 },
-    });
-  state.scope = "1";
-  state.lookups.employees = [];
+  vi.mocked(api).mockReset();
 });
 afterEach(() => {
   cleanup();
-  clients.forEach((client) => client.clear());
-  clients.length = 0;
+  client?.clear();
 });
 function show() {
-  const client = new QueryClient({
+  client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  clients.push(client);
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
@@ -45,57 +35,75 @@ function show() {
     </QueryClientProvider>,
   );
 }
-
-it("renders minimum employee names from the current authorized lookup scope", async () => {
-  const employees = [{ id: "20", name: "허용 지점 직원" }];
-  state.lookups.employees = employees;
+it("shows only response employees and puts a Sunday overnight shift in its start day once", async () => {
+  vi.mocked(api).mockResolvedValue({
+    weekStart: "2026-11-02",
+    weekEnd: "2026-11-08",
+    shifts: [
+      {
+        id: "big-1",
+        employee: { id: "staff", name: "본인" },
+        branchId: "1",
+        startsAt: "2026-11-08T13:00:00Z",
+        endsAt: "2026-11-08T21:00:00Z",
+        workDate: "2026-11-08",
+        plannedBreakMinutes: 30,
+        plannedWorkMinutes: 450,
+      },
+    ],
+    attendance: [],
+  });
   show();
+  const row = await screen.findByRole("rowheader", { name: "본인" });
+  const cells = within(row.parentElement!).getAllByRole("cell");
   expect(
-    await screen.findByRole("rowheader", { name: "허용 지점 직원" }),
+    within(cells[6]).getByRole("button", { name: /예정 근무/ }),
   ).toBeVisible();
-  expect(screen.getByRole("columnheader", { name: "직원" })).toBeVisible();
-  expect(employees).toEqual([{ id: "20", name: "허용 지점 직원" }]);
+  expect(screen.getAllByRole("button", { name: /예정 근무/ })).toHaveLength(1);
+  expect(screen.queryByText("다른 직원")).toBeNull();
+  expect(api).toHaveBeenCalledWith(
+    "/shifts/weekly?scope=1&weekOf=2026-11-04",
+    expect.objectContaining({ signal: expect.any(AbortSignal) }),
+  );
 });
-
-it("preserves legacy schedule exclusions when owner and membership metadata is supplied", async () => {
-  state.lookups.employees = [
-    { id: "owner", name: "소유자", owner: true, memberships: [] },
-    {
-      id: "one",
-      name: "현재 지점 직원",
-      memberships: [{ branchId: "1", role: "staff", permissions: [] }],
-    },
-    {
-      id: "two",
-      name: "다른 지점 직원",
-      memberships: [{ branchId: "2", role: "staff", permissions: [] }],
-    },
-  ];
+it("separates actual work and renders the server minutes without recalculation", async () => {
+  vi.mocked(api).mockResolvedValue({
+    shifts: [],
+    attendance: [
+      {
+        id: "actual",
+        employee: { id: "staff", name: "본인" },
+        branchId: "1",
+        workDate: "2026-11-04",
+        clockInAt: "2026-11-04T00:00:00Z",
+        clockOutAt: "2026-11-04T09:00:00Z",
+        status: "퇴근",
+        workedMinutes: 498,
+      },
+    ],
+  });
   show();
-  expect(
-    await screen.findByRole("rowheader", { name: "현재 지점 직원" }),
-  ).toBeVisible();
-  expect(screen.queryByRole("rowheader", { name: "소유자" })).toBeNull();
-  expect(
-    screen.queryByRole("rowheader", { name: "다른 지점 직원" }),
-  ).toBeNull();
+  expect(await screen.findByText(/실근무 498분/)).toBeVisible();
+  expect(screen.queryByRole("button", { name: /예정 근무/ })).toBeNull();
 });
-
-it("keeps an explicitly unassigned legacy employee out of the all-branch schedule", async () => {
-  state.scope = "all";
-  state.lookups.employees = [
-    { id: "minimum", name: "최소 선택 정보 직원" },
-    {
-      id: "assigned",
-      name: "소속 직원",
-      memberships: [{ branchId: "2", role: "staff", permissions: [] }],
-    },
-    { id: "unassigned", name: "미배정 직원", owner: false, memberships: [] },
-  ];
+it("does not substitute lookups on a failed request", async () => {
+  vi.mocked(api).mockRejectedValue(new Error("연결 실패"));
   show();
   expect(
-    await screen.findByRole("rowheader", { name: "최소 선택 정보 직원" }),
+    await screen.findByText(/근무표 데이터를 불러오지 못했어요/),
   ).toBeVisible();
-  expect(screen.getByRole("rowheader", { name: "소속 직원" })).toBeVisible();
-  expect(screen.queryByRole("rowheader", { name: "미배정 직원" })).toBeNull();
+  expect(screen.queryByText("다른 직원")).toBeNull();
+});
+it("uses Seoul wall time and ISO Monday boundaries independently of host timezone", () => {
+  expect(seoulInstant("2026-11-09T08:00")).toBe("2026-11-08T23:00:00.000Z");
+  expect(seoulInput("2026-11-08T23:00:00Z")).toBe("2026-11-09T08:00");
+  expect(weekDays("2026-11-08")).toEqual([
+    "2026-11-02",
+    "2026-11-03",
+    "2026-11-04",
+    "2026-11-05",
+    "2026-11-06",
+    "2026-11-07",
+    "2026-11-08",
+  ]);
 });

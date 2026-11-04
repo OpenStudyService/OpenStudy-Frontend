@@ -2256,6 +2256,234 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/shifts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 근무 목록
+     * @description 조회 범위 안의 근무를 startsAt 오름차순(같으면 id)으로 반환한다. status 기본값은 예정이며 취소된 근무는 status=취소로만 나온다. from·to는 Asia/Seoul 날짜이고 workDate가 [from, to]인 근무를 고른다. scope는 지점만 좁히고 직원 조건을 풀지 않는다.
+     */
+    get: operations["listShifts"];
+    put?: never;
+    /**
+     * 예정 근무 등록
+     * @description 근무 지점의 MANAGER 이상이 활성 소속 직원의 예정 근무를 등록한다. 시각은 분 단위, 종료 > 시작, 길이 24시간 이하, 예정 휴게 분 < 길이(자정 넘김 허용). 같은 직원의 모든 지점의 예정 근무와 승인 휴가와 겹치면 409 SHIFT_CONFLICT와 겹친 구간을 반환한다. 운영 중지 지점은 409 BRANCH_NOT_ACTIVE. 대상 직원 행을 잠가 같은 직원의 동시 등록을 직렬화한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["createShift"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shifts/weekly": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 주간 근무표
+     * @description weekOf(Asia/Seoul 날짜, 생략 시 오늘)가 속한 월요일~일요일의 예정 근무(shifts)와 실제 근태(attendance)를 따로 반환한다. 근무는 startsAt, 근태는 clockInAt의 Asia/Seoul 날짜로 그 주에 속하며 자정을 넘는 근무는 시작한 주에만 나온다. 취소된 근무는 빠진다. 페이지가 없다.
+     */
+    get: operations["getWeeklyShiftSchedule"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shifts/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 근무 상세
+     * @description 취소된 근무도 반환한다. 연결된 근태 요약을 함께 준다. 볼 수 없으면 404다.
+     */
+    get: operations["getShift"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * 예정 근무 수정
+     * @description 시작·종료·예정 휴게만 수정한다. branchId·employeeId·status는 422 IMMUTABLE_FIELD. 시각 규칙은 보내지 않은 필드를 현재 값으로 채운 최종 값으로 검사하고, 자기 자신을 뺀 같은 직원의 예정 근무·승인 휴가와 겹치면 409 SHIFT_CONFLICT. 취소된 근무는 409 INVALID_STATE, 운영 중지 지점은 409 BRANCH_NOT_ACTIVE. 볼 수 없으면 404, 볼 수 있으나 근무 지점의 MANAGER가 아니면 403.
+     */
+    patch: operations["updateShift"];
+    trace?: never;
+  };
+  "/shifts/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 예정 근무 취소
+     * @description 근무를 취소 상태로 바꾸고 shift_events에 이력을 남긴다. 근무 행·이력·연결된 근태는 삭제하지 않는다. 취소된 근무는 기본 목록·주간 근무표·충돌 검사에서 빠진다. 운영 중지 지점과 대상 직원의 소속이 회수된 경우에도 허용한다. 이미 취소된 근무는 409 INVALID_STATE.
+     */
+    post: operations["cancelShift"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/attendance/current": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 진행 중인 본인 근태
+     * @description 본인의 진행 중 근태(근무 중·휴게 중) 하나 또는 null을 반환한다. 소속이 회수된 지점의 근태도 본인이 닫을 수 있도록 반환한다.
+     */
+    get: operations["getMyCurrentAttendance"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/attendance/clock-in": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 본인 출근
+     * @description 현재 서버 시각과 선택 지점으로 본인 근태를 만든다. 선택 지점의 활성 소속이 아니면 403(OWNER도 소속 행 필요), 운영 중지 지점은 409 BRANCH_NOT_ACTIVE, 지점과 무관하게 진행 중 근태가 있으면 409 ATTENDANCE_ALREADY_WORKING. 같은 지점의 예정 근무 중 startsAt ≤ 출근 시각 < endsAt인 근무가 있으면 연결한다. 예정 근무만으로 출근 처리하지 않는다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     */
+    post: operations["clockIn"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/attendance/break-start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 휴게 시작
+     * @description 근무 중에만 현재 서버 시각으로 휴게를 시작한다. 진행 중 근태가 없으면 409 ATTENDANCE_NOT_WORKING, 휴게 중이면 409 ATTENDANCE_ON_BREAK. 근태 지점이 현재 유효 소속이 아니면 403. 운영 중지 지점에서도 허용한다. 상태를 먼저 검사하고 version을 검사한다. reloadUrl은 /api/me/attendance/current.
+     */
+    post: operations["startBreak"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/attendance/break-end": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 휴게 종료
+     * @description 휴게 중에만 현재 서버 시각으로 열린 휴게를 끝낸다. 진행 중 근태가 없으면 409 ATTENDANCE_NOT_WORKING, 휴게 중이 아니면 409 ATTENDANCE_NOT_ON_BREAK. 운영 중지 지점과 소속이 회수된 지점에서도 허용한다. 상태를 먼저 검사하고 version을 검사한다. reloadUrl은 /api/me/attendance/current.
+     */
+    post: operations["endBreak"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/attendance/clock-out": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 본인 퇴근
+     * @description 현재 서버 시각을 퇴근 시각으로 저장하고 퇴근 상태로 바꾼다. 휴게 중이면 409 ATTENDANCE_ON_BREAK, 진행 중 근태가 없으면(중복 퇴근 포함) 409 ATTENDANCE_NOT_WORKING. 운영 중지 지점과 소속이 회수된 지점에서도 허용한다. 실근무 분은 M8-D07로 계산한다. 상태를 먼저 검사하고 version을 검사한다. reloadUrl은 /api/me/attendance/current.
+     */
+    post: operations["clockOut"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-records": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 근태 목록
+     * @description 조회 범위 안의 근태를 clockInAt 내림차순(같으면 id)으로 반환한다. 일반 직원은 본인 근태만, MANAGER는 MANAGER인 지점에서 기록된 근태와 그 외 지점의 본인 근태를 받는다. 지점 선택(scope)만으로 다른 직원의 기록이 열리지 않는다. from·to는 Asia/Seoul 날짜이고 workDate가 [from, to]인 근태를 고른다.
+     */
+    get: operations["listAttendanceRecords"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-records/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 근태 상세
+     * @description 출근·퇴근 시각, 휴게 구간, 실근무 분, 현재 상태, 연결된 근무를 반환한다. 목록과 같은 계산을 쓴다. 볼 수 없으면 404다.
+     */
+    get: operations["getAttendanceRecord"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2838,7 +3066,9 @@ export interface components {
         | "rooms"
         | "room-reservations"
         | "lockers"
-        | "locker-assignments";
+        | "locker-assignments"
+        | "shifts"
+        | "attendance-records";
       entityId: string | null;
       branchId: string | null;
       /** Format: date-time */
@@ -4332,6 +4562,204 @@ export interface components {
       customerId: components["schemas"]["Id"];
       reservations: components["schemas"]["RoomReservation"][];
       assignments: components["schemas"]["LockerAssignment"][];
+    };
+    /**
+     * @description DB SCHEDULED=예정, CANCELLED=취소.
+     * @enum {string}
+     */
+    ShiftStatus: "예정" | "취소";
+    /**
+     * @description WORKING이고 열린 휴게가 없으면 근무 중, 있으면 휴게 중, LEFT는 퇴근.
+     * @enum {string}
+     */
+    AttendanceStatus: "근무 중" | "휴게 중" | "퇴근";
+    /** @description shift_events의 CANCELLED 행에서 읽는다. */
+    ShiftCancellation: {
+      /** Format: date-time */
+      cancelledAt: string;
+      cancelledBy: components["schemas"]["ActorSummary"];
+      reason: string | null;
+    };
+    /** @description 근무에 연결된 실제 근태 요약. 같은 직원·같은 지점이다. */
+    AttendanceSummary: {
+      id: components["schemas"]["Id"];
+      status: components["schemas"]["AttendanceStatus"];
+      /** Format: date-time */
+      clockInAt: string;
+      /** Format: date-time */
+      clockOutAt: string | null;
+      /** @description M8-D07: (퇴근 − 출근 − 휴게 합)을 초 단위로 계산한 뒤 분 미만 버림, 0 미만 없음. 퇴근 전에는 null. */
+      workedMinutes: number | null;
+    };
+    /** @description 예정 근무. 실제 출퇴근은 AttendanceRecord로 구분한다. 목록·주간 근무표·상세가 같은 DTO다. canEdit은 화면 안내용이며 서버가 다시 검사한다. */
+    Shift: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["ShiftStatus"];
+      branchId: components["schemas"]["Id"];
+      employee: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      startsAt: string;
+      /** Format: date-time */
+      endsAt: string;
+      /**
+       * Format: date
+       * @description startsAt의 Asia/Seoul 날짜
+       */
+      workDate: string;
+      plannedBreakMinutes: number;
+      /** @description 근무 길이(분) − 예정 휴게 분 */
+      plannedWorkMinutes: number;
+      cancellation: components["schemas"]["ShiftCancellation"] | null;
+      attendance: components["schemas"]["AttendanceSummary"][];
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      canEdit: boolean;
+    };
+    ShiftPage: {
+      items: components["schemas"]["Shift"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 상태는 항상 예정으로 만든다. 등록자는 세션 사용자다. 0 < endsAt − startsAt ≤ 24시간, plannedBreakMinutes < 길이. */
+    ShiftCreate: {
+      branchId: components["schemas"]["Id"];
+      employeeId: components["schemas"]["Id"];
+      /**
+       * Format: date-time
+       * @description 오프셋이 있는 ISO 8601. 초·초 미만은 0(분 단위)
+       */
+      startsAt: string;
+      /**
+       * Format: date-time
+       * @description 오프셋이 있는 ISO 8601. 초·초 미만은 0(분 단위)
+       */
+      endsAt: string;
+      /**
+       * @description 근무 길이(분)보다 작아야 한다
+       * @default 0
+       */
+      plannedBreakMinutes: number;
+    };
+    /** @description branchId·employeeId·status는 받지 않는다(422 IMMUTABLE_FIELD). version 외 항목이 없으면 422. reason은 shift_events에 남는다. */
+    ShiftUpdate: {
+      version: components["schemas"]["Version"];
+      /**
+       * Format: date-time
+       * @description 오프셋이 있는 ISO 8601. 초·초 미만은 0(분 단위)
+       */
+      startsAt?: string;
+      /**
+       * Format: date-time
+       * @description 오프셋이 있는 ISO 8601. 초·초 미만은 0(분 단위)
+       */
+      endsAt?: string;
+      /** @description 근무 길이(분)보다 작아야 한다 */
+      plannedBreakMinutes?: number;
+      reason?: string;
+    };
+    /** @description reason은 선택이며 shift_events에 남는다. */
+    ShiftCancel: {
+      version: components["schemas"]["Version"];
+      reason?: string;
+    };
+    /** @description 휴게 구간. endedAt이 null이면 진행 중 휴게다. */
+    AttendanceBreak: {
+      id: components["schemas"]["Id"];
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      endedAt: string | null;
+    };
+    /** @description 실제 출퇴근. 시각은 초 미만을 버린 서버 시각이다. 목록·상세·주간 근무표가 같은 DTO와 같은 계산을 쓴다. */
+    AttendanceRecord: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["AttendanceStatus"];
+      branchId: components["schemas"]["Id"];
+      employee: components["schemas"]["ActorSummary"];
+      shiftId: components["schemas"]["Id"] | null;
+      /** Format: date-time */
+      clockInAt: string;
+      /** Format: date-time */
+      clockOutAt: string | null;
+      /**
+       * Format: date
+       * @description clockInAt의 Asia/Seoul 날짜
+       */
+      workDate: string;
+      breaks: components["schemas"]["AttendanceBreak"][];
+      /** @description M8-D07: (퇴근 − 출근 − 휴게 합)을 초 단위로 계산한 뒤 분 미만 버림, 0 미만 없음. 퇴근 전에는 null. */
+      workedMinutes: number | null;
+    };
+    AttendanceRecordPage: {
+      items: components["schemas"]["AttendanceRecord"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 진행 중 근태가 없으면 attendance는 null이다. */
+    CurrentAttendance: {
+      attendance: components["schemas"]["AttendanceRecord"] | null;
+      /** Format: date-time */
+      asOf: string;
+    };
+    /** @description 시각과 직원은 받지 않는다. 서버 시각과 세션 사용자로 기록한다. */
+    ClockIn: {
+      branchId: components["schemas"]["Id"];
+    };
+    /** @description shifts는 workDate가 그 주인 예정 근무(취소 제외), attendance는 workDate가 그 주인 실제 근태다. 페이지가 없다. */
+    WeeklyShiftSchedule: {
+      /**
+       * Format: date
+       * @description 월요일(Asia/Seoul)
+       */
+      weekStart: string;
+      /**
+       * Format: date
+       * @description 일요일(Asia/Seoul), 포함
+       */
+      weekEnd: string;
+      /** @enum {string} */
+      timeZone: "Asia/Seoul";
+      shifts: components["schemas"]["Shift"][];
+      attendance: components["schemas"]["AttendanceRecord"][];
+      /** Format: date-time */
+      asOf: string;
+    };
+    /** @description 요청자가 볼 수 있는 겹친 근무. 직원·휴게·등록자·version은 담지 않는다. */
+    ShiftConflictTarget: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      /** Format: date-time */
+      startsAt: string;
+      /** Format: date-time */
+      endsAt: string;
+    };
+    /** @description 겹친 구간은 요청 근무와의 교집합이다. 볼 수 없는 근무는 visible=false, label=다른 지점 근무, shift=null이고 겹친 구간을 시간순으로 합친다. 휴가는 visible=false, label=승인 휴가, shift=null이다. */
+    ShiftConflict: {
+      /** @enum {string} */
+      kind: "근무" | "휴가";
+      visible: boolean;
+      /** @enum {string} */
+      label: "근무" | "다른 지점 근무" | "승인 휴가";
+      /** Format: date-time */
+      overlapStartsAt: string;
+      /** Format: date-time */
+      overlapEndsAt: string;
+      shift: components["schemas"]["ShiftConflictTarget"] | null;
+    };
+    /** @description 근무 등록·수정의 409 본문. ApiError 필드에 conflicts를 더한다. code=SHIFT_CONFLICT일 때만 conflicts가 있고 overlapStartsAt 오름차순이다. */
+    ShiftConflictError: {
+      code: string;
+      message: string;
+      requestId: string;
+      fieldErrors?: {
+        [key: string]: string;
+      };
+      latestVersion?: components["schemas"]["Version"];
+      reloadUrl?: string;
+      conflicts?: components["schemas"]["ShiftConflict"][];
     };
   };
   responses: {
@@ -9867,6 +10295,522 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SpaceHistory"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listShifts: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 조회 범위와 교집합. 일반 직원이 다른 직원 ID를 넣으면 빈 결과 */
+        employeeId?: components["schemas"]["Id"];
+        /** @description true면 본인 기록만 */
+        mine?: boolean;
+        /** @description 기본 예정 */
+        status?: components["schemas"]["ShiftStatus"];
+        /** @description workDate ≥ from (Asia/Seoul) */
+        from?: string;
+        /** @description workDate ≤ to (Asia/Seoul) */
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createShift: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShiftCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Shift"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 버전·상태·운영 중지·멱등성 충돌. code=SHIFT_CONFLICT면 conflicts에 겹친 구간을 담는다. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getWeeklyShiftSchedule: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        /** @description 이 날짜가 속한 주(월요일 시작, Asia/Seoul) */
+        weekOf?: string;
+        /** @description 조회 범위와 교집합. 일반 직원이 다른 직원 ID를 넣으면 빈 결과 */
+        employeeId?: components["schemas"]["Id"];
+        /** @description true면 본인 기록만 */
+        mine?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WeeklyShiftSchedule"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getShift: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Shift"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateShift: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShiftUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Shift"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 버전·상태·운영 중지·멱등성 충돌. code=SHIFT_CONFLICT면 conflicts에 겹친 구간을 담는다. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelShift: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShiftCancel"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Shift"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getMyCurrentAttendance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CurrentAttendance"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  clockIn: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClockIn"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceRecord"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  startBreak: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceRecord"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  endBreak: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceRecord"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  clockOut: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceRecord"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listAttendanceRecords: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 조회 범위와 교집합. 일반 직원이 다른 직원 ID를 넣으면 빈 결과 */
+        employeeId?: components["schemas"]["Id"];
+        /** @description true면 본인 기록만 */
+        mine?: boolean;
+        /** @description 이 근무에 연결된 근태 */
+        shiftId?: components["schemas"]["Id"];
+        status?: components["schemas"]["AttendanceStatus"];
+        /** @description workDate ≥ from (Asia/Seoul) */
+        from?: string;
+        /** @description workDate ≤ to (Asia/Seoul) */
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceRecordPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getAttendanceRecord: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceRecord"];
         };
       };
       401: components["responses"]["Error401"];
