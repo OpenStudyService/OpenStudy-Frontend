@@ -1,6 +1,8 @@
 import { Dialog } from "radix-ui";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
+import { PanelDrafts, confirmDiscard } from "./leaveGuard";
+import type { RefObject } from "react";
 import { Icon } from "./Icon";
 export function Button({
   variant = "",
@@ -69,6 +71,7 @@ export function Panel({
   description = "상세 내용을 확인하고 필요한 작업을 진행해 주세요.",
   children,
   wide = false,
+  closeDisabled = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -76,53 +79,57 @@ export function Panel({
   description?: string;
   children: ReactNode;
   wide?: boolean;
+  closeDisabled?: boolean;
 }) {
   const headingId = useId();
+  const [drafts] = useState(() => new Set<RefObject<boolean>>());
   const trigger = useRef<HTMLElement | null>(null);
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) onClose();
-      }}
-    >
-      <Dialog.Portal>
-        <Dialog.Overlay className="panel-overlay" />
-        <Dialog.Content
-          aria-labelledby={headingId}
-          className={`panel ${wide ? "wide" : ""}`}
-          onOpenAutoFocus={(e) => {
-            e.preventDefault();
-            trigger.current = document.activeElement as HTMLElement | null;
-            document.getElementById(headingId)?.focus();
-          }}
-          onCloseAutoFocus={(e) => {
-            e.preventDefault();
-            requestAnimationFrame(() => {
-              const target = trigger.current?.isConnected
-                ? trigger.current
-                : document.getElementById("main");
-              target?.focus();
-            });
-          }}
-        >
-          <header className="panel-head">
-            <div>
-              <Dialog.Title id={headingId} tabIndex={-1}>
-                {title}
-              </Dialog.Title>
-              <Dialog.Description>{description}</Dialog.Description>
-            </div>
-            <Dialog.Close asChild>
-              <Button aria-label="닫기">
-                <Icon name="close" />
-              </Button>
-            </Dialog.Close>
-          </header>
-          <div className="panel-body">{children}</div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <PanelDrafts.Provider value={drafts}>
+      <Dialog.Root
+        open={open}
+        onOpenChange={(v) => {
+          if (!v && !closeDisabled && confirmDiscard(drafts)) onClose();
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="panel-overlay" />
+          <Dialog.Content
+            aria-labelledby={headingId}
+            className={`panel ${wide ? "wide" : ""}`}
+            onOpenAutoFocus={(e) => {
+              e.preventDefault();
+              trigger.current = document.activeElement as HTMLElement | null;
+              document.getElementById(headingId)?.focus();
+            }}
+            onCloseAutoFocus={(e) => {
+              e.preventDefault();
+              requestAnimationFrame(() => {
+                const target = trigger.current?.isConnected
+                  ? trigger.current
+                  : document.getElementById("main");
+                target?.focus();
+              });
+            }}
+          >
+            <header className="panel-head">
+              <div>
+                <Dialog.Title id={headingId} tabIndex={-1}>
+                  {title}
+                </Dialog.Title>
+                <Dialog.Description>{description}</Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <Button aria-label="닫기" disabled={closeDisabled}>
+                  <Icon name="close" />
+                </Button>
+              </Dialog.Close>
+            </header>
+            <div className="panel-body">{children}</div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </PanelDrafts.Provider>
   );
 }
 export function Heading({

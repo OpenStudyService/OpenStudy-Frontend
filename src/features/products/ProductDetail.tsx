@@ -1,3 +1,4 @@
+import { useDraftGuard, leaveMessage } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -57,6 +58,7 @@ export function ProductDetail({
   const [latest, setLatest] = useState("");
   const [busy, setBusy] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
+  const leave = useDraftGuard({ draft, selection });
   const manage = canManageProduct(user, product);
   const branchName = (id: string) =>
     session.branches.find((b) => b.id === id)?.name ?? id;
@@ -80,6 +82,10 @@ export function ProductDetail({
     retry: false,
   });
   function applySaved(updated: Product) {
+    leave.saved({
+      draft: draftFromProduct(updated),
+      selection: updated.branchIds,
+    });
     setProduct(updated);
     setBase(updated);
     setDraft(draftFromProduct(updated));
@@ -93,6 +99,13 @@ export function ProductDetail({
     request: () => Promise<Product>,
     done: string,
   ) {
+    const losesDraft =
+      area !== "edit" &&
+      JSON.stringify(draft) !== JSON.stringify(draftFromProduct(base));
+    const losesSelection =
+      area !== "branches" &&
+      JSON.stringify(selection) !== JSON.stringify(product.branchIds);
+    if ((losesDraft || losesSelection) && !window.confirm(leaveMessage)) return;
     setBusy(true);
     setFailure(null);
     setNotice("");
@@ -172,6 +185,7 @@ export function ProductDetail({
     product.status === "판매 중" ? "판매 중지" : "판매 중";
   return (
     <div className="grid gap-6">
+      {leave.guard}
       <section className="grid gap-1">
         <h3>{product.name}</h3>
         <p className="help">

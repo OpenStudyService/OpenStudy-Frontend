@@ -27,6 +27,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Verify live and Mock production builds
         run: npm run test:builds
+      - name: Verify responsive layouts, draft protection and accessibility
+        run: npm run test:e2e:usability
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: frontend-${{ github.sha }}

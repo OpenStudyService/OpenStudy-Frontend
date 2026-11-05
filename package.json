@@ -18,6 +18,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e:usability": "playwright test --config playwright.usability.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "test:e2e:invitations:mock": "playwright test --config playwright.invitation-mock.config.ts",
@@ -66,6 +67,7 @@
     ]
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",

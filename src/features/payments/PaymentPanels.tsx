@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
@@ -103,6 +104,7 @@ export function RefundForm({
   }, []);
   const [reason, setReason] = useState("");
   const [validation, setValidation] = useState("");
+  const leave = useDraftGuard(reason);
   const write = useSubmission<RefundCreate, Payment>(
     `refund:${session.user.id}:${paymentId}`,
     (body, key) => refundPayment(paymentId, body, key, branchId),
@@ -135,7 +137,10 @@ export function RefundForm({
     onBusyChange(true);
     try {
       const result = await write.run({ reason: reason.trim() });
-      if (result && mounted.current) onRefunded(result);
+      if (result && mounted.current) {
+        leave.saved();
+        onRefunded(result);
+      }
     } catch (error) {
       if (
         error instanceof ApiError &&
@@ -150,6 +155,7 @@ export function RefundForm({
   }
   return (
     <form className="form-grid mt-5" onSubmit={submit}>
+      {leave.guard}
       <p className="help">
         원결제 지점의 결제 권한이 있고 사용 이력이 없으며 만료 전인 이용권만
         전액 환불할 수 있어요. 서버가 처리 시점에 다시 확인합니다.
@@ -247,6 +253,7 @@ function PaymentPanelSession({
   const p = payment.data;
   return (
     <Panel
+      closeDisabled={busy}
       open
       title="결제 상세"
       onClose={() => {
@@ -423,6 +430,7 @@ function PassPanelSession({
   const keepEditor = adjusting && !!p && !denied;
   return (
     <Panel
+      closeDisabled={busy}
       open
       title="보유 이용권 상세"
       onClose={() => {

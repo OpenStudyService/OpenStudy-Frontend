@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState, type FormEvent } from "react";
 import { useApp } from "../../app/context";
 import { api, queryString } from "../../shared/api/client";
@@ -142,6 +143,7 @@ export function BranchForm({
     [busy, setBusy] = useState(false),
     [latest, setLatest] = useState(""),
     [profileSaved, setProfileSaved] = useState(false);
+  const leave = useDraftGuard(draft);
   const idempotency = useIdempotency();
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -180,6 +182,7 @@ export function BranchForm({
           key: idempotency.key("create-branch", draft),
         });
       idempotency.committed();
+      leave.saved();
       await onSaved();
     } catch (e) {
       setError(e as Error);
@@ -189,6 +192,7 @@ export function BranchForm({
   }
   return (
     <form onSubmit={(e) => void submit(e)} className="grid gap-4">
+      {leave.guard}
       {error && profileSaved && (
         <p className="help" role="status">
           지점 기본 정보·운영시간은 저장되었지만 운영 상태는 저장하지

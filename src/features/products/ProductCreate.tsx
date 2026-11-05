@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { api } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
@@ -26,6 +27,7 @@ export function ProductCreate({
       ? [defaultBranchId]
       : [],
   }));
+  const leave = useDraftGuard(draft);
   const [errors, setErrors] = useState<Errors>({});
   const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,6 +46,7 @@ export function ProductCreate({
         key: key.key("create", body),
       });
       key.committed();
+      leave.saved();
       onSaved(created);
     } catch (e) {
       setError(e as Error);
@@ -60,6 +63,7 @@ export function ProductCreate({
         void submit();
       }}
     >
+      {leave.guard}
       <p className="help">
         상품은 삭제할 수 없어요. 더 이상 팔지 않으려면 등록 후 판매를 중지해
         주세요.

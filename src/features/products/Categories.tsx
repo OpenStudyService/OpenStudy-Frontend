@@ -1,4 +1,10 @@
+import {
+  PanelDrafts,
+  confirmDiscard,
+  useDraftGuard,
+} from "../../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { api, ApiError } from "../../shared/api/client";
@@ -32,7 +38,9 @@ function CategoryManagementSession() {
   const [kind, setKind] = useState<Kind>("시간권");
   const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
+  const leave = useDraftGuard({ code, name, kind });
   const [edit, setEdit] = useState<ProductCategory | null>(null);
+  const [editorDrafts] = useState(() => new Set<RefObject<boolean>>());
   async function refresh() {
     await query.invalidateQueries({ queryKey: ["data", session.user.id] });
   }
@@ -50,6 +58,7 @@ function CategoryManagementSession() {
   }
   return (
     <section className="grid gap-4">
+      {leave.guard}
       <p className="help">
         분류 코드와 유형은 등록한 뒤에는 바꿀 수 없어요. 분류를 쓰지 않으려면
         사용 중지로 바꿔 주세요. 이미 지정된 상품은 그대로 유지돼요.
@@ -67,6 +76,7 @@ function CategoryManagementSession() {
                 key: key.key("create", body),
               });
               key.committed();
+              leave.saved({ code: "", name: "", kind });
               setCode("");
               setName("");
             });
@@ -128,6 +138,11 @@ function CategoryManagementSession() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button
                     onClick={() => {
+                      if (
+                        edit?.id !== category.id &&
+                        !confirmDiscard(editorDrafts)
+                      )
+                        return;
                       setEdit(category);
                       setError(null);
                     }}
@@ -163,15 +178,17 @@ function CategoryManagementSession() {
         </>
       )}
       {edit && (
-        <CategoryNameEditor
-          key={edit.id}
-          category={edit}
-          onClose={() => setEdit(null)}
-          onSaved={() => {
-            setEdit(null);
-            void refresh();
-          }}
-        />
+        <PanelDrafts.Provider value={editorDrafts}>
+          <CategoryNameEditor
+            key={edit.id}
+            category={edit}
+            onClose={() => setEdit(null)}
+            onSaved={() => {
+              setEdit(null);
+              void refresh();
+            }}
+          />
+        </PanelDrafts.Provider>
       )}
       <SaveError error={error} refresh={refresh} fieldLabels={fieldLabels} />
     </section>
@@ -193,6 +210,7 @@ function CategoryNameEditor({
     [latest, setLatest] = useState<ProductCategory | null>(null),
     [conflict, setConflict] = useState(false),
     [busy, setBusy] = useState(false);
+  const leave = useDraftGuard(name);
   const controller = useRef<AbortController | null>(null),
     lock = useRef(false);
   useEffect(() => {
@@ -241,6 +259,7 @@ function CategoryNameEditor({
           signal,
         });
         signal.throwIfAborted();
+        leave.saved();
         onSaved();
       },
       (failure) => {
@@ -259,6 +278,7 @@ function CategoryNameEditor({
       className="card grid gap-3 p-4"
       onSubmit={save}
     >
+      {leave.guard}
       <h3>{category.code} 이름 변경</h3>
       <Field label="분류 이름 변경">
         <input
@@ -286,7 +306,13 @@ function CategoryNameEditor({
         <Button type="submit" disabled={busy || (conflict && !latest)}>
           {busy ? "처리 중…" : latest ? "최신 기준으로 이름 저장" : "이름 저장"}
         </Button>
-        <Button type="button" disabled={busy} onClick={onClose}>
+        <Button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (leave.confirm()) onClose();
+          }}
+        >
           취소
         </Button>
       </div>

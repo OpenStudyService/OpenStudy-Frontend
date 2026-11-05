@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -24,6 +25,8 @@ export function InvitationManagement() {
     [selectedId, setSelectedId] = useState<string | null>(null),
     [reason, setReason] = useState(""),
     [filter, setFilter] = useState("");
+  const leave = useDraftGuard({ name, email, branchId, role, grants });
+  const rejection = useDraftGuard(reason);
   const managed = session.branches
     .filter(
       (b) =>
@@ -92,6 +95,7 @@ export function InvitationManagement() {
       );
       key.committed();
       query.setQueryData(detailKey, updated);
+      rejection.saved("");
       setReason("");
       await refresh();
     } catch (e) {
@@ -103,6 +107,8 @@ export function InvitationManagement() {
   if (!managed.length) return <State title="초대 관리 권한이 없어요" />;
   return (
     <section className="grid gap-4">
+      {leave.guard}
+      {rejection.guard}
       <h2>초대·승인 관리</h2>
       <Button
         disabled={busy || rows.isFetching || detail.isFetching}
@@ -138,6 +144,13 @@ export function InvitationManagement() {
               key: key.key("create", body),
             });
             key.committed();
+            leave.saved({
+              name: "",
+              email: "",
+              branchId,
+              role,
+              grants,
+            });
             setName("");
             setEmail("");
             await refresh();
@@ -262,6 +275,7 @@ export function InvitationManagement() {
               <Button
                 disabled={busy}
                 onClick={() => {
+                  if (!rejection.confirm()) return;
                   setSelectedId(i.id);
                   setError(null);
                   setReason("");

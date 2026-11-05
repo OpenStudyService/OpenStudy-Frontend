@@ -386,6 +386,24 @@ it("asks for confirmation before stopping sales and then sends the status", asyn
   ]);
 });
 
+it("keeps an unsaved product draft when a different section would replace it", async () => {
+  const dialog = await open();
+  const name = within(dialog).getByLabelText("상품명");
+  await userEvent.clear(name);
+  await userEvent.type(name, "보존할 상품명");
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "판매 중지" }),
+  );
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "중지 확인" }),
+  );
+  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(calls()).toEqual([]);
+  expect(name).toHaveValue("보존할 상품명");
+  confirm.mockRestore();
+});
+
 it("returns the branch selection to the saved set when the change is rejected", async () => {
   failures["PUT /products/p1/branches"] = new ApiError(403, {
     code: "SCOPE_DENIED",

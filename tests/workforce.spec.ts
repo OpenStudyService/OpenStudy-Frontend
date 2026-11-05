@@ -30,6 +30,10 @@ test("mock schedule creates an overnight shift, keeps conflicts and cancels thro
   await expect(page.getByLabel("시작 (Asia/Seoul)")).toHaveValue(
     "2036-11-02T22:00",
   );
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("confirm");
+    await dialog.accept();
+  });
   await page.getByRole("button", { name: "닫기", exact: true }).click();
   await page.getByRole("button", { name: /예정 근무 ·/ }).click();
   await page.getByRole("button", { name: "근무 취소" }).click();

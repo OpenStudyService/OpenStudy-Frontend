@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -349,6 +350,7 @@ function EmployeeProfile({
     [error, setError] = useState<Error | null>(null),
     [latest, setLatest] = useState(""),
     [busy, setBusy] = useState(false);
+  const leave = useDraftGuard({ name, status });
   return (
     <form
       className="grid gap-3"
@@ -365,6 +367,7 @@ function EmployeeProfile({
               ...(status === "승인 대기" ? {} : { status }),
             } satisfies components["schemas"]["EmployeeUpdate"],
           });
+          leave.saved();
           setVersion(updated.version);
           await onSaved(updated, version);
         } catch (e) {
@@ -374,6 +377,7 @@ function EmployeeProfile({
         }
       }}
     >
+      {leave.guard}
       <Field label="직원 이름">
         <input
           required
@@ -459,6 +463,7 @@ export function MembershipForm({
     [latest, setLatest] = useState(""),
     [busy, setBusy] = useState(false),
     [blocked, setBlocked] = useState(false);
+  const leave = useDraftGuard(draft);
   const versions = sharedVersions ?? localVersions;
   const setVersions = onVersionsChange ?? setLocalVersions;
   const adminOnly = [
@@ -487,6 +492,7 @@ export function MembershipForm({
             employeeVersion: updated.employeeVersion,
             version: updated.membership.version,
           });
+          leave.saved();
           onCommitted?.(versions.employeeVersion, updated.employeeVersion);
           await onSaved();
         } catch (e) {
@@ -496,6 +502,7 @@ export function MembershipForm({
         }
       }}
     >
+      {leave.guard}
       <p className="help">
         이 지점의 소속만 저장합니다. 다른 지점 소속은 전송하거나 삭제하지
         않습니다.

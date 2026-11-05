@@ -1,3 +1,4 @@
+import { useLeaveGuard } from "../../shared/ui/leaveGuard";
 import { useId, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,7 +64,10 @@ export function ResourceForm({
   row?: Entity;
   scope: string;
   lookups: LookupData;
-  onSubmit: (data: Record<string, unknown>) => Promise<void>;
+  onSubmit: (
+    data: Record<string, unknown>,
+    committed: () => void,
+  ) => Promise<void>;
   label?: string;
   defaults?: Record<string, unknown>;
 }) {
@@ -105,6 +109,7 @@ export function ResourceForm({
     resolver: zodResolver(schema),
     defaultValues: initial(fields, row, scope, defaults),
   });
+  const leave = useLeaveGuard(form.formState.isDirty);
   const selectedBranch =
     (useWatch({ control: form.control, name: "branchId" }) as string) ||
     row?.branchId ||
@@ -189,7 +194,10 @@ export function ResourceForm({
         payload[f.key] = (payload[f.key] as string).trim();
     }
     try {
-      await onSubmit(payload);
+      await onSubmit(payload, () => {
+        leave.saved();
+        form.reset(data);
+      });
     } catch (e) {
       setError((e as Error).message);
       if (e instanceof ApiError)
@@ -201,6 +209,7 @@ export function ResourceForm({
   }
   return (
     <form className="form-grid" noValidate onSubmit={form.handleSubmit(submit)}>
+      {leave.guard}
       {fields.map((f) => {
         const key = `${id}-${f.key}`,
           error = form.formState.errors[f.key];

@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { api } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
@@ -77,6 +78,7 @@ function PresetForm({
     [latest, setLatest] = useState(""),
     [error, setError] = useState<Error | null>(null),
     [busy, setBusy] = useState(false);
+  const leave = useDraftGuard({ name, role, grants });
   return (
     <form
       className="grid gap-3"
@@ -102,6 +104,7 @@ function PresetForm({
                   } satisfies components["schemas"]["PresetCreate"]),
             },
           );
+          leave.saved();
           await onSaved();
         } catch (e) {
           setError(e as Error);
@@ -110,6 +113,7 @@ function PresetForm({
         }
       }}
     >
+      {leave.guard}
       <Field label="프리셋 이름">
         <input
           required
