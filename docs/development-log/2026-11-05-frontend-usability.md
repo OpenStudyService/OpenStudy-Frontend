@@ -52,3 +52,12 @@ graphify query로 공통 Panel·기존 이탈 경고·반응형 회귀를 찾았
 - 실제 스크린리더·실기기·400% 확대·모든 동적 상태에 대한 수동 WCAG 판정은 미검증이다. axe serious/critical 통과는 전체 WCAG 준수 인증이 아니다.
 - 기존 500KB chunk 경고와 HydrateFallback 경고는 범위 밖이다. 의존성 설치가 보고한 기존/전이 의존성 moderate advisory 10건에 대한 강제 버전 변경은 하지 않았다.
 - Backend 코드·환경·개발 DB를 사용하거나 수정하지 않았다. 로컬 시험 서버는 Playwright가 종료한다. 원격 main 반영·PR 병합·자동 병합은 수행하지 않는다.
+
+### PR #69 첫 CI 실패와 시험 동기화 보완
+
+- [첫 CI](https://github.com/OpenStudyService/OpenStudy-Frontend/actions/runs/41986562097)는 check·배포 스크립트·live/mock 산출물 검사를 통과했으나 Chromium 회귀 27/29개로 실패했다. 로컬 Google Chrome 29개 성공과 구분한다.
+- 회원 필터 시험은 연속 URL 변경 직후 reload하여 상태 필터가 주소에 남기 전에 다음 동작이 진행됐고, 근무 시험은 체험 로그인 완료 전에 직접 페이지 이동을 시작했다. 관측한 실패는 각각 상태 필터 빈값과 근무 등록 버튼 미노출이었다.
+- 회원 시험은 검색·상태·정렬·방향·페이지 크기 각각의 URL 반영을 확인한 뒤 다음 동작/새로고침을 수행한다. 근무 시험은 로그인 후 홈 제목을 확인하고 이동한다. 고정 sleep·재시도·시험 제외나 기존 인수 단언 완화는 하지 않는다. 제품 코드는 변경하지 않았다.
+- 로컬 Playwright Chromium을 설치한 뒤 두 시험을 각 3회 실행하여 6/6개 통과했다. 최초 시도는 Chromium 실행 파일 미설치로 시작하지 못했으며 설치 후 결과와 구분한다.
+- 보완 후 typecheck와 CI용 Chromium 전체 29개가 통과했다(2.0분). 첫 Google Chrome 결과·첫 CI 실패·최종 Chromium 결과를 구분했다.
+- 시험 보완 후 graphify도 다시 갱신했다: 2,621 nodes / 7,883 edges / 124 communities (AST 전용, 기존 ignore 정책 유지).

@@ -4,6 +4,7 @@ test("mock schedule creates an overnight shift, keeps conflicts and cancels thro
 }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "사장님으로 체험" }).click();
+  await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
   await page.goto("/app/gangnam/attendance?week=2036-11-02");
   await page.getByRole("button", { name: "근무 등록" }).click();
   await page.getByLabel("근무 직원").selectOption("junho");
