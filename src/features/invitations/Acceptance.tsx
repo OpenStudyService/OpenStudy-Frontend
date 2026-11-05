@@ -16,15 +16,33 @@ import { useUi } from "../../app/store";
 type Preview = components["schemas"]["InvitationPreview"];
 export function InvitationAccept() {
   const location = useLocation();
-  return <InvitationAcceptance key={location.hash || location.key} />;
+  const [entry, setEntry] = useState(() => ({
+    key: location.key,
+    observedHash: location.hash,
+    fragment: location.hash,
+    revision: 0,
+  }));
+  if (location.key !== entry.key || location.hash !== entry.observedHash) {
+    // Scrubbing this history entry must not remount the form. A new entry or
+    // an incoming fragment (including reopening the same link) starts afresh.
+    const incoming = location.key !== entry.key || !!location.hash;
+    setEntry({
+      key: location.key,
+      observedHash: location.hash,
+      fragment: incoming ? location.hash : entry.fragment,
+      revision: entry.revision + (incoming ? 1 : 0),
+    });
+  }
+  return (
+    <InvitationAcceptance key={entry.revision} fragment={entry.fragment} />
+  );
 }
-function InvitationAcceptance() {
-  const location = useLocation(),
-    query = useQueryClient(),
+function InvitationAcceptance({ fragment }: { fragment: string }) {
+  const query = useQueryClient(),
     navigate = useNavigate(),
     session = useSession();
   const [token] = useState(
-    () => new URLSearchParams(location.hash.slice(1)).get("token") || "",
+    () => new URLSearchParams(fragment.slice(1)).get("token") || "",
   );
   const [preview, setPreview] = useState<Preview | null>(null),
     [error, setError] = useState<Error | null>(null),

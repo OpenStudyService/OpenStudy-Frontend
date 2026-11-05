@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { BrowserRouter, MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { InvitationAccept } from "./Acceptance";
 import { api } from "../../shared/api/client";
@@ -30,7 +30,10 @@ beforeEach(() => {
         : { nextAction: "LOGIN_FOR_APPROVAL_STATUS" },
     );
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, "", "/");
+});
 function mount(url = "/invitations/accept#token=secret-link") {
   const query = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -141,5 +144,109 @@ it("keeps another branch invitation blocked until the first approval and relogin
   expect(api).not.toHaveBeenCalledWith(
     "/invitations/accept",
     expect.anything(),
+  );
+});
+
+function mountBrowser() {
+  window.history.replaceState(
+    { key: "invite-entry", idx: 0 },
+    "",
+    "/invitations/accept#token=secret-link",
+  );
+  const query = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={query}>
+      <BrowserRouter>
+        <InvitationAccept />
+      </BrowserRouter>
+    </QueryClientProvider>,
+  );
+  return query;
+}
+it("retains the private link and password when browser history resynchronizes the scrubbed URL", async () => {
+  const query = mountBrowser();
+  await userEvent.type(
+    await screen.findByLabelText("새 계정 비밀번호"),
+    "secure-password",
+  );
+  expect(window.location.hash).toBe("");
+  act(() => {
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: window.history.state }),
+    );
+  });
+  expect(screen.getByLabelText("새 계정 비밀번호")).toHaveValue(
+    "secure-password",
+  );
+  await userEvent.click(screen.getByRole("button", { name: "초대 수락" }));
+  expect(
+    await screen.findByRole("heading", { name: "초대 수락이 완료됐어요" }),
+  ).toBeVisible();
+  expect(api).toHaveBeenCalledWith(
+    "/invitations/accept",
+    expect.objectContaining({
+      body: expect.objectContaining({ token: "secret-link" }),
+    }),
+  );
+  expect(JSON.stringify(query.getQueryCache().getAll())).not.toContain(
+    "secret-link",
+  );
+});
+
+it("starts a fresh preview for a new or reopened fragment on the same history entry", async () => {
+  const query = mountBrowser();
+  await userEvent.type(
+    await screen.findByLabelText("새 계정 비밀번호"),
+    "discarded-password",
+  );
+  act(() => {
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: window.history.state }),
+    );
+  });
+  act(() => {
+    window.history.replaceState(
+      window.history.state,
+      "",
+      "/invitations/accept#token=another-link",
+    );
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: window.history.state }),
+    );
+  });
+  expect(await screen.findByLabelText("새 계정 비밀번호")).toHaveValue("");
+  expect(api).toHaveBeenCalledWith(
+    "/invitations/preview",
+    expect.objectContaining({ body: { token: "another-link" } }),
+  );
+  expect(window.location.hash).toBe("");
+  act(() => {
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: window.history.state }),
+    );
+  });
+  const previews = vi
+    .mocked(api)
+    .mock.calls.filter(([path]) => path === "/invitations/preview").length;
+  act(() => {
+    window.history.replaceState(
+      window.history.state,
+      "",
+      "/invitations/accept#token=another-link",
+    );
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: window.history.state }),
+    );
+  });
+  await screen.findByLabelText("새 계정 비밀번호");
+  expect(
+    vi
+      .mocked(api)
+      .mock.calls.filter(([path]) => path === "/invitations/preview"),
+  ).toHaveLength(previews + 1);
+  expect(JSON.stringify(query.getQueryCache().getAll())).not.toContain(
+    "another-link",
   );
 });
