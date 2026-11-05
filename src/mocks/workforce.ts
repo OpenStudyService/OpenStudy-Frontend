@@ -6,6 +6,7 @@ import type { Employee, ResourceMap } from "../shared/domain/schema";
 import type { Shift, Conflict } from "../features/attendance/api";
 import { weekDays } from "../features/attendance/api";
 import { assert, DomainError, store } from "./store";
+import { attendanceRecord } from "./attendance";
 type Args = {
   request: Request;
   params: Record<string, string | readonly string[] | undefined>;
@@ -45,7 +46,17 @@ function shift(s: ResourceMap["shifts"], u: Employee): Shift {
       attendance: [],
       canEdit: false,
     }),
-    canEdit: admin(u, s.branchId),
+    attendance: store.db.attendance
+      .filter((a) => a.canonical?.shiftId === s.id)
+      .map(attendanceRecord)
+      .map((a) => ({
+        id: a.id,
+        status: a.status,
+        clockInAt: a.clockInAt,
+        clockOutAt: a.clockOutAt,
+        workedMinutes: a.workedMinutes,
+      })),
+    canEdit: admin(u, s.branchId) && s.status !== "취소",
   };
 }
 class ShiftClash extends DomainError {
@@ -237,23 +248,7 @@ export const workforceHandlers = [
             (admin(u, s.branchId) || s.employeeId === u.id) &&
             days.includes(businessDate(s.startedAt)),
         )
-        .map((s) => ({
-          id: s.id,
-          version: s.version,
-          status: s.status,
-          branchId: s.branchId,
-          employee: actor(s.employeeId),
-          shiftId: null,
-          clockInAt: s.startedAt,
-          clockOutAt: s.endedAt || null,
-          workDate: businessDate(s.startedAt),
-          breaks: s.breaks.map((b, i) => ({
-            id: String(i),
-            startedAt: b.start,
-            endedAt: b.end || null,
-          })),
-          workedMinutes: s.status === "퇴근" ? s.workedMinutes : null,
-        }));
+        .map(attendanceRecord);
       return {
         weekStart: days[0],
         weekEnd: days[6],

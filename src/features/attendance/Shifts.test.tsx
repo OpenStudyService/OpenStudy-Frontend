@@ -15,7 +15,7 @@ import { http, HttpResponse } from "msw/http";
 import { setupServer } from "msw/node";
 import { clearCsrf } from "../../shared/api/client";
 import type { Shift } from "./api";
-import { AttendanceUnavailable, Shifts } from "./Shifts";
+import { Shifts } from "./Shifts";
 const state = vi.hoisted(() => ({
   scope: "1",
   session: {
@@ -181,9 +181,4 @@ it("hides management buttons for staff even if a stale response says canEdit", a
   expect(screen.queryByRole("button", { name: "근무 등록" })).toBeNull();
   expect(screen.queryByRole("button", { name: "근무 수정" })).toBeNull();
   expect(screen.queryByRole("button", { name: "근무 취소" })).toBeNull();
-});
-it("exposes no command or fake success while attendance is unavailable", () => {
-  render(<AttendanceUnavailable />);
-  expect(screen.getByText(/Backend #84/)).toBeVisible();
-  expect(screen.queryByRole("button")).toBeNull();
 });

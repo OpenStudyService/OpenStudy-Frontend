@@ -310,6 +310,7 @@ export const schemas = {
     status: z.enum(["예정", "변경", "취소"]),
   }),
   attendance: base.extend({
+    canonical: z.custom<components["schemas"]["AttendanceRecord"]>().optional(),
     employeeId: str,
     startedAt: str,
     endedAt: z.string(),
@@ -416,7 +417,12 @@ export interface Page<T> {
 export interface WorkspaceEvent {
   id: string;
   type: "changed" | "message" | "read" | "permissions";
-  resource: Resource | "customers" | "seat-sessions" | "locker-assignments";
+  resource:
+    | Resource
+    | "customers"
+    | "seat-sessions"
+    | "locker-assignments"
+    | "attendance-records";
   entityId: string;
   branchId: string;
 }

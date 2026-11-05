@@ -18,17 +18,6 @@ import {
   shiftTime as displayDate,
 } from "./api";
 
-export function AttendanceUnavailable() {
-  return (
-    <section className="card p-5">
-      <h2>출퇴근·휴게 연결 대기</h2>
-      <p>
-        출근·휴게·퇴근과 근태 목록은 Backend #84 구현·병합 후 제공됩니다. 현재
-        예정 근무는 실제 출근을 뜻하지 않습니다.
-      </p>
-    </section>
-  );
-}
 export function Shifts() {
   const { session, scope } = useApp();
   const [params, setParams] = useSearchParams();
