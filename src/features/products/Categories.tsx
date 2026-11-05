@@ -82,37 +82,39 @@ function CategoryManagementSession() {
             });
           }}
         >
-          <h3>분류 등록</h3>
-          <Field label="분류 코드 (영문 대문자·숫자·밑줄)">
-            <input
-              required
-              maxLength={40}
-              pattern="[A-Z][A-Z0-9_]{0,39}"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </Field>
-          <Field label="분류 이름">
-            <input
-              required
-              maxLength={120}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <Field label="분류 유형">
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as Kind)}
-            >
-              {kinds.map((k) => (
-                <option key={k}>{k}</option>
-              ))}
-            </select>
-          </Field>
-          <Button type="submit" disabled={busy}>
-            분류 등록
-          </Button>
+          <fieldset className="contents" disabled={busy}>
+            <h3>분류 등록</h3>
+            <Field label="분류 코드 (영문 대문자·숫자·밑줄)">
+              <input
+                required
+                maxLength={40}
+                pattern="[A-Z][A-Z0-9_]{0,39}"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+              />
+            </Field>
+            <Field label="분류 이름">
+              <input
+                required
+                maxLength={120}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <Field label="분류 유형">
+              <select
+                value={kind}
+                onChange={(e) => setKind(e.target.value as Kind)}
+              >
+                {kinds.map((k) => (
+                  <option key={k}>{k}</option>
+                ))}
+              </select>
+            </Field>
+            <Button type="submit" disabled={busy}>
+              분류 등록
+            </Button>
+          </fieldset>
         </form>
       )}
       {categories.isPending ? (

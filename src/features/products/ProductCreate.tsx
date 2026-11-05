@@ -64,26 +64,29 @@ export function ProductCreate({
       }}
     >
       {leave.guard}
-      <p className="help">
-        상품은 삭제할 수 없어요. 더 이상 팔지 않으려면 등록 후 판매를 중지해
-        주세요.
-      </p>
-      <ProductForm
-        mode="create"
-        draft={draft}
-        errors={errors}
-        categories={categories}
-        branches={branches}
-        onChange={setDraft}
-      />
-      <SaveError
-        error={error}
-        refresh={async () => undefined}
-        fieldLabels={fieldLabels}
-      />
-      <Button type="submit" variant="primary" disabled={busy}>
-        상품 등록
-      </Button>
+      <fieldset className="contents" disabled={busy}>
+        <p className="help">
+          상품은 삭제할 수 없어요. 더 이상 팔지 않으려면 등록 후 판매를 중지해
+          주세요.
+        </p>
+        <ProductForm
+          disabled={busy}
+          mode="create"
+          draft={draft}
+          errors={errors}
+          categories={categories}
+          branches={branches}
+          onChange={setDraft}
+        />
+        <SaveError
+          error={error}
+          refresh={async () => undefined}
+          fieldLabels={fieldLabels}
+        />
+        <Button type="submit" variant="primary" disabled={busy}>
+          상품 등록
+        </Button>
+      </fieldset>
     </form>
   );
 }

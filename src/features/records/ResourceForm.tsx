@@ -210,121 +210,123 @@ export function ResourceForm({
   return (
     <form className="form-grid" noValidate onSubmit={form.handleSubmit(submit)}>
       {leave.guard}
-      {fields.map((f) => {
-        const key = `${id}-${f.key}`,
-          error = form.formState.errors[f.key];
-        return (
-          <div className="field" key={f.key}>
-            {f.type === "checkbox" ? (
-              <label className="flex items-center gap-2">
-                <input type="checkbox" {...form.register(f.key)} />
-                {f.label}
-              </label>
-            ) : (
-              <>
-                <label htmlFor={key}>
+      <fieldset className="contents" disabled={form.formState.isSubmitting}>
+        {fields.map((f) => {
+          const key = `${id}-${f.key}`,
+            error = form.formState.errors[f.key];
+          return (
+            <div className="field" key={f.key}>
+              {f.type === "checkbox" ? (
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" {...form.register(f.key)} />
                   {f.label}
-                  {f.required && (
-                    <span className="ml-1 text-primary" aria-hidden="true">
-                      *
-                    </span>
-                  )}
                 </label>
-                {f.type === "select" || f.type === "multiselect" ? (
-                  <select
-                    id={key}
-                    aria-label={f.label}
-                    aria-required={f.required}
-                    aria-describedby={
-                      error
-                        ? `${key}-error`
-                        : f.ref === "employees" && employeeScopeUnavailable
-                          ? `${key}-scope`
+              ) : (
+                <>
+                  <label htmlFor={key}>
+                    {f.label}
+                    {f.required && (
+                      <span className="ml-1 text-primary" aria-hidden="true">
+                        *
+                      </span>
+                    )}
+                  </label>
+                  {f.type === "select" || f.type === "multiselect" ? (
+                    <select
+                      id={key}
+                      aria-label={f.label}
+                      aria-required={f.required}
+                      aria-describedby={
+                        error
+                          ? `${key}-error`
+                          : f.ref === "employees" && employeeScopeUnavailable
+                            ? `${key}-scope`
+                            : undefined
+                      }
+                      multiple={f.type === "multiselect"}
+                      {...form.register(f.key)}
+                      value={
+                        f.ref === "employees"
+                          ? (employeeValues[
+                              employeeFields.findIndex(
+                                (field) => field.key === f.key,
+                              )
+                            ] as string | string[])
                           : undefined
-                    }
-                    multiple={f.type === "multiselect"}
-                    {...form.register(f.key)}
-                    value={
-                      f.ref === "employees"
-                        ? (employeeValues[
-                            employeeFields.findIndex(
-                              (field) => field.key === f.key,
-                            )
-                          ] as string | string[])
-                        : undefined
-                    }
-                    aria-invalid={!!error}
-                    disabled={
-                      (!!row && f.key === "branchId") ||
-                      (f.ref === "employees" && employeeScopeUnavailable)
-                    }
-                  >
-                    {f.type !== "multiselect" && (
-                      <option value="">선택해 주세요</option>
-                    )}
-                    {f.key === "branchId" && f.options?.includes("all") && (
-                      <option value="all">전체 지점</option>
-                    )}
-                    {options(f).map((o) => (
-                      <option value={o.id} key={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : f.type === "textarea" || f.type === "checks" ? (
-                  <textarea
-                    id={key}
-                    aria-label={f.label}
-                    aria-required={f.required}
-                    aria-describedby={error ? `${key}-error` : undefined}
-                    {...form.register(f.key)}
-                    placeholder={
-                      f.type === "checks"
-                        ? "한 줄에 한 항목씩 입력해 주세요. [x]로 완료를 표시할 수 있어요."
-                        : undefined
-                    }
-                    aria-invalid={!!error}
-                  />
-                ) : (
-                  <input
-                    id={key}
-                    aria-label={f.label}
-                    aria-required={f.required}
-                    aria-describedby={error ? `${key}-error` : undefined}
-                    type={f.type || "text"}
-                    step={f.step || (f.type === "datetime-local" ? 1800 : 1)}
-                    min={f.min}
-                    {...form.register(f.key, {
-                      valueAsNumber: f.type === "number",
-                    })}
-                    aria-invalid={!!error}
-                  />
-                )}
-              </>
-            )}
-            {f.ref === "employees" && employeeScopeUnavailable && (
-              <p className="help" id={`${key}-scope`}>
-                {employeeScopeMessage}
-              </p>
-            )}
-            {error && (
-              <FieldError id={`${key}-error`}>
-                {String(error.message)}
-              </FieldError>
-            )}
-          </div>
-        );
-      })}
-      {error && <FieldError>{error}</FieldError>}
-      <div className="sticky bottom-0 flex justify-end border-t border-line bg-surface pt-4">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={form.formState.isSubmitting}
-        >
-          {form.formState.isSubmitting ? "처리 중…" : label}
-        </Button>
-      </div>
+                      }
+                      aria-invalid={!!error}
+                      disabled={
+                        (!!row && f.key === "branchId") ||
+                        (f.ref === "employees" && employeeScopeUnavailable)
+                      }
+                    >
+                      {f.type !== "multiselect" && (
+                        <option value="">선택해 주세요</option>
+                      )}
+                      {f.key === "branchId" && f.options?.includes("all") && (
+                        <option value="all">전체 지점</option>
+                      )}
+                      {options(f).map((o) => (
+                        <option value={o.id} key={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : f.type === "textarea" || f.type === "checks" ? (
+                    <textarea
+                      id={key}
+                      aria-label={f.label}
+                      aria-required={f.required}
+                      aria-describedby={error ? `${key}-error` : undefined}
+                      {...form.register(f.key)}
+                      placeholder={
+                        f.type === "checks"
+                          ? "한 줄에 한 항목씩 입력해 주세요. [x]로 완료를 표시할 수 있어요."
+                          : undefined
+                      }
+                      aria-invalid={!!error}
+                    />
+                  ) : (
+                    <input
+                      id={key}
+                      aria-label={f.label}
+                      aria-required={f.required}
+                      aria-describedby={error ? `${key}-error` : undefined}
+                      type={f.type || "text"}
+                      step={f.step || (f.type === "datetime-local" ? 1800 : 1)}
+                      min={f.min}
+                      {...form.register(f.key, {
+                        valueAsNumber: f.type === "number",
+                      })}
+                      aria-invalid={!!error}
+                    />
+                  )}
+                </>
+              )}
+              {f.ref === "employees" && employeeScopeUnavailable && (
+                <p className="help" id={`${key}-scope`}>
+                  {employeeScopeMessage}
+                </p>
+              )}
+              {error && (
+                <FieldError id={`${key}-error`}>
+                  {String(error.message)}
+                </FieldError>
+              )}
+            </div>
+          );
+        })}
+        {error && <FieldError>{error}</FieldError>}
+        <div className="sticky bottom-0 flex justify-end border-t border-line bg-surface pt-4">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={form.formState.isSubmitting}
+          >
+            {form.formState.isSubmitting ? "처리 중…" : label}
+          </Button>
+        </div>
+      </fieldset>
     </form>
   );
 }

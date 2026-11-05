@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -14,6 +14,44 @@ import { UnsavedChangesBoundary, useDraftGuard } from "./leaveGuard";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+it("keeps edits made while a previous save is pending protected after that save finishes", () => {
+  function PendingSave() {
+    const [value, setValue] = useState("");
+    const leave = useDraftGuard(value);
+    const finish = useRef(() => {});
+    return (
+      <>
+        {leave.guard}
+        <input
+          aria-label="초안"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <button
+          onClick={() => {
+            finish.current = leave.saved;
+          }}
+        >
+          저장 시작
+        </button>
+        <button onClick={() => finish.current()}>저장 응답</button>
+      </>
+    );
+  }
+  render(<PendingSave />);
+  fireEvent.change(screen.getByLabelText("초안"), {
+    target: { value: "전송한 값" },
+  });
+  fireEvent.click(screen.getByText("저장 시작"));
+  fireEvent.change(screen.getByLabelText("초안"), {
+    target: { value: "응답 전 새 입력" },
+  });
+  fireEvent.click(screen.getByText("저장 응답"));
+  const event = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(true);
+  expect(screen.getByLabelText("초안")).toHaveValue("응답 전 새 입력");
 });
 function Form({ name }: { name: string }) {
   const [value, setValue] = useState("");

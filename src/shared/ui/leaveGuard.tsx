@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode, RefObject } from "react";
 import { UNSAFE_DataRouterContext, useBlocker } from "react-router";
 
@@ -67,11 +74,11 @@ function Registration({ dirty }: { dirty: RefObject<boolean> }) {
   return router && !navigation ? <RouterGuard drafts={fallback} /> : null;
 }
 
-export function useLeaveGuard(changed: boolean) {
+export function useLeaveGuard(changed: boolean, revision?: string) {
   const dirty = useRef(changed);
   useEffect(() => {
     dirty.current = changed;
-  }, [changed]);
+  }, [changed, revision]);
   useEffect(() => {
     const prevent = (event: BeforeUnloadEvent) => {
       if (dirty.current) {
@@ -85,8 +92,8 @@ export function useLeaveGuard(changed: boolean) {
   return {
     guard: <Registration dirty={dirty} />,
     confirm: () => confirmDiscard(new Set([dirty])),
-    saved: () => {
-      dirty.current = false;
+    saved: (keepChanges = false) => {
+      dirty.current = keepChanges;
     },
   };
 }
@@ -95,12 +102,17 @@ export function useLeaveGuard(changed: boolean) {
 export function useDraftGuard(value: unknown) {
   const serialized = JSON.stringify(value);
   const [baseline, setBaseline] = useState(serialized);
-  const leave = useLeaveGuard(serialized !== baseline);
+  const latest = useRef(serialized);
+  useLayoutEffect(() => {
+    latest.current = serialized;
+  }, [serialized]);
+  const leave = useLeaveGuard(serialized !== baseline, baseline);
   return {
     guard: leave.guard,
     confirm: leave.confirm,
     saved: (nextValue: unknown = value) => {
-      leave.saved();
+      // A delayed success must not clear edits made after the submitted snapshot.
+      leave.saved(latest.current !== serialized);
       setBaseline(JSON.stringify(nextValue));
     },
   };

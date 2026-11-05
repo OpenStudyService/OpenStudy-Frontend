@@ -114,76 +114,78 @@ function PresetForm({
       }}
     >
       {leave.guard}
-      <Field label="프리셋 이름">
-        <input
-          required
-          value={name}
-          maxLength={100}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </Field>
-      <Field label="프리셋 역할">
-        <select
-          disabled={!!preset}
-          value={role}
-          onChange={(e) => {
-            const value = e.target.value as Preset["role"];
-            setRole(value);
-            setGrants(rolePermissions(value));
-          }}
-        >
-          <option value="staff">일반 직원</option>
-          <option value="admin">지점 관리자</option>
-        </select>
-      </Field>
-      {permissions.map((code) => (
-        <label key={code}>
+      <fieldset className="contents" disabled={busy}>
+        <Field label="프리셋 이름">
           <input
-            type="checkbox"
-            checked={grants.includes(code)}
-            disabled={role === "staff" && adminOnly.includes(code)}
-            onChange={(e) =>
-              setGrants(
-                e.target.checked
-                  ? [...grants, code]
-                  : grants.filter((p) => p !== code),
-              )
-            }
-          />{" "}
-          {code}
-        </label>
-      ))}
-      <SaveError
-        error={error}
-        latest={latest}
-        refresh={async () => {
-          try {
-            let page = 1,
-              found: Preset | undefined;
-            while (!found) {
-              const result = await organizationRead<
-                components["schemas"]["PermissionPresetPage"]
-              >(`/permission-presets?pageSize=100&page=${page}`);
-              found = result.items.find((p) => p.id === preset?.id);
-              if (found || page * 100 >= result.meta.total) break;
-              page += 1;
-            }
-            if (!found)
-              throw new Error(
-                "이 프리셋을 찾을 수 없습니다. 목록을 다시 확인해 주세요.",
+            required
+            value={name}
+            maxLength={100}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field>
+        <Field label="프리셋 역할">
+          <select
+            disabled={!!preset}
+            value={role}
+            onChange={(e) => {
+              const value = e.target.value as Preset["role"];
+              setRole(value);
+              setGrants(rolePermissions(value));
+            }}
+          >
+            <option value="staff">일반 직원</option>
+            <option value="admin">지점 관리자</option>
+          </select>
+        </Field>
+        {permissions.map((code) => (
+          <label key={code}>
+            <input
+              type="checkbox"
+              checked={grants.includes(code)}
+              disabled={role === "staff" && adminOnly.includes(code)}
+              onChange={(e) =>
+                setGrants(
+                  e.target.checked
+                    ? [...grants, code]
+                    : grants.filter((p) => p !== code),
+                )
+              }
+            />{" "}
+            {code}
+          </label>
+        ))}
+        <SaveError
+          error={error}
+          latest={latest}
+          refresh={async () => {
+            try {
+              let page = 1,
+                found: Preset | undefined;
+              while (!found) {
+                const result = await organizationRead<
+                  components["schemas"]["PermissionPresetPage"]
+                >(`/permission-presets?pageSize=100&page=${page}`);
+                found = result.items.find((p) => p.id === preset?.id);
+                if (found || page * 100 >= result.meta.total) break;
+                page += 1;
+              }
+              if (!found)
+                throw new Error(
+                  "이 프리셋을 찾을 수 없습니다. 목록을 다시 확인해 주세요.",
+                );
+              setVersion(found.version);
+              setLatest(
+                `${found.name} / 권한 ${found.permissions.join(", ") || "없음"} (v${found.version})`,
               );
-            setVersion(found.version);
-            setLatest(
-              `${found.name} / 권한 ${found.permissions.join(", ") || "없음"} (v${found.version})`,
-            );
-          } catch (e) {
-            setError(e as Error);
-          }
-        }}
-      />
-      <Button type="submit" disabled={busy}>
-        프리셋 저장
-      </Button>
+            } catch (e) {
+              setError(e as Error);
+            }
+          }}
+        />
+        <Button type="submit" disabled={busy}>
+          프리셋 저장
+        </Button>
+      </fieldset>
     </form>
   );
 }

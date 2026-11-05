@@ -61,3 +61,13 @@ graphify query로 공통 Panel·기존 이탈 경고·반응형 회귀를 찾았
 - 로컬 Playwright Chromium을 설치한 뒤 두 시험을 각 3회 실행하여 6/6개 통과했다. 최초 시도는 Chromium 실행 파일 미설치로 시작하지 못했으며 설치 후 결과와 구분한다.
 - 보완 후 typecheck와 CI용 Chromium 전체 29개가 통과했다(2.0분). 첫 Google Chrome 결과·첫 CI 실패·최종 Chromium 결과를 구분했다.
 - 시험 보완 후 graphify도 다시 갱신했다: 2,621 nodes / 7,883 edges / 124 communities (AST 전용, 기존 ignore 정책 유지).
+
+### 저장 중 새 입력 경계 보완
+
+- CI 대기 중 추가 검토에서, 저장 요청이 진행되는 사이 입력이 달라지면 이전 성공 콜백이 최신 초안의 dirty ref를 false로 만들 수 있음을 발견했다. 저장 시작/새 입력/기존 응답 순서를 재현한 단위 시험이 수정 전에 실패했다.
+- draft hook은 전송 시점의 값과 현재 메모리의 최신 값을 비교해 이후 입력을 계속 보호하고, 저장 기준이 바뀌어도 dirty 상태를 다시 반영한다. 프로필처럼 화면에 남는 편집기의 후속 입력도 보호한다.
+- 상품·분류·지점·프리셋·초대·공통 폼처럼 성공 후 닫거나 입력을 초기화하는 폼은 처리 중 fieldset을 비활성화해 성공 응답이 후속 입력을 버리지 않게 했다. 실패하면 다시 입력할 수 있고 기존 초안은 유지한다.
+- 수정 후 공통 guard·상품·공통 폼·조직 집중 단위 시험 39개가 통과했다. 이전 저장의 성공을 새 입력의 저장으로 간주하지 않는다.
+- 이 보완까지 포함한 최종 `npm run check`는 typecheck·lint·Vitest 570개·메일 도구 9개·빌드 가드 19개를 통과했다. 최종 Chromium 전체 29개(2.3분), live/mock 빌드와 산출물 Chrome 5개(10.0초)도 통과했다.
+- 시험 동기화 보완 커밋 `432f906`의 [CI #68](https://github.com/OpenStudyService/OpenStudy-Frontend/actions/runs/41988025389) 성공을 확인했다. 추가 입력 경계 보완은 후속 커밋에서 다시 CI로 검증하며 최종 링크를 PR에 남긴다.
+- 입력 경계 보완 후 최종 graphify: 2,623 nodes / 7,886 edges / 124 communities. AST 전용 갱신이며 기존 ignore 정책을 유지했다.
