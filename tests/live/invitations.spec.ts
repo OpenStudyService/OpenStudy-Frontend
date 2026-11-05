@@ -27,10 +27,16 @@ test.beforeAll(() => {
     );
 });
 
-async function command(context: BrowserContext, path: string, body: unknown) {
+async function command(
+  context: BrowserContext,
+  path: string,
+  body: unknown,
+  method = "POST",
+) {
   const csrf = await context.request.get(`${baseURL}/api/auth/csrf`);
   const { token } = await csrf.json();
-  return context.request.post(`${baseURL}/api${path}`, {
+  return context.request.fetch(`${baseURL}/api${path}`, {
+    method,
     headers: { "X-CSRF-Token": token, "Idempotency-Key": randomUUID() },
     data: body,
   });
@@ -58,14 +64,46 @@ async function list(context: BrowserContext, email: string) {
     `${baseURL}/api/invitations?scope=all&pageSize=100&q=${encodeURIComponent(email)}`,
   );
   expect(response.status()).toBe(200);
-  return (await response.json()).items as Invitation[];
+  const result = await response.json();
+  assertNoSecrets(result);
+  return result.items as Invitation[];
+}
+// Assert booleans rather than dumping an unexpected secret-bearing response.
+function assertNoSecrets(value: unknown) {
+  const forbidden = new Set([
+    "token",
+    "rawToken",
+    "tokenHash",
+    "token_hash",
+    "tokenPayload",
+    "token_payload_ciphertext",
+    "password",
+    "acceptanceUrl",
+    "acceptanceLink",
+  ]);
+  function containsSecret(input: unknown): boolean {
+    if (!input || typeof input !== "object") return false;
+    return Object.entries(input).some(
+      ([key, nested]) => forbidden.has(key) || containsSecret(nested),
+    );
+  }
+  expect(
+    containsSecret(value),
+    "Administrator DTO contains no credentials or mail links",
+  ).toBe(false);
+  expect(
+    JSON.stringify(value).includes("#token="),
+    "Administrator DTO contains no fragment mail link",
+  ).toBe(false);
 }
 async function detail(context: BrowserContext, id: string) {
   const response = await context.request.get(
     `${baseURL}/api/invitations/${id}?scope=all`,
   );
   expect(response.status()).toBe(200);
-  return (await response.json()) as Invitation;
+  const result = await response.json();
+  assertNoSecrets(result);
+  return result as Invitation;
 }
 async function create(page: Page, branch: string, email: string, name: string) {
   await page.goto(`/app/${branch}/employees?tab=invitations`);
@@ -91,9 +129,10 @@ async function create(page: Page, branch: string, email: string, name: string) {
 async function mailLink(
   context: BrowserContext,
   email: string,
-  previous?: string,
+  previous?: string | readonly string[],
 ) {
   let link = "";
+  const seen = new Set(typeof previous === "string" ? [previous] : previous);
   await expect
     .poll(
       async () => {
@@ -113,7 +152,7 @@ async function mailLink(
           const found = mail.Text.match(
             /http:\/\/127\.0\.0\.1:15176\/invitations\/accept#token=[A-Za-z0-9_-]+/,
           )?.[0];
-          if (found && found !== previous) {
+          if (found && !seen.has(found)) {
             link = found;
             return true;
           }
@@ -133,6 +172,12 @@ async function acceptNew(page: Page, link: string) {
   await expect(page.getByLabel("새 계정 비밀번호")).toBeVisible();
   await expect(page).toHaveURL(`${baseURL}/invitations/accept`);
   await page.getByLabel("새 계정 비밀번호").fill(password);
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new PopStateEvent("popstate", { state: window.history.state }),
+    ),
+  );
+  await expect(page.getByLabel("새 계정 비밀번호")).toHaveValue(password);
   await page.getByRole("button", { name: "초대 수락", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "초대 수락이 완료됐어요" }),
@@ -158,8 +203,14 @@ test("real SMTP link: two-browser approval, restricted session, relogin, and an 
     const suffix = randomUUID().slice(0, 8);
     const email = `new-${suffix}@invitation.test`,
       name = `신규 ${suffix}`;
-    await create(manager.page, first.id, email, name);
+    const firstInvitation = await create(manager.page, first.id, email, name);
     const link = await mailLink(manager.context, email);
+    await manager.page
+      .getByRole("button", { name: `초대 상세: ${name}`, exact: true })
+      .click();
+    await expect(
+      manager.page.getByRole("button", { name: "최종 승인", exact: true }),
+    ).toHaveCount(0);
     const page = await employee.newPage();
     const tokenRequests: string[] = [];
     page.on("request", (request) => {
@@ -167,6 +218,14 @@ test("real SMTP link: two-browser approval, restricted session, relogin, and an 
         tokenRequests.push("query token");
     });
     await acceptNew(page, link);
+    // Keep the owner's detail open: actual acceptance must refresh its status
+    // and version without navigating away or manually reloading the page.
+    await expect(
+      manager.page.getByRole("button", { name: "최종 승인", exact: true }),
+    ).toBeEnabled();
+    expect((await detail(manager.context, firstInvitation.id)).status).toBe(
+      "승인 대기",
+    );
     await page.getByRole("link", { name: "로그인으로 돌아가기" }).click();
     await login(page, email);
     await expect(
@@ -215,6 +274,16 @@ test("real SMTP link: two-browser approval, restricted session, relogin, and an 
       await employee.request.get(`${baseURL}/api/me`)
     ).json();
     expect(oldSession.sessionMode).toBe("WORKSPACE");
+    expect(
+      (
+        await employee.request.get(`${baseURL}/api/tasks?scope=${first.id}`)
+      ).status(),
+    ).toBe(200);
+    expect(
+      (
+        await employee.request.get(`${baseURL}/api/tasks?scope=${second.id}`)
+      ).status(),
+    ).toBe(403);
     await expect(
       page.getByRole("heading", { name: /안녕하세요/ }),
     ).toBeVisible();
@@ -253,6 +322,82 @@ test("real SMTP link: two-browser approval, restricted session, relogin, and an 
       page.getByRole("heading", { name: /안녕하세요/ }),
     ).toBeVisible();
     expect((await detail(manager.context, additional.id)).status).toBe("활성");
+    expect(
+      (
+        await employee.request.get(`${baseURL}/api/tasks?scope=${second.id}`)
+      ).status(),
+    ).toBe(200);
+    const lookups = await (
+      await employee.request.get(`${baseURL}/api/lookups?scope=${second.id}`)
+    ).json();
+    expect(lookups.preview).not.toBe(true);
+    expect(
+      (
+        await employee.request.get(`${baseURL}/api/local-preview/lookups`)
+      ).status(),
+    ).toBe(404);
+    // Revoke and reinvite the existing employee at the same branch. The first
+    // branch and password stay usable throughout this restoration flow.
+    const account = await (
+      await manager.context.request.get(
+        `${baseURL}/api/employees/${oldSession.user.id}?scope=${second.id}`,
+      )
+    ).json();
+    const membership = account.memberships.find(
+      (m: { branchId: string }) => m.branchId === second.id,
+    );
+    const revoked = await command(
+      manager.context,
+      `/employees/${oldSession.user.id}/memberships/${second.id}?scope=${second.id}`,
+      {
+        employeeVersion: account.version,
+        version: membership.version,
+        role: "staff",
+        status: "회수",
+        permissions: [],
+      },
+      "PUT",
+    );
+    expect(revoked.status()).toBe(200);
+    expect(
+      (
+        await employee.request.get(`${baseURL}/api/tasks?scope=${first.id}`)
+      ).status(),
+    ).toBe(200);
+    expect(
+      (
+        await employee.request.get(`${baseURL}/api/tasks?scope=${second.id}`)
+      ).status(),
+    ).toBe(403);
+    const restoreName = `복구 ${suffix}`;
+    const restoredInvitation = await create(
+      manager.page,
+      second.id,
+      email,
+      restoreName,
+    );
+    const restoredLink = await mailLink(manager.context, email, [
+      link,
+      additionalLink,
+    ]);
+    await page.goto(restoredLink);
+    await expect(page.getByLabel("기존 계정 비밀번호")).toHaveCount(0);
+    await page.getByRole("button", { name: "초대 수락", exact: true }).click();
+    await expect(page).toHaveURL(/\/pending-approval$/);
+    await approve(manager.page, second.id, restoreName);
+    const restoredSession = await (
+      await employee.request.get(`${baseURL}/api/me`)
+    ).json();
+    expect(restoredSession.user.id).toBe(oldSession.user.id);
+    expect(restoredSession.sessionMode).toBe("WORKSPACE");
+    expect(
+      (
+        await employee.request.get(`${baseURL}/api/tasks?scope=${second.id}`)
+      ).status(),
+    ).toBe(200);
+    expect((await detail(manager.context, restoredInvitation.id)).status).toBe(
+      "활성",
+    );
     await page.screenshot({
       path: test.info().outputPath("approved-second-branch.png"),
       fullPage: true,

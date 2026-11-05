@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
+    "test:e2e:invitations:mock": "playwright test --config playwright.invitation-mock.config.ts",
     "test:e2e:customers:live": "playwright test --config playwright.customers.config.ts",
     "test:e2e:payments:live": "playwright test --config playwright.payments.config.ts",
     "test:e2e:tasks:live": "playwright test --config playwright.tasks.config.ts",

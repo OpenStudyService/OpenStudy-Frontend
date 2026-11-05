@@ -23,10 +23,16 @@ $env:SPRING_PROFILES_ACTIVE='local'
 $env:BOOTSTRAP_OWNER_EMAIL='owner@invitation.test'
 $env:BOOTSTRAP_OWNER_PASSWORD='Invitation-local-2026!'
 .\gradlew.bat bootJar --no-daemon
-& "$env:JAVA_HOME/bin/java.exe" -jar build/libs/openstudy-backend-0.0.1-SNAPSHOT.jar --server.port=18086 --spring.mail.host=127.0.0.1 --spring.mail.port=11025 --spring.mail.properties.mail.smtp.localhost=localhost --openstudy.invitation-mail.enabled=true --openstudy.invitation-mail.from=no-reply@invitation.test --openstudy.invitation-mail.acceptance-url=http://127.0.0.1:15176/invitations/accept
+& "$env:JAVA_HOME/bin/java.exe" -jar build/libs/openstudy-backend-0.0.1-SNAPSHOT.jar --server.port=18086 --openstudy.local-preview.enabled=false --spring.mail.host=127.0.0.1 --spring.mail.port=11025 --spring.mail.properties.mail.smtp.localhost=localhost --openstudy.invitation-mail.enabled=true --openstudy.invitation-mail.from=no-reply@invitation.test --openstudy.invitation-mail.acceptance-url=http://127.0.0.1:15176/invitations/accept
 ```
 
-`local` 프로필이 빈 DB에 샘플 지점 두 개를 준비한다. 초대·계정·소속·세션·승인은 실제 DB/API이며 홈의 업무 내용은 읽기 전용 로컬 샘플이다. [Backend PR #39](https://github.com/OpenStudyService/OpenStudy-Backend/pull/39)의 일반 직원 지점 홈 수정과, 반복 SSE 연결이 DB 연결을 보유하지 않도록 `spring.jpa.open-in-view=false`를 명시한 설정도 필요하다([개발 기록](../development-log/2026-10-27-invitation-live-integration.md)).
+`local` 프로필은 합성 OWNER 초기화에만 사용한다. 샘플 기능을 끈 채 Flyway 완료 후 별도 터미널에서 **이번 빈 검증 DB에만** 지점 두 개를 준비한다.
+
+```powershell
+docker exec --env MYSQL_PWD=invitation-local-only openstudy-invitation-live-db mysql -uroot invitation_live -e "INSERT INTO branches (code,name,address,status) VALUES ('INV-LIVE-01','Invitation One','Synthetic fixture','ACTIVE'),('INV-LIVE-02','Invitation Two','Synthetic fixture','ACTIVE');"
+```
+
+초대·메일·계정·소속·세션·승인은 실제 API와 DB를 사용한다. 업무 진입은 실제 `/tasks` 접근 200 및 승인 전/회수 후 타 지점 403으로 확인하고, `/api/local-preview/lookups`가 404인지 확인한다. 홈의 M9 요약 API 완성 여부는 이 시험의 완료 조건이 아니다. 2026-10-27의 과거 실행은 샘플 홈을 사용했으며 [당시 기록](../development-log/2026-10-27-invitation-live-integration.md)으로 구분한다. [Backend PR #39](https://github.com/OpenStudyService/OpenStudy-Backend/pull/39)의 SSE 연결 반환 수정은 main에 병합돼 있다.
 
 프론트 checkout에서 실행한다. 15176 포트의 live Vite 서버는 Playwright가 직접 시작하며 기존 서버를 재사용하지 않는다. 18086으로 프록시한다.
 
@@ -42,10 +48,20 @@ npm run test:e2e:live
 
 - 신규 메일 링크 수락 → 제한 로그인 → 다른 브라우저 승인 → 15초 poll 갱신 → 기존 제한 세션의 업무 403 유지 → 재로그인 → 지점 진입.
 - 첫 승인 전 추가 지점 수락 403 및 화면 안내, 승인·재로그인 후 같은 초대 수락. 기존 직원은 비밀번호 변경 없이 기존 업무 세션·지점을 유지하며 추가 승인 뒤 새 지점에 들어간다.
+- 같은 지점 소속을 회수한 뒤 새 메일로 재초대·수락·승인하면 같은 계정으로 복구된다. 기존 지점 업무는 유지된다. 수신함에 같은 이메일의 과거 링크가 여럿 있어도 모두 제외하고 새 링크를 사용한다.
+- 관리자 상세를 열어 둔 채 수락하면 페이지 이동·수동 새로고침 없이 최신 승인 상태·버전이 표시된다. 관리자 목록·상세 DTO에 비밀 필드나 수락 링크가 없는지 함께 확인한다.
 - 재발급 전 링크와 만료 링크의 동일 오류, 실제 서버 CSRF 거부, 반려 사유 표시.
 - 다른 계정으로 로그인한 상태에서 신규 링크를 열면 화면에서 로그아웃한 뒤 같은 링크의 수락을 계속한다.
 
 매 실행마다 고유 이메일을 만들고 메일 원문·토큰은 메모리에서만 읽는다. 관리자 API에서 링크를 가져오거나 테스트용 수락 API를 만들지 않는다. request-body trace는 끄며 실패 screenshot·테스트 결과는 Git에서 제외한다. 만료 검사는 `INVITATION_LIVE_DB_CONTAINER`의 전용 `invitation_live.employee_invitations`에서 해당 실행의 초대 1건 기한만 과거로 바꾼다. 컨테이너 이름은 `openstudy-invitation-live-` 접두사로 제한한다. 다른 DB 이름·자격증명을 받지 않는다.
+
+mock 회귀는 기존 서버를 재사용하지 않는 별도 15179 포트에서 실행한다. Mailpit·실제 서버와 구분한다.
+
+```powershell
+npm run test:e2e:invitations:mock
+```
+
+최신 main 기준 완료 검증과 이력 동기화 회귀의 결과는 [2026-11-05 기록](../development-log/2026-11-05-invitation-acceptance-verification.md)을 따른다. 반복 검증에서 기본 로그인 제한에 도달하면 이번 전용 서버만 재시작하고 제한 설정은 완화하지 않는다.
 
 완료 후 서버를 종료하고 이번에 만든 컨테이너만 제거한다.
 
