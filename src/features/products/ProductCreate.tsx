@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { api } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
@@ -26,6 +27,7 @@ export function ProductCreate({
       ? [defaultBranchId]
       : [],
   }));
+  const leave = useDraftGuard(draft);
   const [errors, setErrors] = useState<Errors>({});
   const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,6 +46,7 @@ export function ProductCreate({
         key: key.key("create", body),
       });
       key.committed();
+      leave.saved();
       onSaved(created);
     } catch (e) {
       setError(e as Error);
@@ -60,26 +63,30 @@ export function ProductCreate({
         void submit();
       }}
     >
-      <p className="help">
-        상품은 삭제할 수 없어요. 더 이상 팔지 않으려면 등록 후 판매를 중지해
-        주세요.
-      </p>
-      <ProductForm
-        mode="create"
-        draft={draft}
-        errors={errors}
-        categories={categories}
-        branches={branches}
-        onChange={setDraft}
-      />
-      <SaveError
-        error={error}
-        refresh={async () => undefined}
-        fieldLabels={fieldLabels}
-      />
-      <Button type="submit" variant="primary" disabled={busy}>
-        상품 등록
-      </Button>
+      {leave.guard}
+      <fieldset className="contents" disabled={busy}>
+        <p className="help">
+          상품은 삭제할 수 없어요. 더 이상 팔지 않으려면 등록 후 판매를 중지해
+          주세요.
+        </p>
+        <ProductForm
+          disabled={busy}
+          mode="create"
+          draft={draft}
+          errors={errors}
+          categories={categories}
+          branches={branches}
+          onChange={setDraft}
+        />
+        <SaveError
+          error={error}
+          refresh={async () => undefined}
+          fieldLabels={fieldLabels}
+        />
+        <Button type="submit" variant="primary" disabled={busy}>
+          상품 등록
+        </Button>
+      </fieldset>
     </form>
   );
 }

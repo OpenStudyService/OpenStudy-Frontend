@@ -1,5 +1,5 @@
-import { useContext, useEffect, useRef, useState } from "react";
-import { UNSAFE_DataRouterContext, useBlocker } from "react-router";
+import { useEffect, useRef, useState } from "react";
+export { useLeaveGuard as useRecordLeaveGuard } from "../../shared/ui/leaveGuard";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { ApiError } from "../../shared/api/client";
@@ -86,44 +86,4 @@ export function useRecordWrite() {
     }
   }
   return { run, busy };
-}
-
-const leaveMessage =
-  "저장하지 않은 변경사항이 있어요. 입력을 버리고 이동할까요?";
-function RouterLeaveGuard({ dirty }: { dirty: React.RefObject<boolean> }) {
-  const blocker = useBlocker(
-    ({ nextLocation }) =>
-      dirty.current &&
-      !["/login", "/pending-approval"].includes(nextLocation.pathname),
-  );
-  useEffect(() => {
-    if (blocker.state === "blocked") {
-      if (window.confirm(leaveMessage)) blocker.proceed();
-      else blocker.reset();
-    }
-  }, [blocker]);
-  return null;
-}
-export function useRecordLeaveGuard(changed: boolean) {
-  const dirty = useRef(changed);
-  useEffect(() => {
-    dirty.current = changed;
-  }, [changed]);
-  const router = useContext(UNSAFE_DataRouterContext);
-  useEffect(() => {
-    const prevent = (event: BeforeUnloadEvent) => {
-      if (dirty.current) {
-        event.preventDefault();
-        event.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", prevent);
-    return () => window.removeEventListener("beforeunload", prevent);
-  }, []);
-  return {
-    guard: router ? <RouterLeaveGuard dirty={dirty} /> : null,
-    saved: () => {
-      dirty.current = false;
-    },
-  };
 }

@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -245,6 +246,14 @@ function ShiftEditor({
   const [error, setError] = useState<Error | null>(null),
     [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(row?.version);
+  const leave = useDraftGuard({
+    branch,
+    employee,
+    start,
+    end,
+    minutes,
+    reason,
+  });
   const allowed = row
     ? row.canEdit && admin(session.user, row.branchId) && row.status !== "취소"
     : admin(session.user, branch);
@@ -289,6 +298,7 @@ function ShiftEditor({
         },
       );
       keys.committed();
+      leave.saved();
       setRevision(result.version);
       await query.invalidateQueries({ queryKey: ["data"] });
       if (!row) onCreated(result.id);
@@ -305,6 +315,7 @@ function ShiftEditor({
       : [];
   return (
     <div className="grid gap-4">
+      {leave.guard}
       {row && (
         <>
           <p>

@@ -330,7 +330,8 @@
     @apply mb-6 w-full bg-surface py-3 font-semibold;
   }
   .nav-label {
-    @apply mb-2 mt-5 px-3 text-[10px] font-semibold tracking-wider text-muted;
+    @apply mb-2 mt-5 px-3 text-[10px] font-semibold tracking-wider;
+    color: var(--side-ink);
   }
   .nav-link {
     @apply mb-1 flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs;
@@ -451,6 +452,9 @@
   }
   .calendar-item {
     @apply mt-1 block w-full truncate rounded bg-soft px-1.5 py-1 text-left text-[10px] text-primary;
+  }
+  .calendar-item small {
+    color: inherit;
   }
   .chat-shell {
     @apply flex h-full min-h-0;

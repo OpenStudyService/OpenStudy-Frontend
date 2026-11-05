@@ -1,3 +1,4 @@
+import { useConfirmDiscard } from "../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
 import {
   Link,
@@ -90,6 +91,7 @@ export const navigation = [
   { path: "settings", title: "설정", icon: "settings", group: "환경설정" },
 ];
 export function Layout() {
+  const confirmLeave = useConfirmDiscard();
   const session = useSession(),
     { scope = "all" } = useParams(),
     navigate = useNavigate(),
@@ -274,6 +276,7 @@ export function Layout() {
         ? "팀 채팅"
         : navigation.find((n) => n.path === section)?.title || "OpenStudy";
   async function logout() {
+    if (!confirmLeave()) return;
     await api("/auth/logout", { method: "POST", body: {} });
     closeStreams();
     clearPrivate();

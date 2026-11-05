@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -48,6 +49,13 @@ export function PaymentCreate({
   const [method, setMethod] = useState<CreateBody["method"]>("카드");
   const [mockOutcome, setMockOutcome] =
     useState<CreateBody["mockOutcome"]>("APPROVED");
+  const leave = useDraftGuard({
+    branchId,
+    customerId,
+    productId,
+    method,
+    mockOutcome,
+  });
   const [validation, setValidation] = useState("");
   const write = useSubmission<CreateBody, Payment>(
     `payments:create:${session.user.id}`,
@@ -95,7 +103,10 @@ export function PaymentCreate({
         method,
         mockOutcome,
       });
-      if (result && mounted.current) onSaved(result);
+      if (result && mounted.current) {
+        leave.saved();
+        onSaved(result);
+      }
     } catch {
       /* The submission hook preserves the error and retry key. */
     } finally {
@@ -107,6 +118,7 @@ export function PaymentCreate({
     return <State title="이 지점에서 결제할 권한이 없어요" />;
   return (
     <form onSubmit={submit} className="form-grid">
+      {leave.guard}
       <MockPaymentNotice />
       <fieldset disabled={write.pending} className="contents">
         <Field label="판매 지점">

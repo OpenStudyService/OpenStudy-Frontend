@@ -4,6 +4,7 @@ test("mock schedule creates an overnight shift, keeps conflicts and cancels thro
 }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "사장님으로 체험" }).click();
+  await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
   await page.goto("/app/gangnam/attendance?week=2036-11-02");
   await page.getByRole("button", { name: "근무 등록" }).click();
   await page.getByLabel("근무 직원").selectOption("junho");
@@ -30,6 +31,10 @@ test("mock schedule creates an overnight shift, keeps conflicts and cancels thro
   await expect(page.getByLabel("시작 (Asia/Seoul)")).toHaveValue(
     "2036-11-02T22:00",
   );
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("confirm");
+    await dialog.accept();
+  });
   await page.getByRole("button", { name: "닫기", exact: true }).click();
   await page.getByRole("button", { name: /예정 근무 ·/ }).click();
   await page.getByRole("button", { name: "근무 취소" }).click();

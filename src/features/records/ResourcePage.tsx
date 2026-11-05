@@ -315,7 +315,7 @@ function GenericResourcePage({
   }
   const page = data.data?.page || 1,
     total = data.data?.total || 0;
-  async function save(values: Record<string, unknown>) {
+  async function save(values: Record<string, unknown>, committed: () => void) {
     const payload = {
       ...values,
       ...(!formOpen ? { version: selection.data?.version } : {}),
@@ -329,6 +329,7 @@ function GenericResourcePage({
       },
     );
     idempotency.committed();
+    committed();
     await query.invalidateQueries({ queryKey: ["data"] });
     if (resource === "employees" || resource === "branches")
       await query.invalidateQueries({ queryKey: ["session"] });
@@ -713,7 +714,11 @@ function GenericRecordPanel({
       return p;
     });
   }
-  async function perform(key: string, body: Record<string, unknown>) {
+  async function perform(
+    key: string,
+    body: Record<string, unknown>,
+    committed = () => {},
+  ) {
     setError("");
     if (key === "history") {
       try {
@@ -727,18 +732,21 @@ function GenericRecordPanel({
     }
     if (key === "reschedule") {
       await mutation.mutateAsync({ key: "cancel", body });
+      committed();
       onReschedule?.();
       return;
     }
     await mutation.mutateAsync({ key, body });
+    committed();
     setMode("action", "");
   }
-  async function save(body: Record<string, unknown>) {
+  async function save(body: Record<string, unknown>, committed: () => void) {
     await api(`/${resource}/${id}`, {
       method: "PATCH",
       body: { ...body, version: row.data!.version },
       key: crypto.randomUUID(),
     });
+    committed();
     await query.invalidateQueries({ queryKey: ["data"] });
     if (resource === "employees")
       await query.invalidateQueries({ queryKey: ["session"] });
@@ -814,7 +822,9 @@ function GenericRecordPanel({
                       condition: value(r, "condition"),
                     }}
                     label={actionLabel}
-                    onSubmit={(data) => perform(action, data)}
+                    onSubmit={(data, committed) =>
+                      perform(action, data, committed)
+                    }
                   />
                 </>
               )

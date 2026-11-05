@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -24,6 +25,8 @@ export function InvitationManagement() {
     [selectedId, setSelectedId] = useState<string | null>(null),
     [reason, setReason] = useState(""),
     [filter, setFilter] = useState("");
+  const leave = useDraftGuard({ name, email, branchId, role, grants });
+  const rejection = useDraftGuard(reason);
   const managed = session.branches
     .filter(
       (b) =>
@@ -92,6 +95,7 @@ export function InvitationManagement() {
       );
       key.committed();
       query.setQueryData(detailKey, updated);
+      rejection.saved("");
       setReason("");
       await refresh();
     } catch (e) {
@@ -103,6 +107,8 @@ export function InvitationManagement() {
   if (!managed.length) return <State title="초대 관리 권한이 없어요" />;
   return (
     <section className="grid gap-4">
+      {leave.guard}
+      {rejection.guard}
       <h2>초대·승인 관리</h2>
       <Button
         disabled={busy || rows.isFetching || detail.isFetching}
@@ -138,6 +144,13 @@ export function InvitationManagement() {
               key: key.key("create", body),
             });
             key.committed();
+            leave.saved({
+              name: "",
+              email: "",
+              branchId,
+              role,
+              grants,
+            });
             setName("");
             setEmail("");
             await refresh();
@@ -148,76 +161,78 @@ export function InvitationManagement() {
           }
         }}
       >
-        <h3>직원 초대</h3>
-        <Field label="초대 이름">
-          <input
-            required
-            maxLength={100}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
-        <Field label="초대 이메일 (발송 후 변경 불가)">
-          <input
-            required
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </Field>
-        <Field label="초대 지점">
-          <select
-            required
-            value={branchId}
-            onChange={(e) => setBranch(e.target.value)}
-          >
-            <option value="">지점 선택</option>
-            {managed
-              .filter((b) => b.status === "운영 중")
-              .map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
+        <fieldset className="contents" disabled={busy}>
+          <h3>직원 초대</h3>
+          <Field label="초대 이름">
+            <input
+              required
+              maxLength={100}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+          <Field label="초대 이메일 (발송 후 변경 불가)">
+            <input
+              required
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          <Field label="초대 지점">
+            <select
+              required
+              value={branchId}
+              onChange={(e) => setBranch(e.target.value)}
+            >
+              <option value="">지점 선택</option>
+              {managed
+                .filter((b) => b.status === "운영 중")
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+            </select>
+          </Field>
+          <Field label="초대 역할">
+            <select
+              value={role}
+              onChange={(e) => {
+                const r = e.target.value as "staff" | "admin";
+                setRole(r);
+                setGrants(rolePermissions(r));
+              }}
+            >
+              <option value="staff">일반 직원</option>
+              {session.user.owner && <option value="admin">지점 관리자</option>}
+            </select>
+          </Field>
+          <fieldset>
+            <legend>예정 권한 (선택한 값을 복사하여 승인 시 적용)</legend>
+            {permissions
+              .filter((p) => role === "admin" || p !== "people:manage")
+              .map((p) => (
+                <label className="block" key={p}>
+                  <input
+                    type="checkbox"
+                    checked={grants.includes(p)}
+                    onChange={(e) =>
+                      setGrants(
+                        e.target.checked
+                          ? [...grants, p]
+                          : grants.filter((x) => x !== p),
+                      )
+                    }
+                  />{" "}
+                  {p}
+                </label>
               ))}
-          </select>
-        </Field>
-        <Field label="초대 역할">
-          <select
-            value={role}
-            onChange={(e) => {
-              const r = e.target.value as "staff" | "admin";
-              setRole(r);
-              setGrants(rolePermissions(r));
-            }}
-          >
-            <option value="staff">일반 직원</option>
-            {session.user.owner && <option value="admin">지점 관리자</option>}
-          </select>
-        </Field>
-        <fieldset>
-          <legend>예정 권한 (선택한 값을 복사하여 승인 시 적용)</legend>
-          {permissions
-            .filter((p) => role === "admin" || p !== "people:manage")
-            .map((p) => (
-              <label className="block" key={p}>
-                <input
-                  type="checkbox"
-                  checked={grants.includes(p)}
-                  onChange={(e) =>
-                    setGrants(
-                      e.target.checked
-                        ? [...grants, p]
-                        : grants.filter((x) => x !== p),
-                    )
-                  }
-                />{" "}
-                {p}
-              </label>
-            ))}
+          </fieldset>
+          <Button type="submit" disabled={busy}>
+            초대 이메일 발송 요청
+          </Button>
         </fieldset>
-        <Button type="submit" disabled={busy}>
-          초대 이메일 발송 요청
-        </Button>
       </form>
       <Field label="초대 이름·이메일 검색">
         <input value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -262,6 +277,7 @@ export function InvitationManagement() {
               <Button
                 disabled={busy}
                 onClick={() => {
+                  if (!rejection.confirm()) return;
                   setSelectedId(i.id);
                   setError(null);
                   setReason("");
@@ -324,6 +340,7 @@ export function InvitationManagement() {
                   </Button>
                   <Field label="반려 사유">
                     <input
+                      disabled={busy}
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       maxLength={1000}

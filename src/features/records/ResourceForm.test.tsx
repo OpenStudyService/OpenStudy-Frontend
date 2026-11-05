@@ -1,11 +1,44 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ResourceForm } from "./ResourceForm";
 import { emptyLookups } from "../../app/context";
 import { ApiError } from "../../shared/api/client";
 import type { LookupData } from "../../shared/domain/schema";
 afterEach(cleanup);
+it("keeps failed input protected and clears the guard only on confirmed commit", async () => {
+  const submit = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("저장 실패"))
+    .mockImplementation(async (_data, committed: () => void) => committed());
+  const user = userEvent.setup();
+  render(
+    <ResourceForm
+      fields={[{ key: "name", label: "이름", required: true }]}
+      scope="gangnam"
+      lookups={emptyLookups}
+      onSubmit={submit}
+    />,
+  );
+  await user.type(screen.getByLabelText("이름"), "보존할 초안");
+  await user.click(screen.getByRole("button", { name: "저장하기" }));
+  await screen.findByText("저장 실패");
+  const failed = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(failed);
+  expect(failed.defaultPrevented).toBe(true);
+  expect(screen.getByLabelText("이름")).toHaveValue("보존할 초안");
+  await user.click(screen.getByRole("button", { name: "저장하기" }));
+  await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+  const saved = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(saved);
+  expect(saved.defaultPrevented).toBe(false);
+});
 it("rejects invalid input and preserves a failed write for correction and retry", async () => {
   const submit = vi
     .fn()
@@ -91,7 +124,10 @@ it("renders already scoped minimum employee choices without requiring private ac
   expect(screen.getByRole("option", { name: "지점 직원" })).toHaveValue("20");
   await user.selectOptions(screen.getByLabelText("직원"), "20");
   await user.click(screen.getByRole("button", { name: "저장하기" }));
-  expect(submit).toHaveBeenCalledWith({ employeeId: "20" });
+  expect(submit).toHaveBeenCalledWith(
+    { employeeId: "20" },
+    expect.any(Function),
+  );
   expect(employees).toEqual([{ id: "20", name: "지점 직원" }]);
 });
 
@@ -164,7 +200,10 @@ it("blocks a retained employee after choosing a different branch without members
   expect(screen.getByLabelText("직원")).toBeEnabled();
   expect(screen.getByLabelText("직원")).toHaveValue("20");
   await user.click(screen.getByRole("button", { name: "저장하기" }));
-  expect(submit).toHaveBeenCalledWith({ branchId: "all", employeeId: "20" });
+  expect(submit).toHaveBeenCalledWith(
+    { branchId: "all", employeeId: "20" },
+    expect.any(Function),
+  );
 });
 
 it("retains legacy owner and branch membership filtering when the demo provides metadata", () => {

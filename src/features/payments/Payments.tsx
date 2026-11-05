@@ -285,6 +285,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
       )}
       {creating && (
         <Panel
+          closeDisabled={busy}
           open
           title="Mock 결제"
           onClose={close}

@@ -4,6 +4,7 @@ import {
   Navigate,
   useRouteError,
 } from "react-router";
+import { UnsavedChangesBoundary } from "../shared/ui/leaveGuard";
 import { Layout } from "./Layout";
 import { Home } from "../features/home/Home";
 import {
@@ -52,7 +53,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/app/:scope",
-    element: <Layout />,
+    element: (
+      <UnsavedChangesBoundary>
+        <Layout />
+      </UnsavedChangesBoundary>
+    ),
     errorElement: <RouteError />,
     children: [
       { index: true, element: <Navigate to="home" replace /> },
