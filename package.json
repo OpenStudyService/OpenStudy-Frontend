@@ -37,6 +37,8 @@
     "test:e2e:chat-read:live": "playwright test --config playwright.chat-read.config.ts",
     "test:e2e:workforce:live": "playwright test --config playwright.workforce.config.ts",
     "test:e2e:workforce:mock": "playwright test --config playwright.workforce-mock.config.ts",
+    "test:e2e:attendance:live": "playwright test --config playwright.attendance.config.ts",
+    "test:e2e:attendance:mock": "playwright test --config playwright.attendance-mock.config.ts",
     "test:e2e:chat-read:mock": "playwright test --config playwright.chat-read-mock.config.ts",
     "test:builds": "npm run build && npm run build:demo && playwright test --config playwright.build.config.ts",
     "check": "npm run typecheck && npm run lint && npm test && npm run test:real-mail:tool && npm run test:build:guard",

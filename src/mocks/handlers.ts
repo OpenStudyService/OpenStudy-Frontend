@@ -1,5 +1,6 @@
 import { roomHandlers } from "./rooms";
 import { workforceHandlers } from "./workforce";
+import { attendanceHandlers } from "./attendance";
 import { lockerHandlers } from "./lockers";
 import { customerHistoryHandlers } from "./customer-history";
 import { collaborationHandlers } from "./collaboration";
@@ -348,6 +349,7 @@ function executeAi(r: AiRequest) {
 }
 
 export const handlers = [
+  ...attendanceHandlers,
   ...workforceHandlers,
   ...roomHandlers,
   ...lockerHandlers,

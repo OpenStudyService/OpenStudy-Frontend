@@ -194,7 +194,7 @@ test("real cross-branch conflicts remain redacted and preserve the entered times
     await manager.context.close();
   }
 });
-test("staff sees only their own schedule, no management or live attendance commands", async ({
+test("staff sees only their own schedule and cannot manage other employees", async ({
   browser,
 }) => {
   const manager = await login(browser),
@@ -239,16 +239,13 @@ test("staff sees only their own schedule, no management or live attendance comma
     await staff.page.getByRole("button", { name: "닫기", exact: true }).click();
     await staff.page.getByRole("tab", { name: "출퇴근·휴게" }).click();
     await expect(
-      staff.page.getByRole("button", {
-        name: /출근하기|휴게 시작|휴게 종료|퇴근하기/,
-      }),
+      staff.page.getByRole("button", { name: "출근하기" }),
+    ).toBeEnabled();
+    await expect(
+      staff.page.getByLabel("근태 직원", { exact: true }),
     ).toHaveCount(0);
     expect(
-      calls.filter((url) =>
-        /\/attendance(?:[/?]|$)|\/me\/attendance|\/attendance-records/.test(
-          url,
-        ),
-      ),
+      calls.filter((url) => /\/api\/attendance(?:[/?]|$)/.test(url)),
     ).toEqual([]);
     const rows = await (
       await api(staff.context, "/shifts?scope=1&from=2036-11-05&to=2036-11-05")

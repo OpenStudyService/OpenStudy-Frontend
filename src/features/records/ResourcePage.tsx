@@ -46,7 +46,8 @@ import {
 import { Icon } from "../../shared/ui/Icon";
 import { ResourceForm } from "./ResourceForm";
 import { WeekSchedule } from "../attendance/WeekSchedule";
-import { Shifts, AttendanceUnavailable } from "../attendance/Shifts";
+import { Shifts } from "../attendance/Shifts";
+import { AttendanceRecords } from "../attendance/AttendanceRecords";
 import { Tasks } from "../tasks/Tasks";
 import { TaskPanel } from "../tasks/TaskPanel";
 import { ChannelManagement } from "../chat/ChannelManagement";
@@ -203,8 +204,8 @@ export function ResourcePage(props: {
 }) {
   return props.resource === "shifts" ? (
     <Shifts />
-  ) : props.resource === "attendance" && !MOCK ? (
-    <AttendanceUnavailable />
+  ) : props.resource === "attendance" ? (
+    <AttendanceRecords />
   ) : props.resource === "lockers" ? (
     <Lockers embedded={props.embedded} />
   ) : props.resource === "rooms" ? (
