@@ -57,3 +57,8 @@ Frontend main `972fbdb`에서 `feature/sales-api-integration`을 만들었다. �
 - 마지막 상태 확인에서 Backend #88이 [PR #165](https://github.com/OpenStudyService/OpenStudy-Backend/pull/165)(`1bbf252`)로 병합되고 이슈가 종료된 것을 확인했다. 착수 당시에는 미병합이어서 합의한 1차 범위에는 포함하지 않았다. 이후 이용권 판매량·발급 건수·상품 순위·일/주/월 추세를 연결하는 2차 작업은 바로 착수할 수 있다. 이번 PR은 #30을 자동 종료하지 않는다.
 - 운영 배포·운영 DB·실제 모바일 기기·다중 인스턴스·대용량 성능·Backend 전체 테스트 재실행은 수행하지 않는다.
 - 작업 브랜치 push와 PR 준비까지만 수행하고 main 반영·PR 병합·자동 병합은 사용자에게 맡긴다.
+
+## 7. 전달 기록
+
+- 구현 커밋 `c563dfc`를 `feature/sales-revenue-integration`에 커밋·push하고 [PR #74](https://github.com/OpenStudyService/OpenStudy-Frontend/pull/74)를 생성했다. #30에도 완료 범위·검증·남은 작업을 기록했으며 이슈는 열린 상태다.
+- 원격 main 변경·병합·자동 병합 없이 사용자 검토·병합을 기다린다. 최종 작업 트리에는 기존 미추적 `.gitattributes`만 이번 범위 밖으로 남긴다.
