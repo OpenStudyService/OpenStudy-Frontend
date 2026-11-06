@@ -18,6 +18,7 @@ type Args = {
 };
 type Metadata = {
   productName: string;
+  categoryCode: string;
   terms: ProductTerms;
   categoryName: string;
   method: Payment["method"];
@@ -47,6 +48,7 @@ function metadata(row: PaymentRow, value: State): Metadata {
       category = store.get("productCategories", product.categoryId);
     saved = {
       productName: product.name,
+      categoryCode: category.code,
       terms: structuredClone(product.terms),
       categoryName: category.name,
       method: row.method === "Mock 현금" ? "현금" : "카드",
@@ -134,6 +136,14 @@ export function passView(actor: Employee, row: PassRow): Pass {
     createdAt: row.createdAt,
     used: used(row),
     canRefund: refundable(actor, row),
+  };
+}
+export function salesProductSnapshot(row: PaymentRow) {
+  const saved = metadata(row, state());
+  return {
+    productName: saved.productName,
+    categoryName: saved.categoryName,
+    categoryCode: saved.categoryCode,
   };
 }
 function paymentView(actor: Employee, row: PaymentRow): Payment {
@@ -454,6 +464,7 @@ export const paymentHandlers = [
           });
         state().metadata.set(row.id, {
           productName: product.name,
+          categoryCode: store.get("productCategories", product.categoryId).code,
           terms: structuredClone(product.terms),
           categoryName: store.get("productCategories", product.categoryId).name,
           method: body.method,

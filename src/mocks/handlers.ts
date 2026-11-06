@@ -1,3 +1,4 @@
+import { salesHandlers } from "./sales";
 import { roomHandlers } from "./rooms";
 import { workforceHandlers } from "./workforce";
 import { attendanceHandlers } from "./attendance";
@@ -349,6 +350,7 @@ function executeAi(r: AiRequest) {
 }
 
 export const handlers = [
+  ...salesHandlers,
   ...attendanceHandlers,
   ...workforceHandlers,
   ...roomHandlers,

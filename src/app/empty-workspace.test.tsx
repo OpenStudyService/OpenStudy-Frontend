@@ -275,15 +275,17 @@ it("keeps list columns and filters with an empty canonical task page", async () 
   expect(screen.getByText("총 0건 · 1페이지")).toBeVisible();
 });
 
-it("keeps sales totals and table headers with no sales response", async () => {
+it("shows a missing sales response as an error instead of zero revenue", async () => {
   renderWorkspace(() => new Response(null, { status: 204 }), "sales");
   expect(
-    await screen.findByRole("heading", {
-      name: "조회 기간에 매출 내역이 없어요",
-    }),
+    (
+      await screen.findAllByRole("heading", {
+        name: "요청을 완료하지 못했어요",
+      })
+    )[0],
   ).toBeVisible();
-  expect(screen.getAllByText("0원")).toHaveLength(3);
-  expect(screen.getByRole("columnheader", { name: "순매출" })).toBeVisible();
+  expect(screen.queryByText("0원")).not.toBeInTheDocument();
+  expect(screen.getAllByText(/매출 응답을 확인할 수 없어요/)).toHaveLength(3);
 });
 
 it("shows a channel empty state for a canonical empty channel collection", async () => {

@@ -1,0 +1,61 @@
+/** Shared display rules. Ratios use percentage points (12.5 means 12.5%). */
+const numbers = new Intl.NumberFormat("ko-KR");
+const dateOptions = {
+  timeZone: "Asia/Seoul",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+} as const;
+const shortDateTime = new Intl.DateTimeFormat("ko-KR", dateOptions);
+const fullDateTime = new Intl.DateTimeFormat("ko-KR", {
+  ...dateOptions,
+  year: "numeric",
+  second: "2-digit",
+});
+const businessDay = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Seoul",
+});
+
+export function formatNumber(value: number | bigint | null | undefined) {
+  return typeof value === "bigint" ||
+    (typeof value === "number" && Number.isFinite(value))
+    ? numbers.format(value)
+    : "—";
+}
+
+export function formatKrw(value: number | bigint | null | undefined) {
+  const number = formatNumber(value);
+  return number === "—" ? number : `${number}원`;
+}
+
+export function formatPercent(rate: number | null | undefined, digits = 1) {
+  if (rate === null) return "해당 없음";
+  if (typeof rate !== "number" || !Number.isFinite(rate)) return "—";
+  return `${new Intl.NumberFormat("ko-KR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(rate)}%`;
+}
+
+function parsedDate(iso: string | null | undefined) {
+  if (!iso?.trim()) return undefined;
+  const date = new Date(iso);
+  return Number.isFinite(date.getTime()) ? date : undefined;
+}
+
+export function formatDateTime(iso: string | null | undefined) {
+  const date = parsedDate(iso);
+  return date ? fullDateTime.format(date) : "—";
+}
+
+export function formatShortDateTime(iso: string | null | undefined) {
+  const date = parsedDate(iso);
+  return date ? shortDateTime.format(date) : "—";
+}
+
+export function formatBusinessDate(iso: string | null | undefined) {
+  const date = parsedDate(iso);
+  return date ? businessDay.format(date) : "—";
+}

@@ -150,38 +150,50 @@ test("purchase/refund and room booking conflicts preserve input", async ({
     panel.getByRole("heading", { name: "전액 환불 완료" }),
   ).toBeVisible();
   await panel.getByRole("button", { name: "닫기", exact: true }).click();
-  await page.goto("/app/gangnam/reservations");
-  await page.getByRole("button", { name: "예약 등록", exact: true }).click();
-  await panel
-    .getByLabel("회원", { exact: true })
-    .selectOption({ label: "한유나" });
-  await panel
-    .getByLabel("스터디룸", { exact: true })
-    .selectOption({ label: "스터디룸 A" });
-  await panel.getByLabel("시작 일시").fill("2026-10-18T14:00");
-  await panel.getByLabel("종료 일시").fill("2026-10-18T16:00");
-  await panel.getByLabel("이용 인원").fill("3");
+  async function reservationForm() {
+    await page.goto("/app/gangnam/reservations?detail=new");
+    const reservationCustomer = panel.getByLabel("고객 선택");
+    const customerOption = reservationCustomer
+      .locator("option")
+      .filter({ hasText: "한유나" });
+    await expect(customerOption).toBeAttached();
+    await reservationCustomer.selectOption(
+      (await customerOption.getAttribute("value"))!,
+    );
+    const room = panel.getByLabel("예약 룸", { exact: true });
+    const roomOption = room.locator("option").filter({ hasText: "스터디룸 A" });
+    await expect(roomOption).toBeAttached();
+    await room.selectOption((await roomOption.getAttribute("value"))!);
+    await panel.getByLabel("예약 날짜").fill("2026-10-18");
+    await panel.getByLabel("시작 시각 (한국 시간)").selectOption("14");
+    await panel.getByLabel("이용 시간", { exact: true }).selectOption("2");
+    await panel.getByLabel("이용 인원").fill("3");
+  }
+  await reservationForm();
+  const saved = page.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" &&
+      new URL(r.url()).pathname === "/api/room-reservations",
+  );
   await panel.getByRole("button", { name: "예약 등록", exact: true }).click();
-  await expect(panel).not.toBeVisible();
-  await page.getByRole("button", { name: "예약 등록", exact: true }).click();
-  await panel
-    .getByLabel("회원", { exact: true })
-    .selectOption({ label: "한유나" });
-  await panel
-    .getByLabel("스터디룸", { exact: true })
-    .selectOption({ label: "스터디룸 A" });
-  await panel.getByLabel("시작 일시").fill("2026-10-18T14:00");
-  await panel.getByLabel("종료 일시").fill("2026-10-18T16:00");
-  await panel.getByLabel("이용 인원").fill("3");
+  expect((await saved).status()).toBe(201);
+  await expect(
+    panel.getByRole("heading", { name: "스터디룸 A 예약", exact: true }),
+  ).toBeVisible();
+  await panel.getByRole("button", { name: "닫기", exact: true }).click();
+  await reservationForm();
   await panel.getByRole("button", { name: "예약 등록", exact: true }).click();
-  await expect(panel.getByRole("alert")).toContainText("이미 예약된 시간");
-  await expect(panel.getByLabel("시작 일시")).toHaveValue("2026-10-18T14:00");
+  await expect(
+    panel.getByText(/선택 시간이 다른 예약과 겹칩니다/),
+  ).toBeVisible();
+  await expect(panel.getByLabel("예약 날짜")).toHaveValue("2026-10-18");
+  await expect(panel.getByLabel("시작 시각 (한국 시간)")).toHaveValue("14");
 });
 test("AI SSE result matches the ordinary sales ledger and supports cancellation", async ({
   page,
 }) => {
   await login(page);
-  await page.goto("/app/all/sales");
+  await page.goto("/app/all/sales?from=2026-09-01&to=2026-10-01");
   await expect(
     page.getByRole("cell", { name: "300,000원", exact: true }).first(),
   ).toBeVisible();

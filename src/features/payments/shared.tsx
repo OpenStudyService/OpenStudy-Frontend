@@ -5,6 +5,7 @@ import { useApp } from "../../app/context";
 import { customerApi } from "../customers/api";
 import { Field, Pager } from "../organization/shared";
 import { Button, ErrorState } from "../../shared/ui/primitives";
+import { formatDateTime } from "../../shared/domain/format";
 
 export const MOCK_PAYMENT_NOTICE = "Mock 결제·실제 금전 이동 없음";
 export function MockPaymentNotice() {
@@ -70,20 +71,7 @@ export function useSalesClock() {
   }, [anchor]);
   return now;
 }
-export function dateTime(value: string | null) {
-  return value
-    ? new Intl.DateTimeFormat("ko-KR", {
-        timeZone: "Asia/Seoul",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      }).format(new Date(value))
-    : "—";
-}
+export const dateTime = formatDateTime;
 export function CustomerSelector({
   value,
   onChange,
