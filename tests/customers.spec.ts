@@ -181,18 +181,29 @@ test("URL filters survive reload and a cancelled keyboard close preserves regist
   page,
 }) => {
   await login(page);
+  // Each filter change rewrites the query from the router's committed search params, so the next change waits for
+  // the control to show the value (the render committed), not only for the browser URL, which updates earlier.
+  const change = async (label: string, value: string) => {
+    await page.getByLabel(label).selectOption(value);
+    await expect(page.getByLabel(label)).toHaveValue(value);
+  };
   await page.getByRole("searchbox", { name: "회원 검색" }).fill("010");
+  await expect(page.getByRole("searchbox", { name: "회원 검색" })).toHaveValue(
+    "010",
+  );
   await expect(page).toHaveURL(/[?&]q=010(?:&|$)/);
-  await page.getByLabel("회원 상태 필터").selectOption("정상");
+  await change("회원 상태 필터", "정상");
+  await change("회원 정렬", "name");
+  await change("정렬 방향", "asc");
+  await change("페이지당 항목 수", "20");
   await expect
-    .poll(() => new URL(page.url()).searchParams.get("status"))
-    .toBe("정상");
-  await page.getByLabel("회원 정렬").selectOption("name");
-  await expect(page).toHaveURL(/[?&]sort=name(?:&|$)/);
-  await page.getByLabel("정렬 방향").selectOption("asc");
-  await expect(page).toHaveURL(/[?&]direction=asc(?:&|$)/);
-  await page.getByLabel("페이지당 항목 수").selectOption("20");
-  await expect(page).toHaveURL(/[?&]pageSize=20(?:&|$)/);
+    .poll(() => {
+      const search = new URL(page.url()).searchParams;
+      return ["q", "status", "sort", "direction", "pageSize"].map((key) =>
+        search.get(key),
+      );
+    })
+    .toEqual(["010", "정상", "name", "asc", "20"]);
   await page.reload();
   await expect(page.getByRole("searchbox", { name: "회원 검색" })).toHaveValue(
     "010",
