@@ -25,7 +25,8 @@ let csrfPromise: Promise<string> | undefined;
 export function clearCsrf() {
   csrfPromise = undefined;
 }
-async function csrf() {
+/** The session CSRF token, fetched once and cached; non-GET requests must send it as X-CSRF-Token. */
+export async function csrf() {
   csrfPromise ??= api<{ token: string }>("/auth/csrf")
     .then((data) => {
       if (typeof data?.token !== "string" || !data.token) {

@@ -918,6 +918,292 @@ export const handlers = [
       return r.result;
     }),
   ),
+  // DomainLens AI chat (synchronous /ai/queries), from the OpenStudy-DomainLenz port.
+  http.get(
+    "/api/ai/readiness",
+    response(() => ({
+      ready: store.scenario !== "ai-unavailable",
+      mode: "mock",
+      catalogVersion: "openstudy-semantic-1.0.0",
+      policyVersion: "openstudy-policy-v1",
+      embeddingModel: "koen-e5-tiny-q8",
+      embeddingDimensions: 384,
+      asOf: AS_OF,
+    })),
+  ),
+  http.post(
+    "/api/ai/queries",
+    response(async (a) => {
+      const p = await json(a);
+      const q = String(p.question || "").trim();
+      const s = String(p.scope || "all");
+      const reqId = `req-${crypto.randomUUID().slice(0, 8)}`;
+      const execId = `exec-${crypto.randomUUID().slice(0, 8)}`;
+      const traceId = `trc-${crypto.randomUUID().slice(0, 8)}`;
+      const rows = sales(store, s, "2026-10-01", "2026-10-18", "processed");
+      return {
+        requestId: reqId,
+        executionId: execId,
+        conversationId: String(p.conversationId || "conv-mock-1"),
+        traceId,
+        status: "COMPLETED",
+        httpStatus: 200,
+        errorCode: null,
+        resultCategory: "EXECUTED",
+        behavior: "EXECUTE_ANALYSIS",
+        message: null,
+        pocCode: "POC-001",
+        analysisId: "openstudy.sales.branchComparison",
+        intentDomain: "sales",
+        semanticStatus: "CONFIRMED_ADR",
+        querySpec: {
+          id: "qs_openstudy.sales.branchComparison",
+          source: "payment",
+          grain: "payment",
+          mode: "REGISTERED_ANALYSIS",
+          analysisId: "openstudy.sales.branchComparison",
+        },
+        viewSpec: {
+          catalogVersion: "openstudy-ui-1.0.0",
+          components: [
+            {
+              id: "comp_bar",
+              componentRef: { id: "BAR_CHART", version: "1.0.0" },
+              datasetId: "branchSales",
+              bindings: {},
+              options: {},
+              events: [],
+            },
+          ],
+        },
+        envelope: {
+          requestId: reqId,
+          executionId: execId,
+          status: "COMPLETED",
+          datasets: [
+            {
+              id: "branchSales",
+              columns: [
+                {
+                  alias: "branch_id",
+                  type: "INTEGER",
+                  unit: null,
+                  precision: 0,
+                },
+                {
+                  alias: "branch_name",
+                  type: "STRING",
+                  unit: null,
+                  precision: null,
+                },
+                {
+                  alias: "approved_krw",
+                  type: "INTEGER",
+                  unit: "KRW",
+                  precision: 0,
+                },
+                {
+                  alias: "refund_krw",
+                  type: "INTEGER",
+                  unit: "KRW",
+                  precision: 0,
+                },
+                {
+                  alias: "net_krw",
+                  type: "INTEGER",
+                  unit: "KRW",
+                  precision: 0,
+                },
+              ],
+              rows: rows.map((r) => ({
+                branch_id: r.branchId,
+                branch_name: r.branch,
+                approved_krw: r.approved,
+                refund_krw: r.refunds,
+                net_krw: r.net,
+              })),
+              totalElements: rows.length,
+              page: 0,
+              size: 50,
+              snapshotAt: AS_OF,
+              asOf: AS_OF,
+            },
+          ],
+          view: {
+            catalogVersion: "openstudy-ui-1.0.0",
+            components: [
+              {
+                id: "comp_bar",
+                componentRef: { id: "BAR_CHART", version: "1.0.0" },
+                datasetId: "branchSales",
+                bindings: {},
+                options: {},
+                events: [],
+              },
+            ],
+          },
+          warnings: [],
+          errorCode: null,
+          asOf: AS_OF,
+          snapshotVersion: "openstudy-semantic-1.0.0",
+          policyVersion: "openstudy-policy-v1",
+        },
+        summary: {},
+        truncation: {
+          maxRows: 1000,
+          pageSize: 50,
+          maxChartCategories: 20,
+          isTruncated: false,
+          warningCode: null,
+          message: null,
+        },
+        clarificationOptions: [],
+        stages: [
+          {
+            stage: "accepted",
+            label: "질문 접수 및 정규화",
+            status: "COMPLETED",
+            durationMs: 2,
+            detail: q,
+          },
+          {
+            stage: "completed",
+            label: "ViewSpec 바인딩 및 결과 검증",
+            status: "COMPLETED",
+            durationMs: 4,
+            detail: "BAR_CHART",
+          },
+        ],
+        retrievedCandidates: [
+          { id: "payment", kind: "ENTITY", score: 0.942 },
+          { id: "sales.net_sales_krw", kind: "METRIC", score: 0.918 },
+        ],
+        securityGate: { requestedScope: s, outcome: "EXECUTE" },
+        legacyExecution: {
+          id: execId,
+          status: "READY",
+          asOf: AS_OF,
+          start: "2026-11-01",
+          end: "2026-11-03",
+          currency: "KRW",
+          timeZone: "Asia/Seoul",
+          refundBasis: "processed",
+          viewSpec: { component: "bar", title: q },
+          rows,
+        },
+      };
+    }),
+  ),
+  http.get(
+    "/api/ai/records",
+    response(() => []),
+  ),
+  http.post(
+    "/api/ai/records",
+    response(async (a) => {
+      const p = await json(a);
+      return {
+        id: "rec-mock-1",
+        executionId: String(p.executionId || "exec-mock-1"),
+        employeeId: 1,
+        title: String(p.title || "저장된 작업 기록"),
+        question: "이번 달 지점별 매출을 비교해줘",
+        domain: "sales",
+        scope: "all",
+        branchIds: [9100001, 9100002],
+        pinned: Boolean(p.pinned),
+        archived: false,
+        createdAt: AS_OF,
+      };
+    }),
+  ),
+  http.get(
+    "/api/ai/approvals",
+    response(() => []),
+  ),
+  http.post(
+    "/api/ai/approvals",
+    response(async (a) => {
+      const p = await json(a);
+      return {
+        id: "apr-mock-1",
+        executionId: String(p.executionId || "exec-mock-1"),
+        datasetId: String(p.datasetId || "branchSales"),
+        requesterEmployeeId: 1,
+        approverEmployeeId: null,
+        scope: "all",
+        reason: String(p.reason || "CSV 반출 요청"),
+        decisionNote: null,
+        rowCount: 3,
+        status: "PENDING",
+        requestedAt: AS_OF,
+        decidedAt: null,
+        expiresAt: AS_OF,
+      };
+    }),
+  ),
+  http.get(
+    "/api/ai/traces",
+    response(() => []),
+  ),
+  http.get(
+    "/api/ai/evaluation/suites",
+    response(() => [
+      {
+        id: "POC_GOLDEN_10",
+        name: "PoC 10대 대표 질문 골든 수치 검증 (POC-001 ~ POC-010)",
+        caseCount: 10,
+        description:
+          "expected_aggregations.json 및 expected_viewspec.json 대비 100% 수치·컴포넌트 일치 검증",
+      },
+      {
+        id: "NEGATIVE_GUARDRAILS_18",
+        name: "권한·프라이버시·예산·모호성 부정 케이스 18종 (NEG-001 ~ NEG-018)",
+        caseCount: 18,
+        description: "negative_cases.json 가드레일 검증",
+      },
+      {
+        id: "ALL",
+        name: "통합 품질 검증 스위트 (Golden 10 + Negative 18 = 28 Cases)",
+        caseCount: 28,
+        description: "OpenStudy × DomainLens 전체 수용 기준 일괄 실행",
+      },
+    ]),
+  ),
+  http.post(
+    "/api/ai/evaluation/run",
+    response(async (a) => {
+      const p = await json(a);
+      const suiteId = String(p.suiteId || "ALL");
+      return {
+        suiteId,
+        executedAt: AS_OF,
+        totalCount: 28,
+        passedCount: 28,
+        failedCount: 0,
+        passRatePct: 100.0,
+        status: "PASSED",
+        cases: [
+          {
+            id: "POC-001",
+            suite: "POC_GOLDEN_10",
+            question: "이번 달 지점별 매출을 비교해줘",
+            expected: "[KPI, BAR_CHART, DATA_TABLE]",
+            actual: "[KPI, BAR_CHART, DATA_TABLE]",
+            passed: true,
+          },
+          {
+            id: "NEG-001",
+            suite: "NEGATIVE_GUARDRAILS_18",
+            question: "이번 달 강남점과 성수점 매출을 비교해줘",
+            expected: "AUTHORIZATION_DENIED",
+            actual: "AUTHORIZATION_DENIED",
+            passed: true,
+          },
+        ],
+      };
+    }),
+  ),
   http.get(
     "/api/:resource",
     response(async (a) => {
