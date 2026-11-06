@@ -2484,6 +2484,146 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sales/revenue": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 기간·지점 매출
+     * @description 승인액·환불액·순매출과 용도별 소계를 반환한다. 이용권·스터디룸·사물함 결제를 모두 포함하고(M9-D03) 원결제 지점에 귀속하며, 환불도 처리 지점이 아니라 원결제 지점에서 차감한다(M9-D05). 실패 결제와 이용권 소비 차감은 포함하지 않는다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     */
+    get: operations["getRevenueSummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sales/revenue/branches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 지점별 매출 비교
+     * @description 적용 지점마다 한 행의 매출을 요청한 정렬로 반환한다. 거래가 없는 지점도 0과 dataStatus=noData로 담는다. sort=requested는 branchIds를 보낸 순서(생략 시 ID 오름차순)이고, 금액 정렬의 동률은 branchId를 같은 방향으로 정렬한다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     */
+    get: operations["compareBranchRevenue"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sales/ledger": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 매출 최소 원장
+     * @description 매출 집계의 근거가 되는 승인 항목과 환불 항목을 페이지로 반환한다. 고객 이름·연락처·고객 ID·결제 수단·처리자·환불 사유는 담지 않는다. 같은 조건의 GET /sales/revenue와 합계가 같다. 정렬은 basisAt, 같으면 승인 → 환불, 같으면 원천 ID이며 모두 direction(기본 desc)을 따른다. 결제 상세는 GET /payments/{id}에서 payments:read를 따로 확인한다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     */
+    get: operations["listSalesLedger"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sales/passes/volume": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 이용권 결제 건수·판매량·발급 건수
+     * @description 이용권 결제만 대상으로 결제 건수(건), 판매 수량·환불 수량·순판매량(개), 발급 건수(개)를 따로 반환한다(M9-D06). 환불된 판매는 순판매량에서 빠지고 발급 건수에는 남는다. 실패 결제는 어느 지표에도 없다. 환불 수량은 refundBasis를 따른다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     */
+    get: operations["getPassSalesVolume"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sales/passes/products": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 이용권 상품별 판매량·순위
+     * @description 판매 당시 상품 스냅샷(상품 ID·상품명·분류 코드·분류 이름)마다 판매량과 순위를 반환한다. 순서는 netSoldQuantity 내림차순, 같으면 productId·productName·categoryCode·categoryName 오름차순으로 고정한다. 기간에 원거래가 없는 상품은 행이 없다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     */
+    get: operations["listPassProductSales"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sales/trend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 매출·이용권 판매량 추세
+     * @description 기간 안의 모든 일·주·월 구간을 시간 오름차순으로 반환하고 거래가 없는 구간은 0과 noData로 채운다. 주는 월요일 0시(Asia/Seoul)에 시작한다. 경계에 걸친 첫·마지막 구간은 기간 안의 부분만 집계하고 partial과 aggregation.partial로 표시한다(M9-D04). 구간 합은 totals와 같다. measure=revenue는 purpose 필터를, measure=passes는 productId·categoryCode 필터를 받는다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     */
+    get: operations["getSalesTrend"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/home/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 운영 홈 요약
+     * @description 현재 이용 좌석·오늘의 업무와 완료율·미처리 문의·점검 필요·오늘의 근무 계획·최근 공지·읽지 않은 메시지를 원본 기능(M5·M7·M8)의 같은 조건 집계로 묶어 반환한다. 오늘은 Asia/Seoul 날짜다. 업무는 OWNER면 선택 범위, 그 외 직원이면 본인 담당이 기본이고 mine·assigneeId로 바꿀 수 있다. 근무 카드의 count·items는 M8-D02 조회 범위(OWNER 전체, 기록 지점 MANAGER, 그 외 본인)를 넘지 않는다. colleagues는 요청자가 유효 소속인 지점의 같은 지점 동료 근무를 이름·시작·종료 시각만으로 담는 홈 전용 예외이며 근무표·근태 API의 조회 범위는 바뀌지 않는다. 매출 정보는 담지 않는다.
+     */
+    get: operations["getHomeSummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4761,6 +4901,497 @@ export interface components {
       reloadUrl?: string;
       conflicts?: components["schemas"]["ShiftConflict"][];
     };
+    /**
+     * @description 원=원화 정수 금액, 건=결제·환불·업무 건수, 개=이용권 수량, %=백분율(소수 첫째 자리).
+     * @enum {string}
+     */
+    MetricUnit: "원" | "건" | "개" | "%";
+    /**
+     * @description noData=조건에 맞는 원거래 행이 없음. 합계는 0으로 채우지만 '계산 결과 0'(hasData)과 구분한다(M9-D09).
+     * @enum {string}
+     */
+    DataStatus: "hasData" | "noData";
+    /** @description 비율의 공통 표현(M9-D09). state=value ⇔ denominator>0 ⇔ percent≠null. */
+    Ratio: {
+      /**
+       * @description notApplicable=분모가 0(해당 없음). 이때 percent는 null이다.
+       * @enum {string}
+       */
+      state: "value" | "notApplicable";
+      /** @description numerator ÷ denominator × 100을 소수 첫째 자리 HALF_UP으로 반올림. 0.0은 값이 있는 0이다. */
+      percent: number | null;
+      numerator: number;
+      denominator: number;
+    };
+    /** @description 이 응답에 담긴 지표. id는 최상위 x-metric-definitions의 id다. */
+    MetricRef: {
+      id: string;
+      unit: components["schemas"]["MetricUnit"];
+    };
+    /** @description 집계에 실제 적용한 조건. M10이 같은 조건 객체로 공통 집계 기반을 호출한다(M10-D05). from·to는 null이 아니다. */
+    AggregationCondition: {
+      /** @description 실제로 집계한 지점, ID 오름차순. */
+      branchIds: components["schemas"]["Id"][];
+      /** @description branchIds를 생략해 sales:read가 있는 모든 지점을 집계했으면 true. */
+      allBranches: boolean;
+      /**
+       * Format: date-time
+       * @description 적용한 시작(포함), UTC.
+       */
+      from: string | null;
+      /**
+       * Format: date-time
+       * @description 적용한 종료(제외), UTC.
+       */
+      to: string | null;
+      /** @enum {string} */
+      refundBasis: "processedDate" | "paymentDate";
+      /**
+       * @description 용도 필터. 이용권 지표 operation은 항상 이용권이다.
+       * @enum {string|null}
+       */
+      purpose: "이용권" | "스터디룸" | "사물함" | null;
+      productId: components["schemas"]["Id"] | null;
+      categoryCode: string | null;
+      /**
+       * @description 추세에서만 값이 있다.
+       * @enum {string|null}
+       */
+      granularity: "day" | "week" | "month" | null;
+    };
+    /** @description 부분 구간 표시(M9-D04, FR-AGG-09). */
+    AggregationPartial: {
+      /** @description to > asOf. 기간이 아직 끝나지 않아 asOf 이후 거래가 더 들어올 수 있다. */
+      periodOpen: boolean;
+      /** @description 추세의 첫 구간이 from에서 잘렸으면 true. 추세가 아니면 null. */
+      firstBucketPartial: boolean | null;
+      /** @description 추세의 마지막 구간이 to에서 잘렸으면 true. 추세가 아니면 null. */
+      lastBucketPartial: boolean | null;
+    };
+    /** @description 모든 매출·이용권 집계 응답의 공통 메타정보(FR-AGG-09). 카드·표·차트·원장이 같은 값을 쓴다. dataStatus=noData ⇔ sourceRowCount=0. */
+    AggregationMeta: {
+      condition: components["schemas"]["AggregationCondition"];
+      /** @description from·to를 생략해 기본 기간(이번 달)을 적용했으면 true(M9-D01). */
+      defaultPeriod: boolean;
+      /** @enum {string} */
+      timeZone: "Asia/Seoul";
+      /** @enum {string} */
+      currency: "KRW";
+      /**
+       * Format: date-time
+       * @description 결과 기준 시각(UTC). 이 시각까지 커밋된 원거래로 계산했다.
+       */
+      asOf: string;
+      /** @description 결과 행 수(페이지가 아닌 전체). operation마다 정의가 aggregation-api.md에 있다. */
+      rowCount: number;
+      /** @description 계산에 쓴 원거래 항목 수(승인 항목 + 환불 항목). 같은 조건의 최소 원장 total과 같다. */
+      sourceRowCount: number;
+      dataStatus: components["schemas"]["DataStatus"];
+      partial: components["schemas"]["AggregationPartial"];
+      metrics: components["schemas"]["MetricRef"][];
+    };
+    /** @description 매출 지표 묶음(원 정수·건). 정의는 x-metric-definitions. */
+    RevenueAmounts: {
+      approvedAmountKrw: number;
+      refundAmountKrw: number;
+      /** @description approvedAmountKrw − refundAmountKrw. 환불 처리일 기준에서는 음수일 수 있다. */
+      netAmountKrw: number;
+      approvedPaymentCount: number;
+      refundCount: number;
+      dataStatus: components["schemas"]["DataStatus"];
+    };
+    /** @description 한 용도의 매출 소계. */
+    PurposeRevenue: {
+      /** @enum {string} */
+      purpose: "이용권" | "스터디룸" | "사물함";
+      approvedAmountKrw: number;
+      refundAmountKrw: number;
+      /** @description approvedAmountKrw − refundAmountKrw. 환불 처리일 기준에서는 음수일 수 있다. */
+      netAmountKrw: number;
+      approvedPaymentCount: number;
+      refundCount: number;
+      dataStatus: components["schemas"]["DataStatus"];
+    };
+    /** @description 기간·지점 매출(FR-AGG-01·17). totals = byPurpose 합. */
+    RevenueSummary: {
+      aggregation: components["schemas"]["AggregationMeta"];
+      totals: components["schemas"]["RevenueAmounts"];
+      /** @description 이용권·스터디룸·사물함 순서로 항상 세 행(purpose 필터가 있으면 그 한 행). 거래가 없는 용도도 0과 noData로 담는다. */
+      byPurpose: components["schemas"]["PurposeRevenue"][];
+    };
+    /** @description 한 지점의 매출. 거래가 없는 지점도 0과 noData로 담는다. */
+    BranchRevenue: {
+      branchId: components["schemas"]["Id"];
+      branchName: string;
+      approvedAmountKrw: number;
+      refundAmountKrw: number;
+      /** @description approvedAmountKrw − refundAmountKrw. 환불 처리일 기준에서는 음수일 수 있다. */
+      netAmountKrw: number;
+      approvedPaymentCount: number;
+      refundCount: number;
+      dataStatus: components["schemas"]["DataStatus"];
+      byPurpose: components["schemas"]["PurposeRevenue"][];
+    };
+    /** @description 지점별 매출 비교(FR-AGG-02). totals = items 합 = 같은 조건의 GET /sales/revenue totals. */
+    BranchRevenueComparison: {
+      aggregation: components["schemas"]["AggregationMeta"];
+      totals: components["schemas"]["RevenueAmounts"];
+      /** @description 적용한 지점마다 한 행. 요청한 정렬을 따른다. */
+      items: components["schemas"]["BranchRevenue"][];
+    };
+    /** @description 이용권 결제 건수·판매 수량·발급 건수(M9-D06). 세 지표는 단위가 다르다(건·개·개). */
+    PassVolume: {
+      paymentCount: number;
+      soldQuantity: number;
+      refundedQuantity: number;
+      /** @description soldQuantity − refundedQuantity. 환불 처리일 기준에서는 음수일 수 있다. */
+      netSoldQuantity: number;
+      issuedCount: number;
+      dataStatus: components["schemas"]["DataStatus"];
+    };
+    /** @description 이용권 판매량(FR-PASS-05, FR-AGG-03). */
+    PassVolumeSummary: {
+      aggregation: components["schemas"]["AggregationMeta"];
+      totals: components["schemas"]["PassVolume"];
+    };
+    /** @description 판매 당시 상품 스냅샷 하나의 판매량(FR-AGG-06·07). */
+    PassProductSales: {
+      /** @description netSoldQuantity 내림차순 경쟁 순위(같은 값은 같은 순위, 다음 순위는 건너뜀). */
+      rank: number;
+      productId: components["schemas"]["Id"];
+      /** @description 판매 당시 상품명(passes.snapshot_product_name). */
+      productName: string;
+      /** @description 판매 당시 분류 코드. */
+      categoryCode: string;
+      /** @description 판매 당시 분류 이름. */
+      categoryName: string;
+      /** @enum {string} */
+      kind: "시간권" | "기간권" | "정액권";
+      paymentCount: number;
+      soldQuantity: number;
+      refundedQuantity: number;
+      /** @description soldQuantity − refundedQuantity. 환불 처리일 기준에서는 음수일 수 있다. */
+      netSoldQuantity: number;
+      issuedCount: number;
+      dataStatus: components["schemas"]["DataStatus"];
+    };
+    /** @description 상품별 판매량·순위. totals는 페이지가 아닌 전체 합이며 같은 조건의 GET /sales/passes/volume totals와 같다. */
+    PassProductSalesPage: {
+      items: components["schemas"]["PassProductSales"][];
+      meta: components["schemas"]["PageMeta"];
+      aggregation: components["schemas"]["AggregationMeta"];
+      totals: components["schemas"]["PassVolume"];
+    };
+    /** @description 추세의 한 구간. measure=revenue면 revenue만, measure=passes면 passes만 값이 있다. 거래가 없는 구간도 0과 noData로 담는다. */
+    SalesTrendBucket: {
+      /** @description day=YYYY-MM-DD, week=그 주 월요일 YYYY-MM-DD, month=YYYY-MM(Asia/Seoul). */
+      label: string;
+      /**
+       * Format: date-time
+       * @description 잘리기 전 구간 시작(UTC).
+       */
+      bucketStart: string;
+      /**
+       * Format: date-time
+       * @description 잘리기 전 구간 종료(제외, UTC).
+       */
+      bucketEnd: string;
+      /**
+       * Format: date-time
+       * @description 실제로 집계한 시작 = max(bucketStart, from).
+       */
+      start: string;
+      /**
+       * Format: date-time
+       * @description 실제로 집계한 종료 = min(bucketEnd, to).
+       */
+      end: string;
+      /** @description start≠bucketStart 또는 end≠bucketEnd. */
+      partial: boolean;
+      revenue: components["schemas"]["RevenueAmounts"] | null;
+      passes: components["schemas"]["PassVolume"] | null;
+    };
+    /** @description 일·주·월 추세(FR-AGG-14). 구간 합 = totals = 같은 조건의 합계 operation 값. */
+    SalesTrend: {
+      aggregation: components["schemas"]["AggregationMeta"];
+      /** @enum {string} */
+      measure: "revenue" | "passes";
+      /** @enum {string} */
+      granularity: "day" | "week" | "month";
+      totals: {
+        revenue: components["schemas"]["RevenueAmounts"] | null;
+        passes: components["schemas"]["PassVolume"] | null;
+      };
+      /** @description 기간 안의 모든 구간, 시간 오름차순(M9-D04). */
+      items: components["schemas"]["SalesTrendBucket"][];
+    };
+    /** @description 최소 원장 한 항목(FR-AGG-18). 고객 이름·연락처·고객 ID·결제 수단·처리자·환불 사유는 담지 않는다(M9-D07). */
+    SalesLedgerEntry: {
+      /** @description payment-{결제 ID} 또는 refund-{환불 ID}. */
+      id: string;
+      /** @enum {string} */
+      entryType: "승인" | "환불";
+      paymentId: components["schemas"]["Id"];
+      refundId: components["schemas"]["Id"] | null;
+      /** @description 판매(원결제) 지점. 매출 귀속 지점이다(M9-D05). */
+      branchId: components["schemas"]["Id"];
+      processingBranchId: components["schemas"]["Id"] | null;
+      /** @enum {string} */
+      purpose: "이용권" | "스터디룸" | "사물함";
+      productId: components["schemas"]["Id"] | null;
+      /** @description 이용권은 판매 당시 상품명. 스터디룸·사물함은 null. */
+      productName: string | null;
+      categoryCode: string | null;
+      categoryName: string | null;
+      /** @description 이용권 승인 +1, 이용권 환불 −1, 그 외 0. */
+      passQuantity: number;
+      /** @description 승인 +원결제 금액, 환불 −환불 금액. */
+      amountKrw: number;
+      /**
+       * Format: date-time
+       * @description 원결제 승인 시각.
+       */
+      approvedAt: string;
+      /**
+       * Format: date-time
+       * @description 환불 처리 시각. 승인 항목은 null.
+       */
+      refundedAt: string | null;
+      /**
+       * Format: date-time
+       * @description 이 항목을 기간·구간에 넣은 시각. 승인=approvedAt, 환불=processedDate면 refundedAt, paymentDate면 approvedAt.
+       */
+      basisAt: string;
+      /** @description 요청자에게 branchId의 payments:read가 있으면 true. GET /payments/{id} 이동 안내용이며 서버가 다시 검사한다. */
+      canViewPayment: boolean;
+    };
+    /** @description 최소 원장. totals는 전체 항목의 합이며 같은 조건의 GET /sales/revenue totals와 같다. meta.total = aggregation.sourceRowCount. */
+    SalesLedgerPage: {
+      items: components["schemas"]["SalesLedgerEntry"][];
+      meta: components["schemas"]["PageMeta"];
+      aggregation: components["schemas"]["AggregationMeta"];
+      totals: components["schemas"]["RevenueAmounts"];
+    };
+    /** @description 홈 항목의 이동 대상(FR-DASH-06). */
+    HomeLink: {
+      /** @enum {string} */
+      screen:
+        | "seat-board"
+        | "task-list"
+        | "task-detail"
+        | "inquiry-list"
+        | "inquiry-detail"
+        | "facility-list"
+        | "facility-detail"
+        | "shift-list"
+        | "shift-detail"
+        | "notice-list"
+        | "notice-detail"
+        | "channel";
+      branchId: components["schemas"]["Id"] | null;
+      targetId: components["schemas"]["Id"] | null;
+      /** @description 목록 화면 주소에 복원할 조건(FR-DASH-06). */
+      query: {
+        [key: string]: string;
+      };
+    };
+    /** @description 카드 수치를 재현하는 원본 API와 조건. 같은 요청자·같은 시점이면 같은 수치가 나온다. */
+    HomeSource: {
+      operationId: string;
+      query: {
+        [key: string]: string;
+      };
+      /** @description 원본 목록 결과에 더할 조건이 있으면 그 설명. 없으면 null. */
+      clientFilter: string | null;
+    };
+    /** @description 홈 요약의 적용 범위. 매출 집계 메타(AggregationMeta)와 달리 기간·환불 기준·통화가 없다. */
+    HomeMeta: {
+      /** @description 집계한 지점, ID 오름차순. */
+      branchIds: components["schemas"]["Id"][];
+      allBranches: boolean;
+      /**
+       * Format: date
+       * @description 오늘(Asia/Seoul, M9-D08).
+       */
+      date: string;
+      /**
+       * Format: date-time
+       * @description 오늘 0시(Asia/Seoul)의 UTC.
+       */
+      dayStart: string;
+      /**
+       * Format: date-time
+       * @description 내일 0시(Asia/Seoul)의 UTC. 제외.
+       */
+      dayEnd: string;
+      /** @enum {string} */
+      timeZone: "Asia/Seoul";
+      /** Format: date-time */
+      asOf: string;
+      taskFilter: {
+        mine: boolean;
+        assigneeId: components["schemas"]["Id"] | null;
+        /** @description 요청에 mine·assigneeId가 없어 역할 기본값을 적용했으면 true. */
+        defaulted: boolean;
+      };
+    };
+    /** @description 오늘의 업무(M9-D08). total = open + completedToday. */
+    HomeTaskCounts: {
+      total: number;
+      /** @description 오늘의 업무 중 완료가 아닌 것. */
+      open: number;
+      /** @description 오늘의 업무 중 dueAt < asOf이고 완료가 아닌 것. */
+      overdue: number;
+      completedToday: number;
+      /** @description completedToday ÷ total. total=0이면 notApplicable. */
+      completionRate: components["schemas"]["Ratio"];
+    };
+    HomeTaskItem: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      title: string;
+      status: components["schemas"]["TaskStatus"];
+      priority: components["schemas"]["TaskPriority"];
+      /** Format: date-time */
+      dueAt: string;
+      assignee: components["schemas"]["ActorSummary"];
+      overdue: boolean;
+      link: components["schemas"]["HomeLink"];
+    };
+    /** @description today는 taskFilter 조건, mine은 항상 요청자 본인 담당 업무다(FR-DASH-05의 오늘의 업무·내 업무 구분). */
+    HomeTaskCard: {
+      today: components["schemas"]["HomeTaskCounts"];
+      mine: components["schemas"]["HomeTaskCounts"];
+      /** @description taskFilter의 오늘의 업무 중 완료가 아닌 것, dueAt 오름차순·id 오름차순 5개. */
+      items: components["schemas"]["HomeTaskItem"][];
+      link: components["schemas"]["HomeLink"];
+      sources: components["schemas"]["HomeSource"][];
+    };
+    HomeSeatBranch: {
+      branchId: components["schemas"]["Id"];
+      total: number;
+      inUse: number;
+      occupancy: components["schemas"]["Ratio"];
+    };
+    /** @description 현재 이용 좌석(M5 GET /seats/occupancy와 같은 값). */
+    HomeSeatCard: {
+      total: number;
+      inUse: number;
+      available: number;
+      blocked: number;
+      /** @description Σ inUse ÷ Σ total. 좌석이 없으면 notApplicable. */
+      occupancy: components["schemas"]["Ratio"];
+      branches: components["schemas"]["HomeSeatBranch"][];
+      link: components["schemas"]["HomeLink"];
+      source: components["schemas"]["HomeSource"];
+    };
+    /** @description 고객 정보는 담지 않는다. */
+    HomeInquiryItem: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      subject: string;
+      status: components["schemas"]["InquiryStatus"];
+      /** Format: date-time */
+      createdAt: string;
+      link: components["schemas"]["HomeLink"];
+    };
+    /** @description 미처리 문의(M7 GET /inquiries/summary의 unresolved와 같은 값). */
+    HomeInquiryCard: {
+      unresolved: number;
+      received: number;
+      inProgress: number;
+      items: components["schemas"]["HomeInquiryItem"][];
+      link: components["schemas"]["HomeLink"];
+      source: components["schemas"]["HomeSource"];
+    };
+    HomeFacilityItem: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      name: string;
+      status: components["schemas"]["FacilityStatus"];
+      /** Format: date */
+      nextInspectionOn: string;
+      link: components["schemas"]["HomeLink"];
+    };
+    /** @description 점검 필요(M7 GET /facilities/summary의 inspectionDue와 같은 값). */
+    HomeFacilityCard: {
+      inspectionDue: number;
+      items: components["schemas"]["HomeFacilityItem"][];
+      link: components["schemas"]["HomeLink"];
+      source: components["schemas"]["HomeSource"];
+    };
+    HomeShiftItem: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      employee: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      startsAt: string;
+      /** Format: date-time */
+      endsAt: string;
+      link: components["schemas"]["HomeLink"];
+    };
+    /** @description 오늘의 근무 계획(M9-D08). count·items는 M8-D02 조회 범위 안의 근무만 세고 원본 GET /shifts와 같다. colleagues는 홈 카드만의 예외로 같은 지점 동료의 이름·근무 시각만 담는다. */
+    HomeShiftCard: {
+      count: number;
+      items: components["schemas"]["HomeShiftItem"][];
+      /** @description colleagues의 전체 수. */
+      colleagueCount: number;
+      /** @description 요청자가 유효 소속인 scope 지점의 활성 소속 동료(본인 제외) 근무 중 오늘과 겹치는 취소되지 않은 예정 근무. startsAt·endsAt·employeeName·branchId 오름차순 5개. 역할과 무관하며 원본 GET /shifts로 재현되지 않는다(일반 직원은 M8-D02상 본인 근무만 조회). */
+      colleagues: components["schemas"]["HomeShiftColleague"][];
+      link: components["schemas"]["HomeLink"];
+      source: components["schemas"]["HomeSource"];
+    };
+    HomeNoticeItem: {
+      id: components["schemas"]["Id"];
+      title: string;
+      pinned: boolean;
+      /** Format: date-time */
+      publishedAt: string;
+      link: components["schemas"]["HomeLink"];
+    };
+    /** @description 최근 공지(M7 GET /notices?status=게시 중의 앞 5개). */
+    HomeNoticeCard: {
+      items: components["schemas"]["HomeNoticeItem"][];
+      link: components["schemas"]["HomeLink"];
+      source: components["schemas"]["HomeSource"];
+    };
+    HomeChannelItem: {
+      id: components["schemas"]["Id"];
+      name: string;
+      branchId: components["schemas"]["Id"] | null;
+      unreadCount: number;
+      /** Format: date-time */
+      lastMessageAt: string | null;
+      link: components["schemas"]["HomeLink"];
+    };
+    /** @description 읽지 않은 메시지(M7 GET /channels의 unreadCount 합). */
+    HomeMessageCard: {
+      unreadCount: number;
+      channels: components["schemas"]["HomeChannelItem"][];
+      link: components["schemas"]["HomeLink"];
+      source: components["schemas"]["HomeSource"];
+    };
+    /** @description 운영 홈 요약(FR-DASH-02·03·05·06). 각 카드는 원본 기능의 권한·범위를 넘지 않는다. */
+    HomeSummary: {
+      meta: components["schemas"]["HomeMeta"];
+      seats: components["schemas"]["HomeSeatCard"];
+      tasks: components["schemas"]["HomeTaskCard"];
+      inquiries: components["schemas"]["HomeInquiryCard"];
+      facilities: components["schemas"]["HomeFacilityCard"];
+      shifts: components["schemas"]["HomeShiftCard"];
+      notices: components["schemas"]["HomeNoticeCard"];
+      messages: components["schemas"]["HomeMessageCard"];
+    };
+    /** @description 같은 지점 동료의 오늘 근무(2026-11-05 사용자 결정, FR-DASH-05). 이름과 근무 시작·종료 시각만 담는다. 근무 ID·직원 ID·예정 휴게·근태·메모·변경 이력·이동 대상은 없다. */
+    HomeShiftColleague: {
+      branchId: components["schemas"]["Id"];
+      /** @description 동료 직원 이름. 직원 ID는 담지 않는다. */
+      employeeName: string;
+      /** Format: date-time */
+      startsAt: string;
+      /** Format: date-time */
+      endsAt: string;
+    };
   };
   responses: {
     /** @description 유효한 세션/자격증명 없음 */
@@ -4851,6 +5482,20 @@ export interface components {
     Q: string;
     /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
     Direction: "asc" | "desc";
+    /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+    AggregationBranchIds: components["schemas"]["Id"][];
+    /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+    AggregationFrom: string;
+    /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+    AggregationTo: string;
+    /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+    RefundBasis: "processedDate" | "paymentDate";
+    /** @description 결제 용도(payments.purpose) 필터. 생략하면 세 용도 모두(M9-D03). */
+    SalesPurpose: "이용권" | "스터디룸" | "사물함";
+    /** @description 이용권 상품(passes.product_id) 필터. 판매 당시 이름이 다른 행도 모두 포함한다. */
+    PassProductId: components["schemas"]["Id"];
+    /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+    PassCategoryCode: string;
   };
   requestBodies: never;
   headers: never;
@@ -10811,6 +11456,315 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AttendanceRecord"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getRevenueSummary: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+        refundBasis?: components["parameters"]["RefundBasis"];
+        /** @description 결제 용도(payments.purpose) 필터. 생략하면 세 용도 모두(M9-D03). */
+        purpose?: components["parameters"]["SalesPurpose"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RevenueSummary"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  compareBranchRevenue: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+        refundBasis?: components["parameters"]["RefundBasis"];
+        /** @description 결제 용도(payments.purpose) 필터. 생략하면 세 용도 모두(M9-D03). */
+        purpose?: components["parameters"]["SalesPurpose"];
+        sort?:
+          | "netAmount"
+          | "approvedAmount"
+          | "refundAmount"
+          | "branchId"
+          | "requested";
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BranchRevenueComparison"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listSalesLedger: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+        refundBasis?: components["parameters"]["RefundBasis"];
+        /** @description 결제 용도(payments.purpose) 필터. 생략하면 세 용도 모두(M9-D03). */
+        purpose?: components["parameters"]["SalesPurpose"];
+        /** @description 승인 또는 환불 항목만. 이 필터를 쓰면 totals는 그 항목만의 합이다. */
+        entryType?: "승인" | "환불";
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
+        direction?: components["parameters"]["Direction"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalesLedgerPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getPassSalesVolume: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+        refundBasis?: components["parameters"]["RefundBasis"];
+        /** @description 이용권 상품(passes.product_id) 필터. 판매 당시 이름이 다른 행도 모두 포함한다. */
+        productId?: components["parameters"]["PassProductId"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PassVolumeSummary"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listPassProductSales: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+        refundBasis?: components["parameters"]["RefundBasis"];
+        /** @description 이용권 상품(passes.product_id) 필터. 판매 당시 이름이 다른 행도 모두 포함한다. */
+        productId?: components["parameters"]["PassProductId"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PassProductSalesPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getSalesTrend: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+        refundBasis?: components["parameters"]["RefundBasis"];
+        granularity?: "day" | "week" | "month";
+        measure?: "revenue" | "passes";
+        /** @description 결제 용도(payments.purpose) 필터. 생략하면 세 용도 모두(M9-D03). */
+        purpose?: components["parameters"]["SalesPurpose"];
+        /** @description 이용권 상품(passes.product_id) 필터. 판매 당시 이름이 다른 행도 모두 포함한다. */
+        productId?: components["parameters"]["PassProductId"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SalesTrend"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getHomeSummary: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        /** @description true면 본인 담당 업무. 생략하면 OWNER는 false, 그 외는 true(M9-D08). */
+        mine?: boolean;
+        /** @description 이 담당자의 업무. mine=true와 함께 보내면 422. */
+        assigneeId?: components["schemas"]["Id"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeSummary"];
         };
       };
       401: components["responses"]["Error401"];

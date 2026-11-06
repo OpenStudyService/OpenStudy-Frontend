@@ -1,4 +1,5 @@
 import type { Employee, Membership } from "../../shared/domain/schema";
+import { formatPercent } from "../../shared/domain/format";
 export type {
   Seat,
   SeatBoard,
@@ -56,5 +57,4 @@ export function canManageSeats(user: Employee, branchId: string) {
       ))
   );
 }
-export const occupancyLabel = (rate: number | null) =>
-  rate === null ? "해당 없음" : `${rate.toFixed(1)}%`;
+export const occupancyLabel = formatPercent;

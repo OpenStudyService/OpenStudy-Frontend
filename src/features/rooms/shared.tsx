@@ -1,6 +1,7 @@
 import { ApiError } from "../../shared/api/client";
 import { Button, FieldError } from "../../shared/ui/primitives";
 import type { ReactNode } from "react";
+import { formatShortDateTime } from "../../shared/domain/format";
 
 export const keyFor = (
   user: string,
@@ -10,15 +11,7 @@ export const keyFor = (
 ) => ["data", user, scope, resource, "detail", id];
 export const stamp = (date: string, hour = 0) =>
   `${date}T${String(hour).padStart(2, "0")}:00:00+09:00`;
-export const displayTime = (iso: string) =>
-  new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(iso));
+export const displayTime = formatShortDateTime;
 export const abortError = (e: unknown) =>
   e instanceof DOMException && e.name === "AbortError";
 export function WriteError({

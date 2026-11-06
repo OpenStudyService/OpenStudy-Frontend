@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { useApp } from "../../app/context";
 import { ApiError } from "../../shared/api/client";
 import { can, won } from "../../shared/domain/schema";
+import { formatNumber } from "../../shared/domain/format";
 import {
   Badge,
   Button,
@@ -23,7 +24,7 @@ import { canAdjust } from "../pass-history/model";
 
 export function passBalance(pass: Pass) {
   if (pass.kind === "시간권")
-    return `${new Intl.NumberFormat("ko-KR").format(pass.remainingMinutes ?? 0)}분`;
+    return `${formatNumber(pass.remainingMinutes ?? 0)}분`;
   if (pass.kind === "정액권") return won(pass.remainingCreditKrw ?? 0);
   return `${dateTime(pass.startedAt)} ~ ${dateTime(pass.expiresAt)}`;
 }
