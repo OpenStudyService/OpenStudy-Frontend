@@ -9,7 +9,7 @@ async function login(page: Page) {
   await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
   await page.goto("/app/gangnam/payments");
   await expect(
-    page.getByRole("heading", { name: "결제", exact: true }),
+    page.getByRole("heading", { name: "결제 관리", exact: true }),
   ).toBeVisible();
 }
 async function api(page: Page, path: string, body?: object) {

@@ -159,7 +159,7 @@ export const catalog: Partial<Record<Resource, Definition>> = {
     ],
   },
   members: {
-    title: "회원·이용권",
+    title: "회원 관리",
     singular: "회원",
     description: "회원의 이용 상황과 응대 이력을 한곳에서 확인해요.",
     permission: "members:write",
@@ -187,7 +187,7 @@ export const catalog: Partial<Record<Resource, Definition>> = {
     fields: [],
   },
   payments: {
-    title: "결제·환불",
+    title: "결제 관리",
     singular: "결제",
     description:
       "실제 금전 이동 없는 내부 Mock 결제입니다. 승인·실패·환불은 원장에 기록돼요.",
@@ -315,7 +315,7 @@ export const catalog: Partial<Record<Resource, Definition>> = {
     ],
   },
   facilities: {
-    title: "시설·점검",
+    title: "시설 관리",
     singular: "점검",
     description: "쾌적한 공간을 위한 점검과 청소, 소모품을 함께 관리해요.",
     permission: "facilities:write",

@@ -67,7 +67,7 @@ test("product draft survives cancelled close, back and reload, then discards onc
 }) => {
   await login(page);
   await page
-    .getByRole("link", { name: "상품·요율", exact: true })
+    .getByRole("link", { name: "상품 관리", exact: true })
     .first()
     .click();
   await page.getByRole("button", { name: "상품 등록", exact: true }).click();

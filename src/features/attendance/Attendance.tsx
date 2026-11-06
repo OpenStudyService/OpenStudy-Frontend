@@ -9,7 +9,7 @@ export function Attendance() {
   const { session } = useApp();
   return (
     <ResourceGroup
-      title="근무·근태"
+      title="근무 관리"
       description="예정 근무와 실제 출퇴근을 구분해 확인하고 나의 근무 시간을 기록해요."
       intro={
         <>
