@@ -10,6 +10,21 @@ import {
   YAxis,
 } from "recharts";
 import { won } from "../../shared/domain/schema";
+import type { ParsedAiResult, TypedDatasetDto } from "./domainlens";
+import { CongestionHeatmap } from "./views/CongestionHeatmap";
+import { RankedBarChart } from "./views/RankedBarChart";
+import { SeatMapCard } from "./views/SeatMapCard";
+import { RoomWeekCalendar } from "./views/RoomWeekCalendar";
+import { UrgentTaskList } from "./views/UrgentTaskList";
+
+export {
+  CongestionHeatmap,
+  RankedBarChart,
+  SeatMapCard,
+  RoomWeekCalendar,
+  UrgentTaskList,
+};
+
 export interface SalesRow {
   branchId: string;
   branch: string;
@@ -114,4 +129,165 @@ export function SalesTable({ rows }: { rows: SalesRow[] }) {
       </table>
     </div>
   );
+}
+
+export function DomainDataTable({ dataset }: { dataset: TypedDatasetDto }) {
+  const columns =
+    dataset.columns.length > 0
+      ? dataset.columns
+      : Object.keys(dataset.rows[0] || {}).map((alias) => ({
+          alias,
+          type: "STRING",
+          unit: null,
+          precision: null,
+        }));
+
+  return (
+    <div className="data-scroll" data-testid="viewspec-data-table">
+      <table className="data-table">
+        <thead>
+          <tr>
+            {columns.map((c) => (
+              <th key={c.alias}>
+                {c.alias}
+                {c.unit ? ` (${c.unit})` : ""}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dataset.rows.map((row, idx) => (
+            <tr key={idx}>
+              {columns.map((c) => {
+                const val = row[c.alias];
+                const formatted =
+                  c.unit === "KRW" && typeof val === "number"
+                    ? won(val)
+                    : val === null || val === undefined
+                      ? "-"
+                      : String(val);
+                return <td key={c.alias}>{formatted}</td>;
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function ViewSpecRenderer({
+  parsed,
+  activeView,
+  scope = "all",
+}: {
+  parsed: ParsedAiResult;
+  activeView?: string;
+  scope?: string;
+}) {
+  const comp = (activeView || parsed.primaryComponent).toUpperCase();
+
+  if (comp === "HEATMAP" || activeView === "heatmap") {
+    const rows =
+      parsed.datasets.heatmapRows ?? parsed.datasetList[0]?.rows ?? [];
+    return <CongestionHeatmap rows={rows} />;
+  }
+
+  if (comp === "RANKED_BAR_CHART" || activeView === "ranked_bar") {
+    const rows =
+      parsed.datasets.topProducts ?? parsed.datasetList[0]?.rows ?? [];
+    return <RankedBarChart rows={rows} />;
+  }
+
+  if (comp === "SEAT_MAP" || activeView === "seat_map") {
+    const seats =
+      parsed.datasets.seatMap ??
+      parsed.datasetList[1]?.rows ??
+      parsed.datasetList[0]?.rows ??
+      [];
+    const summary =
+      parsed.datasets.seatSummary?.[0] ??
+      (parsed.summary as Record<string, unknown>) ??
+      null;
+    return <SeatMapCard seats={seats} summary={summary} />;
+  }
+
+  if (comp === "WEEK_CALENDAR" || activeView === "week_calendar") {
+    const branchSummaries = parsed.datasets.branchSummaries ?? [];
+    const reservations =
+      parsed.datasets.reservationRows ?? parsed.datasetList[0]?.rows ?? [];
+    return (
+      <RoomWeekCalendar
+        branchSummaries={branchSummaries}
+        reservations={reservations}
+      />
+    );
+  }
+
+  if (comp === "TASK_LIST" || activeView === "task_list") {
+    const rows =
+      parsed.datasets.urgentTasks ?? parsed.datasetList[0]?.rows ?? [];
+    return <UrgentTaskList rows={rows} scope={scope} />;
+  }
+
+  if (comp === "DATA_TABLE" || comp === "TABLE" || activeView === "table") {
+    if (parsed.datasetList.length > 0) {
+      return <DomainDataTable dataset={parsed.datasetList[0]} />;
+    }
+    return <SalesTable rows={parsed.salesRows} />;
+  }
+
+  // Default BAR_CHART / LINE_CHART / KPI
+  const kind = comp === "LINE_CHART" || activeView === "line" ? "line" : "bar";
+  if (parsed.salesRows.length > 0) {
+    return (
+      <div className="flex flex-col gap-4">
+        <SalesChart rows={parsed.salesRows} kind={kind} />
+        <SalesTable rows={parsed.salesRows} />
+      </div>
+    );
+  }
+  if (parsed.datasets.dailySales) {
+    const dailyRows: SalesRow[] = parsed.datasets.dailySales.map((r, i) => ({
+      branchId: String(r.date_kst ?? i),
+      branch: String(r.date_kst ?? "").slice(5),
+      approved: Number(r.approved_krw ?? 0),
+      refunds: Number(r.refund_krw ?? 0),
+      net: Number(r.net_krw ?? 0),
+    }));
+    return (
+      <div className="flex flex-col gap-4">
+        <SalesChart rows={dailyRows} kind="line" />
+        <DomainDataTable dataset={parsed.datasetList[0]} />
+      </div>
+    );
+  }
+  if (parsed.datasets.purposeSales) {
+    const purposeRows: SalesRow[] = parsed.datasets.purposeSales.map(
+      (r, i) => ({
+        branchId: String(r.purpose ?? i),
+        branch:
+          r.purpose === "PASS"
+            ? "이용권 (PASS)"
+            : r.purpose === "ROOM"
+              ? "스터디룸 (ROOM)"
+              : r.purpose === "LOCKER"
+                ? "사물함 (LOCKER)"
+                : String(r.purpose ?? ""),
+        approved: Number(r.approved_krw ?? 0),
+        refunds: Number(r.refund_krw ?? 0),
+        net: Number(r.net_krw ?? 0),
+      }),
+    );
+    return (
+      <div className="flex flex-col gap-4">
+        <SalesChart rows={purposeRows} kind="bar" />
+        <DomainDataTable dataset={parsed.datasetList[0]} />
+      </div>
+    );
+  }
+  if (parsed.datasetList.length > 0) {
+    return <DomainDataTable dataset={parsed.datasetList[0]} />;
+  }
+  return <SalesTable rows={parsed.salesRows} />;
 }

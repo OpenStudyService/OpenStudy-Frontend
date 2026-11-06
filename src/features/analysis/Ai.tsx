@@ -1,367 +1,536 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, API_BASE, MOCK } from "../../shared/api/client";
-import { openStream } from "../../shared/api/stream";
-import { can } from "../../shared/domain/schema";
+import { api, MOCK } from "../../shared/api/client";
+import { can, won } from "../../shared/domain/schema";
 import { useApp } from "../../app/context";
 import {
+  Avatar,
   Badge,
   Button,
   ErrorState,
-  FieldError,
-  Heading,
   State,
 } from "../../shared/ui/primitives";
 import { Icon } from "../../shared/ui/Icon";
-import { SalesChart, SalesTable } from "./Charts";
-import { getExecution } from "./domainlens";
-import type { Execution } from "./domainlens";
-const labels: Record<string, string> = {
-  idle: "질문을 입력해 주세요",
-  accepted: "질문 접수",
-  retrieving: "업무 지표 확인",
-  generating: "조회 명세 생성",
-  validating: "권한·조건 검증",
-  executing: "데이터 조회",
-  completed: "조회 완료",
-  failed: "조회 실패",
-  canceled: "취소됨",
-  clarification: "확인이 필요해요",
-  unsupported: "지원하지 않는 질문",
-};
+import { ViewSpecRenderer } from "./Charts";
+import {
+  executeAiQuery,
+  parseAiResult,
+  POC_QUESTIONS,
+  toViewMode,
+} from "./domainlens";
+import type {
+  ClarificationOptionDto,
+  ParsedAiResult,
+  PocQuestionSpec,
+} from "./domainlens";
+
+/** One question and its answer, kept only for this screen session (saved conversations: #71). */
+interface Turn {
+  id: string;
+  question: string;
+  askedAt: string;
+  state: "loading" | "completed" | "clarification" | "refused" | "error";
+  parsed: ParsedAiResult | null;
+  view: string;
+  message: string;
+  options: ClarificationOptionDto[];
+}
+
+const DOMAINS = ["전체", "매출", "좌석", "이용권", "스터디룸", "업무", "근태"];
+const MAX_QUESTION = 1000;
+
+/**
+ * The AI chat (DomainLens natural-language reads). A refused answer explains itself; it never shows partial data.
+ * A scope or account change starts a new conversation (the key), since earlier answers were read under other
+ * permissions.
+ */
 export function Ai() {
-  const { session, scope } = useApp(),
-    [question, setQuestion] = useState(""),
-    [requestId, setRequestId] = useState(""),
-    [phase, setPhase] = useState("idle"),
-    [error, setError] = useState(""),
-    [result, setResult] = useState<Execution | null>(null),
-    [choices, setChoices] = useState<{ id: string; label: string }[]>([]),
-    [view, setView] = useState("bar"),
-    [submitting, setSubmitting] = useState(false);
-  const allowed =
-    can(session.user, scope, "ai:read") &&
-    can(session.user, scope, "sales:read");
+  const { session, scope } = useApp();
+  return <AiChat key={`${session.user.id}:${scope}`} />;
+}
+
+function AiChat() {
+  const { session, scope } = useApp();
+  const user = session.user;
+  const allowed = can(user, scope, "ai:read");
+  const salesAllowed = can(user, scope, "sales:read");
+  const [question, setQuestion] = useState("");
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [domain, setDomain] = useState("전체");
+  const [busy, setBusy] = useState(false);
+  const abort = useRef<AbortController | null>(null);
+  const bottom = useRef<HTMLDivElement | null>(null);
   const readiness = useQuery({
-    queryKey: ["data", session.user.id, scope, "ai", "readiness"],
+    queryKey: ["data", user.id, scope, "ai", "readiness"],
     queryFn: ({ signal }) =>
-      api<{ ready: boolean; mode?: string; message?: string }>(
-        "/catalog/readiness",
-        { signal },
-      ),
+      api<{ ready: boolean; message?: string }>("/catalog/readiness", {
+        signal,
+      }),
     enabled: allowed,
     retry: false,
   });
-  const active = [
-    "accepted",
-    "retrieving",
-    "generating",
-    "validating",
-    "executing",
-  ].includes(phase);
+  useEffect(() => () => abort.current?.abort(), []);
   useEffect(() => {
-    if (!requestId) return;
-    let terminal = false;
-    const listeners: Record<string, (event: MessageEvent) => void> = {};
-    for (const event of [
-      "accepted",
-      "retrieving",
-      "generating",
-      "validating",
-      "executing",
-    ])
-      listeners[event] = () => setPhase(event);
-    listeners.completed = (event) => {
-      terminal = true;
-      stop();
-      const data = JSON.parse((event as MessageEvent).data) as {
-        status: string;
-        executionId?: string;
-        unsupportedReason?: string;
-      };
-      if (data.status === "UNSUPPORTED") {
-        setPhase("unsupported");
-        setError(data.unsupportedReason || "지원하지 않는 질문입니다.");
-      } else if (data.executionId)
-        void getExecution(data.executionId)
-          .then((r) => {
-            setResult(r);
-            setView(r.viewSpec.component);
-            setPhase("completed");
-          })
-          .catch((e) => {
-            setError(e.message);
-            setPhase("failed");
-          });
-    };
-    listeners.clarification = (event) => {
-      terminal = true;
-      stop();
-      const data = JSON.parse((event as MessageEvent).data) as {
-        clarificationOptions: { id: string; label: string }[];
-      };
-      setChoices(data.clarificationOptions || []);
-      setPhase("clarification");
-    };
-    listeners.failed = (event) => {
-      terminal = true;
-      stop();
-      const data = JSON.parse((event as MessageEvent).data) as {
-        message: string;
-      };
-      setError(data.message);
-      setPhase("failed");
-    };
-    listeners.canceled = () => {
-      terminal = true;
-      stop();
-      setPhase("canceled");
-    };
-    const stop = openStream(
-      `${API_BASE}/requests/${requestId}/events`,
-      listeners,
-      (connected) => {
-        if (connected) setError("");
-        else if (!terminal)
-          setError(
-            "연결이 끊겨 재연결 중입니다. 같은 요청을 이어서 확인하고 있어요.",
-          );
+    bottom.current?.scrollIntoView?.({ block: "end" });
+  }, [turns]);
+
+  function patch(id: string, next: Partial<Turn>) {
+    setTurns((all) => all.map((t) => (t.id === id ? { ...t, ...next } : t)));
+  }
+
+  async function ask(text: string, clarificationChoice?: string) {
+    const trimmed = text.trim();
+    if (!trimmed || busy || !readiness.data?.ready) return;
+    const id = crypto.randomUUID();
+    setTurns((all) => [
+      ...all,
+      {
+        id,
+        question: trimmed,
+        askedAt: new Date().toISOString(),
+        state: "loading",
+        parsed: null,
+        view: "",
+        message: "",
+        options: [],
       },
-    );
-    const timeout = setTimeout(() => {
-      if (!terminal) {
-        terminal = true;
-        stop();
-        void api(`/requests/${requestId}/cancel`, {
-          method: "POST",
-          body: {},
-        }).catch(() => undefined);
-        setError("조회 제한 시간 60초를 초과했습니다. 다시 시도해 주세요.");
-        setPhase("failed");
-      }
-    }, 60000);
-    return () => {
-      clearTimeout(timeout);
-      stop();
-      if (!terminal)
-        void api(`/requests/${requestId}/cancel`, {
-          method: "POST",
-          body: {},
-        }).catch(() => undefined);
-    };
-  }, [requestId]);
-  async function ask(text = question) {
-    if (!text.trim() || active || submitting) return;
-    setSubmitting(true);
-    setQuestion(text);
-    setError("");
-    setResult(null);
-    setChoices([]);
+    ]);
+    setQuestion("");
+    setBusy(true);
+    const controller = new AbortController();
+    abort.current = controller;
     try {
-      const conversation = await api<{ id: string }>("/conversations", {
-        method: "POST",
-        body: {},
-      });
-      const request = await api<{ requestId: string }>(
-        `/conversations/${conversation.id}/requests`,
-        {
-          method: "POST",
-          body: { question: text, scope },
-          key: crypto.randomUUID(),
-        },
+      const res = await executeAiQuery(
+        { question: trimmed, scope, clarificationChoice },
+        controller.signal,
       );
-      setPhase("accepted");
-      setRequestId(request.requestId);
+      if (res.status === "COMPLETED" && res.envelope) {
+        const parsed = parseAiResult(res);
+        patch(id, {
+          state: "completed",
+          parsed,
+          view: toViewMode(parsed.primaryComponent),
+          message: res.message || "",
+        });
+      } else if (res.status === "CLARIFICATION") {
+        patch(id, {
+          state: "clarification",
+          message:
+            res.message ||
+            "어떤 지표를 볼지 확인이 필요해요. 아래에서 하나를 골라 주세요.",
+          options: res.clarificationOptions || [],
+        });
+      } else {
+        patch(id, {
+          state: "refused",
+          message:
+            res.message ||
+            "이 질문은 지금 권한이나 조회 범위에서 답할 수 없어요.",
+        });
+      }
     } catch (e) {
-      setPhase("failed");
-      setError((e as Error).message);
+      if (controller.signal.aborted)
+        patch(id, { state: "error", message: "질문을 취소했어요." });
+      else
+        patch(id, {
+          state: "error",
+          message: (e as Error).message || "AI 조회에 실패했어요.",
+        });
     } finally {
-      setSubmitting(false);
+      if (abort.current === controller) abort.current = null;
+      setBusy(false);
     }
   }
+
   if (!allowed)
     return (
       <State
-        title="AI·매출 조회 권한이 필요해요"
-        message="관리자에게 현재 지점의 권한을 확인해 주세요."
+        title="AI 조회 권한이 필요해요"
+        message="관리자에게 현재 지점의 AI 조회 권한을 확인해 주세요."
       />
     );
+  const ready = Boolean(readiness.data?.ready);
+  const examples = POC_QUESTIONS.filter(
+    (q) => domain === "전체" || q.domain === domain,
+  );
   return (
-    <div className="page">
-      <Heading
-        title="업무 AI"
-        description="우리 공간의 데이터를, 필요한 순간에 자연스럽게 물어보세요."
-      >
-        <Badge>{MOCK ? "AI 응답 모킹" : "DomainLens"}</Badge>
-      </Heading>
-      <div className="hero">
-        <div className="relative z-10">
-          <Icon name="ai" size={30} />
-          <h2>
-            궁금한 운영 현황,
-            <br />
-            질문에서 시작해 보세요.
-          </h2>
-          <p className="text-xs">
-            허용된 지점과 지표 안에서 데이터를 조회하고 표와 차트로 정리해요.
-          </p>
-        </div>
-      </div>
-      {readiness.error ? (
-        <ErrorState
-          error={readiness.error}
-          retry={() => void readiness.refetch()}
-        />
-      ) : readiness.data && !readiness.data.ready ? (
-        <div className="tip mb-5">
-          AI 엔진이 아직 준비되지 않았습니다. 준비 상태를 다시 확인해 주세요.
-          <Button className="ml-3" onClick={() => void readiness.refetch()}>
-            다시 확인
-          </Button>
-        </div>
-      ) : null}
-      {MOCK && (
-        <p className="tip mb-5">
-          가상 원장에서 일반 매출과 같은 기준으로 계산한 모킹 응답입니다. 실제
-          DomainLens 엔진과 DB는 연결되지 않았습니다.
-        </p>
-      )}
-      <form
-        className="card p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ask();
-        }}
-      >
-        <label htmlFor="ai-question" className="mb-3 block">
-          어떤 데이터가 궁금하신가요?
-        </label>
-        <textarea
-          id="ai-question"
-          className="min-h-24 w-full"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          maxLength={1000}
-          placeholder="지난달 지점별 매출을 보여줘"
-        />
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            className="btn quiet"
-            onClick={() => setQuestion("지난달 지점별 매출을 보여줘")}
-          >
-            지난달 지점별 매출 ↗
-          </button>
-          <div className="flex gap-2">
-            {active && (
+    // A single pane: has-channel keeps chat-main visible on phones, where the team chat shows its list instead.
+    <div className="chat-shell has-channel">
+      <section className="chat-main" aria-labelledby="ai-chat-title">
+        <header className="chat-header">
+          <div className="min-w-0">
+            <h2 id="ai-chat-title">업무 AI</h2>
+            <p className="help">
+              허용된 지점과 지표 안에서 운영 데이터를 조회해 표와 차트로
+              정리해요.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge>{MOCK ? "AI 응답 모킹" : "DomainLens"}</Badge>
+            {turns.length > 0 && (
               <Button
-                type="button"
-                onClick={() =>
-                  void api(`/requests/${requestId}/cancel`, {
-                    method: "POST",
-                    body: {},
-                  }).catch((e) => setError(e.message))
-                }
+                disabled={busy}
+                onClick={() => {
+                  setTurns([]);
+                  setQuestion("");
+                }}
               >
-                조회 취소
+                새 대화
               </Button>
             )}
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={
-                active ||
-                submitting ||
-                !question.trim() ||
-                !readiness.data?.ready
-              }
-            >
-              <Icon name="ai" size={16} />
-              {active ? "조회 중…" : "질문하기"}
-            </Button>
           </div>
-        </div>
-      </form>
-      <section className="mt-5" aria-live="polite" aria-atomic="false">
-        <div className="mb-4 flex items-center gap-2 text-xs">
-          <Badge>{labels[phase]}</Badge>
-          {active && (
-            <span className="text-muted">
-              현재 권한으로 데이터를 확인하고 있어요.
-            </span>
-          )}
-        </div>
-        {error && (
-          <div className="mb-4">
-            <FieldError>{error}</FieldError>
-          </div>
-        )}
-        {phase === "clarification" && (
-          <div className="card p-5">
-            <h2>조회할 지표를 확인해 주세요.</h2>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {choices.map((c) => (
-                <Button key={c.id} onClick={() => void ask(c.label)}>
-                  {c.label}
-                </Button>
-              ))}
+        </header>
+        <div className="messages" aria-live="polite">
+          {readiness.error ? (
+            <ErrorState
+              error={readiness.error}
+              retry={() => void readiness.refetch()}
+            />
+          ) : readiness.data && !ready ? (
+            <div className="tip mb-4 flex flex-wrap items-center gap-3">
+              AI 엔진이 아직 준비되지 않았어요.
+              <Button onClick={() => void readiness.refetch()}>
+                다시 확인
+              </Button>
             </div>
+          ) : null}
+          {MOCK && (
+            <p className="tip mb-4">
+              가상 데이터로 만든 모킹 응답이에요. 실제 DomainLens 엔진과 DB에는
+              연결되지 않았어요.
+            </p>
+          )}
+          {turns.length === 0 ? (
+            <Examples
+              domain={domain}
+              setDomain={setDomain}
+              examples={examples}
+              salesAllowed={salesAllowed}
+              disabled={!ready || busy}
+              onPick={(q) => void ask(q.question)}
+            />
+          ) : (
+            turns.map((turn) => (
+              <TurnView
+                key={turn.id}
+                turn={turn}
+                userName={user.name}
+                scope={scope}
+                disabled={busy}
+                onView={(view) => patch(turn.id, { view })}
+                onChoose={(option) => void ask(option.label, option.id)}
+              />
+            ))
+          )}
+          <div ref={bottom} />
+        </div>
+        <form
+          className="composer"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void ask(question);
+          }}
+        >
+          <label className="sr-only" htmlFor="ai-question">
+            AI에게 질문
+          </label>
+          <textarea
+            id="ai-question"
+            value={question}
+            maxLength={MAX_QUESTION}
+            placeholder="예: 이번 달 지점별 매출을 비교해줘"
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing
+              ) {
+                e.preventDefault();
+                void ask(question);
+              }
+            }}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted">
+              Enter로 보내기 · Shift+Enter로 줄바꿈
+            </span>
+            {busy ? (
+              <Button type="button" onClick={() => abort.current?.abort()}>
+                질문 취소
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={!question.trim() || !ready}
+              >
+                <Icon name="ai" size={16} />
+                질문하기
+              </Button>
+            )}
           </div>
-        )}
-        {result && (
-          <section className="card">
-            <header className="card-header">
-              <h2>{result.viewSpec.title}</h2>
-              <div className="flex gap-1">
-                {[
-                  ["table", "표"],
-                  ["bar", "막대"],
-                  ["line", "선"],
-                ].map(([v, l]) => (
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function Examples({
+  domain,
+  setDomain,
+  examples,
+  salesAllowed,
+  disabled,
+  onPick,
+}: {
+  domain: string;
+  setDomain: (domain: string) => void;
+  examples: PocQuestionSpec[];
+  salesAllowed: boolean;
+  disabled: boolean;
+  onPick: (question: PocQuestionSpec) => void;
+}) {
+  return (
+    <section aria-labelledby="ai-examples-title" className="py-2">
+      <h3 id="ai-examples-title" className="mb-1">
+        이런 질문을 할 수 있어요
+      </h3>
+      <p className="help mb-3">
+        질문을 고르면 바로 조회해요. 직접 입력해도 돼요.
+      </p>
+      <div className="tabs" role="tablist" aria-label="질문 분야">
+        {DOMAINS.map((d) => (
+          <button
+            key={d}
+            type="button"
+            role="tab"
+            aria-selected={domain === d}
+            className={`tab ${domain === d ? "active" : ""}`}
+            onClick={() => setDomain(d)}
+          >
+            {d}
+          </button>
+        ))}
+      </div>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {examples.map((q) => {
+          const blocked = q.requiresSalesRead && !salesAllowed;
+          return (
+            <li key={q.code}>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-line bg-surface p-3 text-left hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={disabled || blocked}
+                onClick={() => onPick(q)}
+              >
+                <span className="block text-[11px] font-semibold text-primary">
+                  {q.domain}
+                </span>
+                <span className="block text-[13px] text-ink">{q.question}</span>
+                {blocked && (
+                  <span className="mt-1 block text-[11px] text-muted">
+                    매출 조회 권한이 있어야 볼 수 있어요.
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function TurnView({
+  turn,
+  userName,
+  scope,
+  disabled,
+  onView,
+  onChoose,
+}: {
+  turn: Turn;
+  userName: string;
+  scope: string;
+  disabled: boolean;
+  onView: (view: string) => void;
+  onChoose: (option: ClarificationOptionDto) => void;
+}) {
+  const time = new Date(turn.askedAt).toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return (
+    <>
+      <article className="message" aria-label="내 질문">
+        <Avatar name={userName} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <b className="text-xs">{userName}</b>
+            <time className="text-[10px] text-muted" dateTime={turn.askedAt}>
+              {time}
+            </time>
+          </div>
+          <p>{turn.question}</p>
+        </div>
+      </article>
+      <article className="message" aria-label="AI 답변">
+        <span
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-soft text-primary"
+          aria-hidden="true"
+        >
+          <Icon name="ai" size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <b className="text-xs">업무 AI</b>
+          {turn.state === "loading" && (
+            <p className="flex items-center gap-2 text-muted">
+              <span className="spinner !h-4 !w-4" aria-hidden="true" />
+              권한을 확인하고 데이터를 조회하고 있어요…
+            </p>
+          )}
+          {turn.state === "completed" && turn.parsed && (
+            <Answer
+              parsed={turn.parsed}
+              message={turn.message}
+              view={turn.view}
+              scope={scope}
+              onView={onView}
+            />
+          )}
+          {turn.state === "clarification" && (
+            <>
+              <p>{turn.message}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {turn.options.map((option) => (
                   <Button
-                    key={v}
-                    variant={view === v ? "primary" : ""}
-                    onClick={() => setView(v)}
+                    key={option.id}
+                    disabled={disabled}
+                    onClick={() => onChoose(option)}
                   >
-                    {l}
+                    {option.label}
                   </Button>
                 ))}
               </div>
-            </header>
-            {!["table", "bar", "line"].includes(view) ? (
-              <State
-                title="지원하지 않는 결과 화면입니다"
-                message="허용된 표 또는 차트 형식으로만 결과를 표시합니다."
-              />
-            ) : !result.rows.length ? (
-              <State
-                title="조회된 데이터가 없어요"
-                message="기간과 허용 지점의 거래를 확인해 주세요."
-              />
-            ) : (
-              <>
-                {view !== "table" && (
-                  <div className="p-5">
-                    <SalesChart
-                      rows={result.rows}
-                      kind={view as "bar" | "line"}
-                    />
-                  </div>
-                )}
-                <SalesTable rows={result.rows} />
-              </>
-            )}
-            <p className="help border-t border-line p-5">
-              {result.start} 이상 ~ {result.end} 미만 · {result.timeZone} ·{" "}
-              {result.currency} ·{" "}
-              {result.refundBasis === "processed"
-                ? "환불 처리일 기준"
-                : "원결제일 차감 기준"}{" "}
-              · 기준 시각 {result.asOf}
+            </>
+          )}
+          {(turn.state === "refused" || turn.state === "error") && (
+            <p role={turn.state === "error" ? "alert" : undefined}>
+              {turn.message}
             </p>
-          </section>
-        )}
+          )}
+        </div>
+      </article>
+    </>
+  );
+}
+
+function Answer({
+  parsed,
+  message,
+  view,
+  scope,
+  onView,
+}: {
+  parsed: ParsedAiResult;
+  message: string;
+  view: string;
+  scope: string;
+  onView: (view: string) => void;
+}) {
+  const primary = toViewMode(parsed.primaryComponent);
+  const views = [
+    primary,
+    ...(parsed.salesRows.length > 0 ? ["bar", "line"] : []),
+    "table",
+  ].filter((v, i, all) => all.indexOf(v) === i);
+  const sales = parsed.salesRows;
+  const total = (key: "approved" | "refunds" | "net") =>
+    sales.reduce((sum, row) => sum + row[key], 0);
+  const empty =
+    sales.length === 0 && parsed.datasetList.every((d) => d.rows.length === 0);
+  return (
+    <>
+      {message && <p>{message}</p>}
+      <section
+        className="card mt-2 max-w-3xl"
+        aria-label={`${parsed.title} 결과`}
+      >
+        <header className="card-header">
+          <h3 className="text-sm">{parsed.title}</h3>
+          {views.length > 1 && (
+            <div className="flex gap-1" role="group" aria-label="결과 보기">
+              {views.map((v) => (
+                <Button
+                  key={v}
+                  variant={view === v ? "primary" : ""}
+                  aria-pressed={view === v}
+                  onClick={() => onView(v)}
+                >
+                  {viewLabel(v)}
+                </Button>
+              ))}
+            </div>
+          )}
+        </header>
+        <div className="p-4">
+          {empty ? (
+            <State
+              title="조회된 데이터가 없어요"
+              message="기간과 허용 지점을 확인해 주세요."
+            />
+          ) : (
+            <>
+              {sales.length > 0 && (
+                <dl className="mb-4 grid grid-cols-3 gap-2 text-xs">
+                  {(
+                    [
+                      ["순매출", total("net")],
+                      ["승인 결제액", total("approved")],
+                      ["환불액", total("refunds")],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-soft p-3">
+                      <dt className="text-muted">{label}</dt>
+                      <dd className="m-0 mt-1 text-base font-semibold">
+                        {won(value)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <ViewSpecRenderer
+                parsed={parsed}
+                activeView={view}
+                scope={scope}
+              />
+            </>
+          )}
+        </div>
+        <p className="help border-t border-line px-4 py-3">
+          기준 시각{" "}
+          {parsed.asOf ? parsed.asOf.slice(0, 16).replace("T", " ") : "-"}
+          {" · "}Asia/Seoul
+          {parsed.warnings.length > 0 && ` · ${parsed.warnings.join(" · ")}`}
+        </p>
       </section>
-    </div>
+    </>
+  );
+}
+
+function viewLabel(view: string) {
+  return (
+    {
+      table: "표",
+      bar: "막대",
+      line: "선",
+      ranked_bar: "순위",
+      heatmap: "히트맵",
+      seat_map: "좌석",
+      week_calendar: "캘린더",
+      task_list: "목록",
+      kpi: "요약",
+    }[view] || view
   );
 }
