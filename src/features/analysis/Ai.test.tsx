@@ -9,6 +9,12 @@ import type { AiQueryResponseDto } from "./domainlens";
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
   execute: vi.fn(),
+  history: {
+    list: vi.fn(),
+    reopen: vi.fn(),
+    rename: vi.fn(),
+    remove: vi.fn(),
+  },
   context: {} as { session: CurrentUser; scope: string },
 }));
 vi.mock("../../app/context", () => ({ useApp: () => mocks.context }));
@@ -19,6 +25,7 @@ vi.mock("../../shared/api/client", async (load) => ({
 vi.mock("./domainlens", async (load) => ({
   ...(await load<typeof import("./domainlens")>()),
   executeAiQuery: mocks.execute,
+  aiConversations: mocks.history,
 }));
 vi.mock("./Charts", () => ({
   ViewSpecRenderer: ({ activeView }: { activeView?: string }) => (
@@ -125,6 +132,7 @@ let client: QueryClient;
 beforeEach(() => {
   mocks.context = { session: session(["ai:read", "sales:read"]), scope: "1" };
   mocks.api.mockResolvedValue({ ready: true });
+  mocks.history.list.mockResolvedValue([]);
 });
 afterEach(() => {
   cleanup();
@@ -277,4 +285,84 @@ it("disables sales examples without sales:read and blocks asking while the engin
   expect(sales).toHaveTextContent("매출 조회 권한이 있어야 볼 수 있어요.");
   await userEvent.type(screen.getByLabelText("AI에게 질문"), "좌석 현황");
   expect(screen.getByRole("button", { name: "질문하기" })).toBeDisabled();
+});
+
+const saved = {
+  id: "conv-1",
+  title: "매출 점검",
+  scope: "1",
+  createdAt: "2026-11-06T01:00:00Z",
+  lastAskedAt: "2026-11-06T01:05:00Z",
+};
+
+it("reopens a saved conversation with each question re-run, and keeps asking in it", async () => {
+  mocks.history.list.mockResolvedValue([saved]);
+  mocks.history.reopen.mockResolvedValue({
+    id: "conv-1",
+    title: "매출 점검",
+    scope: "1",
+    turns: [
+      {
+        question: "지점별 매출",
+        askedAt: "2026-11-06T01:00:00Z",
+        response: response({ message: "다시 조회했어요." }),
+      },
+      {
+        question: "옛 지점 매출",
+        askedAt: "2026-11-06T01:05:00Z",
+        response: response({
+          status: "REFUSED",
+          envelope: null,
+          message: "지금 권한이나 지점 범위로는 다시 조회할 수 없어요.",
+        }),
+      },
+    ],
+  });
+  mocks.execute.mockResolvedValue(response({ message: "이어서 답했어요." }));
+  show();
+  const user = userEvent.setup();
+  await user.click(
+    (await screen.findAllByRole("button", { name: /^매출 점검/ }))[0],
+  );
+  expect(mocks.history.reopen).toHaveBeenCalledWith(
+    "conv-1",
+    "1",
+    expect.any(AbortSignal),
+  );
+  expect(await screen.findByText("다시 조회했어요.")).toBeInTheDocument();
+  expect(
+    screen.getByText("지금 권한이나 지점 범위로는 다시 조회할 수 없어요."),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText(/결과 화면/)).toHaveLength(1);
+  await ask("이어서 질문");
+  expect(await screen.findByText("이어서 답했어요.")).toBeInTheDocument();
+  expect(mocks.execute).toHaveBeenLastCalledWith(
+    expect.objectContaining({ conversationId: "conv-1" }),
+    expect.any(AbortSignal),
+  );
+});
+
+it("renames and deletes a saved conversation from the history", async () => {
+  mocks.history.list.mockResolvedValue([saved]);
+  mocks.history.rename.mockResolvedValue({ id: "conv-1", title: "새 제목" });
+  mocks.history.remove.mockResolvedValue(undefined);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  show();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "매출 점검 제목 변경" }),
+  );
+  const title = screen.getByLabelText("대화 제목");
+  await user.clear(title);
+  await user.type(title, "새 제목");
+  await user.click(screen.getByRole("button", { name: "저장" }));
+  await waitFor(() =>
+    expect(mocks.history.rename).toHaveBeenCalledWith("conv-1", "새 제목"),
+  );
+  await user.click(screen.getByRole("button", { name: "매출 점검 삭제" }));
+  expect(confirm).toHaveBeenCalled();
+  await waitFor(() =>
+    expect(mocks.history.remove).toHaveBeenCalledWith("conv-1"),
+  );
+  confirm.mockRestore();
 });

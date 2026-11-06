@@ -83,6 +83,8 @@ const response =
           );
       }
       const result = await fn(a);
+      // A handler may answer without a body (204), e.g. a delete.
+      if (result instanceof Response) return result;
       return HttpResponse.json(result === undefined ? null : result);
     } catch (error) {
       if (error instanceof z.ZodError)
@@ -349,6 +351,187 @@ function executeAi(r: AiRequest) {
   );
 }
 
+/** Saved mock AI conversations of this browser session, by employee (#71). Results are rebuilt, never stored. */
+const aiConversationStore = new Map<
+  string,
+  {
+    id: string;
+    employeeId: string;
+    title: string;
+    scope: string;
+    createdAt: string;
+    lastAskedAt: string;
+    questions: { question: string; askedAt: string }[];
+  }
+>();
+/** The mock DomainLens answer: every question returns the branch sales comparison of the mock ledger. */
+function mockAiAnswer(q: string, s: string, conversationId: string) {
+  const reqId = `req-${crypto.randomUUID().slice(0, 8)}`;
+  const execId = `exec-${crypto.randomUUID().slice(0, 8)}`;
+  const traceId = `trc-${crypto.randomUUID().slice(0, 8)}`;
+  const rows = sales(store, s, "2026-10-01", "2026-10-18", "processed");
+  return {
+    requestId: reqId,
+    executionId: execId,
+    conversationId,
+    traceId,
+    status: "COMPLETED",
+    httpStatus: 200,
+    errorCode: null,
+    resultCategory: "EXECUTED",
+    behavior: "EXECUTE_ANALYSIS",
+    message: null,
+    pocCode: "POC-001",
+    analysisId: "openstudy.sales.branchComparison",
+    intentDomain: "sales",
+    semanticStatus: "CONFIRMED_ADR",
+    querySpec: {
+      id: "qs_openstudy.sales.branchComparison",
+      source: "payment",
+      grain: "payment",
+      mode: "REGISTERED_ANALYSIS",
+      analysisId: "openstudy.sales.branchComparison",
+    },
+    viewSpec: {
+      catalogVersion: "openstudy-ui-1.0.0",
+      components: [
+        {
+          id: "comp_bar",
+          componentRef: { id: "BAR_CHART", version: "1.0.0" },
+          datasetId: "branchSales",
+          bindings: {},
+          options: {},
+          events: [],
+        },
+      ],
+    },
+    envelope: {
+      requestId: reqId,
+      executionId: execId,
+      status: "COMPLETED",
+      datasets: [
+        {
+          id: "branchSales",
+          columns: [
+            {
+              alias: "branch_id",
+              type: "INTEGER",
+              unit: null,
+              precision: 0,
+            },
+            {
+              alias: "branch_name",
+              type: "STRING",
+              unit: null,
+              precision: null,
+            },
+            {
+              alias: "approved_krw",
+              type: "INTEGER",
+              unit: "KRW",
+              precision: 0,
+            },
+            {
+              alias: "refund_krw",
+              type: "INTEGER",
+              unit: "KRW",
+              precision: 0,
+            },
+            {
+              alias: "net_krw",
+              type: "INTEGER",
+              unit: "KRW",
+              precision: 0,
+            },
+          ],
+          rows: rows.map((r) => ({
+            branch_id: r.branchId,
+            branch_name: r.branch,
+            approved_krw: r.approved,
+            refund_krw: r.refunds,
+            net_krw: r.net,
+          })),
+          totalElements: rows.length,
+          page: 0,
+          size: 50,
+          snapshotAt: AS_OF,
+          asOf: AS_OF,
+        },
+      ],
+      view: {
+        catalogVersion: "openstudy-ui-1.0.0",
+        components: [
+          {
+            id: "comp_bar",
+            componentRef: { id: "BAR_CHART", version: "1.0.0" },
+            datasetId: "branchSales",
+            bindings: {},
+            options: {},
+            events: [],
+          },
+        ],
+      },
+      warnings: [],
+      errorCode: null,
+      asOf: AS_OF,
+      snapshotVersion: "openstudy-semantic-1.0.0",
+      policyVersion: "openstudy-policy-v1",
+    },
+    summary: {},
+    truncation: {
+      maxRows: 1000,
+      pageSize: 50,
+      maxChartCategories: 20,
+      isTruncated: false,
+      warningCode: null,
+      message: null,
+    },
+    clarificationOptions: [],
+    stages: [
+      {
+        stage: "accepted",
+        label: "질문 접수 및 정규화",
+        status: "COMPLETED",
+        durationMs: 2,
+        detail: q,
+      },
+      {
+        stage: "completed",
+        label: "ViewSpec 바인딩 및 결과 검증",
+        status: "COMPLETED",
+        durationMs: 4,
+        detail: "BAR_CHART",
+      },
+    ],
+    retrievedCandidates: [
+      { id: "payment", kind: "ENTITY", score: 0.942 },
+      { id: "sales.net_sales_krw", kind: "METRIC", score: 0.918 },
+    ],
+    securityGate: { requestedScope: s, outcome: "EXECUTE" },
+    legacyExecution: {
+      id: execId,
+      status: "READY",
+      asOf: AS_OF,
+      start: "2026-11-01",
+      end: "2026-11-03",
+      currency: "KRW",
+      timeZone: "Asia/Seoul",
+      refundBasis: "processed",
+      viewSpec: { component: "bar", title: q },
+      rows,
+    },
+  };
+}
+function ownAiConversation(id: string) {
+  const c = aiConversationStore.get(id);
+  assert(
+    c?.employeeId === store.activeUser().id,
+    "AI 대화를 찾을 수 없습니다.",
+    404,
+    "NOT_FOUND",
+  );
+  return c!;
+}
 export const handlers = [
   ...salesHandlers,
   ...attendanceHandlers,
@@ -937,161 +1120,89 @@ export const handlers = [
       const p = await json(a);
       const q = String(p.question || "").trim();
       const s = String(p.scope || "all");
-      const reqId = `req-${crypto.randomUUID().slice(0, 8)}`;
-      const execId = `exec-${crypto.randomUUID().slice(0, 8)}`;
-      const traceId = `trc-${crypto.randomUUID().slice(0, 8)}`;
-      const rows = sales(store, s, "2026-10-01", "2026-10-18", "processed");
-      return {
-        requestId: reqId,
-        executionId: execId,
-        conversationId: String(p.conversationId || "conv-mock-1"),
-        traceId,
-        status: "COMPLETED",
-        httpStatus: 200,
-        errorCode: null,
-        resultCategory: "EXECUTED",
-        behavior: "EXECUTE_ANALYSIS",
-        message: null,
-        pocCode: "POC-001",
-        analysisId: "openstudy.sales.branchComparison",
-        intentDomain: "sales",
-        semanticStatus: "CONFIRMED_ADR",
-        querySpec: {
-          id: "qs_openstudy.sales.branchComparison",
-          source: "payment",
-          grain: "payment",
-          mode: "REGISTERED_ANALYSIS",
-          analysisId: "openstudy.sales.branchComparison",
-        },
-        viewSpec: {
-          catalogVersion: "openstudy-ui-1.0.0",
-          components: [
-            {
-              id: "comp_bar",
-              componentRef: { id: "BAR_CHART", version: "1.0.0" },
-              datasetId: "branchSales",
-              bindings: {},
-              options: {},
-              events: [],
-            },
-          ],
-        },
-        envelope: {
-          requestId: reqId,
-          executionId: execId,
-          status: "COMPLETED",
-          datasets: [
-            {
-              id: "branchSales",
-              columns: [
-                {
-                  alias: "branch_id",
-                  type: "INTEGER",
-                  unit: null,
-                  precision: 0,
-                },
-                {
-                  alias: "branch_name",
-                  type: "STRING",
-                  unit: null,
-                  precision: null,
-                },
-                {
-                  alias: "approved_krw",
-                  type: "INTEGER",
-                  unit: "KRW",
-                  precision: 0,
-                },
-                {
-                  alias: "refund_krw",
-                  type: "INTEGER",
-                  unit: "KRW",
-                  precision: 0,
-                },
-                {
-                  alias: "net_krw",
-                  type: "INTEGER",
-                  unit: "KRW",
-                  precision: 0,
-                },
-              ],
-              rows: rows.map((r) => ({
-                branch_id: r.branchId,
-                branch_name: r.branch,
-                approved_krw: r.approved,
-                refund_krw: r.refunds,
-                net_krw: r.net,
-              })),
-              totalElements: rows.length,
-              page: 0,
-              size: 50,
-              snapshotAt: AS_OF,
-              asOf: AS_OF,
-            },
-          ],
-          view: {
-            catalogVersion: "openstudy-ui-1.0.0",
-            components: [
-              {
-                id: "comp_bar",
-                componentRef: { id: "BAR_CHART", version: "1.0.0" },
-                datasetId: "branchSales",
-                bindings: {},
-                options: {},
-                events: [],
-              },
-            ],
-          },
-          warnings: [],
-          errorCode: null,
-          asOf: AS_OF,
-          snapshotVersion: "openstudy-semantic-1.0.0",
-          policyVersion: "openstudy-policy-v1",
-        },
-        summary: {},
-        truncation: {
-          maxRows: 1000,
-          pageSize: 50,
-          maxChartCategories: 20,
-          isTruncated: false,
-          warningCode: null,
-          message: null,
-        },
-        clarificationOptions: [],
-        stages: [
-          {
-            stage: "accepted",
-            label: "질문 접수 및 정규화",
-            status: "COMPLETED",
-            durationMs: 2,
-            detail: q,
-          },
-          {
-            stage: "completed",
-            label: "ViewSpec 바인딩 및 결과 검증",
-            status: "COMPLETED",
-            durationMs: 4,
-            detail: "BAR_CHART",
-          },
-        ],
-        retrievedCandidates: [
-          { id: "payment", kind: "ENTITY", score: 0.942 },
-          { id: "sales.net_sales_krw", kind: "METRIC", score: 0.918 },
-        ],
-        securityGate: { requestedScope: s, outcome: "EXECUTE" },
-        legacyExecution: {
-          id: execId,
-          status: "READY",
-          asOf: AS_OF,
-          start: "2026-11-01",
-          end: "2026-11-03",
-          currency: "KRW",
-          timeZone: "Asia/Seoul",
-          refundBasis: "processed",
-          viewSpec: { component: "bar", title: q },
-          rows,
-        },
+      const employeeId = store.activeUser().id;
+      const asked = String(p.conversationId || "");
+      const saved = asked ? aiConversationStore.get(asked) : undefined;
+      assert(
+        !asked || saved?.employeeId === employeeId,
+        "AI 대화를 찾을 수 없습니다.",
+        404,
+        "NOT_FOUND",
+      );
+      const now = new Date().toISOString();
+      const conversation = saved ?? {
+        id: `conv-${crypto.randomUUID().slice(0, 8)}`,
+        employeeId,
+        title: q.slice(0, 40),
+        scope: s,
+        createdAt: now,
+        lastAskedAt: now,
+        questions: [],
       };
+      conversation.lastAskedAt = now;
+      conversation.questions.push({ question: q, askedAt: now });
+      aiConversationStore.set(conversation.id, conversation);
+      return mockAiAnswer(q, s, conversation.id);
+    }),
+  ),
+  http.get(
+    "/api/ai/conversations",
+    response(() => {
+      const employeeId = store.activeUser().id;
+      return [...aiConversationStore.values()]
+        .filter((c) => c.employeeId === employeeId)
+        .sort((x, y) => y.lastAskedAt.localeCompare(x.lastAskedAt))
+        .map(({ id, title, scope, createdAt, lastAskedAt }) => ({
+          id,
+          title,
+          scope,
+          createdAt,
+          lastAskedAt,
+        }));
+    }),
+  ),
+  http.get(
+    "/api/ai/conversations/:id",
+    response((a) => {
+      const c = ownAiConversation(String(a.params.id));
+      const s = new URL(a.request.url).searchParams.get("scope") || c.scope;
+      return {
+        id: c.id,
+        title: c.title,
+        scope: s,
+        turns: c.questions.map((t) => ({
+          question: t.question,
+          askedAt: t.askedAt,
+          response: {
+            ...mockAiAnswer(t.question, s, c.id),
+            resultCategory: "REOPENED",
+            message: "저장된 질문을 현재 권한과 기준 시각으로 다시 조회했어요.",
+          },
+        })),
+      };
+    }),
+  ),
+  http.patch(
+    "/api/ai/conversations/:id",
+    response(async (a) => {
+      const c = ownAiConversation(String(a.params.id));
+      const title = String((await json(a)).title || "").trim();
+      assert(
+        title.length > 0 && title.length <= 200,
+        "대화 제목은 1~200자로 입력해 주세요.",
+        422,
+        "VALIDATION_FAILED",
+      );
+      c.title = title;
+      return { id: c.id, title };
+    }),
+  ),
+  http.delete(
+    "/api/ai/conversations/:id",
+    response((a) => {
+      const c = ownAiConversation(String(a.params.id));
+      aiConversationStore.delete(c.id);
+      return new HttpResponse(null, { status: 204 });
     }),
   ),
   http.get(
