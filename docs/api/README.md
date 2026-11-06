@@ -1,5 +1,7 @@
 # 프론트엔드 API 인계 계약
 
+> **2026-11-06 명시적 갱신 정책**: [화면 갱신 정책](../design/data-refresh-policy.md)을 우선한다. 아래의 SSE·재연결 설명은 이전 Mock/구현 계약이며 새 필수 요구가 아니다. 현재 AI JSON 요청·응답을 재사용한다. 실제 endpoint·생성 타입·Mock 변경은 Backend #170·Frontend #77에서 동기화한다.
+
 > 2026-10-18: 이 문서는 현재 프론트/MSW 구현 스냅샷입니다. **백엔드 구현 기준은 [OpenStudy API 명세서 v1.0](../../../docs/api/README.md)**과 [OpenAPI](../../../docs/api/openapi.json)를 사용합니다. 초대 토큰·실제 메일·동시성·근태 원본 등 차이는 [전환 목록](../../../docs/api/compatibility.md)을 확인하세요. 이 폴더의 자동 생성기는 운영용 정본을 덮어쓰지 않습니다.
 
 기준은 개정 요구사항 v1.0과 승인된 React 개발 계획입니다. `openapi.json`은 OpenStudy **컨슈머 계약 초안**이며 백엔드 구현 완료를 의미하지 않습니다. 엔진 소유 DomainLens 계약과 구분합니다.
