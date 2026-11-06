@@ -253,7 +253,7 @@ it("keeps every turn in one log and conversation, with suggestions under it", as
   const user = await ask("이번 달 매출");
   expect(await screen.findByText("첫 답변이에요.")).toBeInTheDocument();
   expect(screen.getByText(/처리 과정 2단계/)).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "추천 질문 보기" }));
+  await user.click(screen.getByRole("button", { name: "추천 질문" }));
   await user.click(screen.getByRole("button", { name: "인기 이용권 TOP 5" }));
   expect(await screen.findByText("두 번째 답변이에요.")).toBeInTheDocument();
   expect(screen.getByText("첫 답변이에요.")).toBeInTheDocument();

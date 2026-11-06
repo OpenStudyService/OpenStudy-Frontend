@@ -246,15 +246,6 @@ function AiChat() {
           )}
           <div ref={bottom} />
         </div>
-        {turns.length > 0 && (
-          <Suggestions
-            open={suggestionsOpen}
-            setOpen={setSuggestionsOpen}
-            salesAllowed={salesAllowed}
-            disabled={!ready || busy}
-            onPick={(q) => void ask(q.question)}
-          />
-        )}
         <form
           className="composer"
           onSubmit={(e) => {
@@ -262,6 +253,13 @@ function AiChat() {
             void ask(question);
           }}
         >
+          {suggestionsOpen && (
+            <Suggestions
+              salesAllowed={salesAllowed}
+              disabled={!ready || busy}
+              onPick={(q) => void ask(q.question)}
+            />
+          )}
           <label className="sr-only" htmlFor="ai-question">
             AI에게 질문
           </label>
@@ -283,9 +281,26 @@ function AiChat() {
             }}
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted">
-              Enter로 보내기 · Shift+Enter로 줄바꿈
-            </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                className={`btn min-h-8 px-2.5 py-1 ${suggestionsOpen ? "border-primary text-primary" : ""}`}
+                aria-expanded={suggestionsOpen}
+                aria-controls="ai-suggestions"
+                onClick={() => setSuggestionsOpen(!suggestionsOpen)}
+              >
+                <Icon name="ai" size={14} />
+                추천 질문
+                <Icon
+                  name="chevron"
+                  size={12}
+                  className={suggestionsOpen ? "rotate-90" : "-rotate-90"}
+                />
+              </button>
+              <span className="truncate text-[11px] text-muted">
+                Enter로 보내기 · Shift+Enter로 줄바꿈
+              </span>
+            </div>
             {busy ? (
               <Button type="button" onClick={() => abort.current?.abort()}>
                 질문 취소
@@ -609,58 +624,43 @@ function Stages({
   );
 }
 
-/** Suggested questions kept under the log, so picking one adds a turn to the same conversation. */
+/**
+ * Suggested questions opened from the composer's toggle, above the text box. Picking one adds a turn to the same
+ * conversation and closes the panel.
+ */
 function Suggestions({
-  open,
-  setOpen,
   salesAllowed,
   disabled,
   onPick,
 }: {
-  open: boolean;
-  setOpen: (open: boolean) => void;
   salesAllowed: boolean;
   disabled: boolean;
   onPick: (question: PocQuestionSpec) => void;
 }) {
   return (
-    <div className="mx-4 -mb-2 shrink-0">
-      <button
-        type="button"
-        className="btn quiet text-xs"
-        aria-expanded={open}
-        aria-controls="ai-suggestions"
-        onClick={() => setOpen(!open)}
-      >
-        추천 질문 {open ? "접기" : "보기"}
-      </button>
-      {open && (
-        <ul
-          id="ai-suggestions"
-          className="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto"
-        >
-          {POC_QUESTIONS.map((q) => {
-            const blocked = q.requiresSalesRead && !salesAllowed;
-            return (
-              <li key={q.code}>
-                <button
-                  type="button"
-                  className="rounded-full border border-line bg-surface px-3 py-1 text-xs hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={disabled || blocked}
-                  title={
-                    blocked
-                      ? "매출 조회 권한이 있어야 볼 수 있어요."
-                      : q.question
-                  }
-                  onClick={() => onPick(q)}
-                >
-                  {q.shortLabel}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+    <ul
+      id="ai-suggestions"
+      aria-label="추천 질문"
+      className="mb-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto border-b border-line pb-3"
+    >
+      {POC_QUESTIONS.map((q) => {
+        const blocked = q.requiresSalesRead && !salesAllowed;
+        return (
+          <li key={q.code}>
+            <button
+              type="button"
+              className="rounded-full border border-line bg-surface px-3 py-1 text-xs hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={disabled || blocked}
+              title={
+                blocked ? "매출 조회 권한이 있어야 볼 수 있어요." : q.question
+              }
+              onClick={() => onPick(q)}
+            >
+              {q.shortLabel}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
