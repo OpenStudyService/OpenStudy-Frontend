@@ -218,9 +218,48 @@ it("resends a clarification choice with its option id", async () => {
         question: "이번 달 지점별 매출을 비교해줘",
         scope: "1",
         clarificationChoice: "branch-sales",
+        conversationId: "conv-1",
       },
       expect.any(AbortSignal),
     ),
+  );
+});
+
+it("keeps every turn in one log and conversation, with suggestions under it", async () => {
+  mocks.execute
+    .mockResolvedValueOnce(
+      response({
+        message: "첫 답변이에요.",
+        stages: [
+          {
+            stage: "accepted",
+            label: "질문 접수 및 정규화",
+            status: "COMPLETED",
+            durationMs: 2,
+            detail: "",
+          },
+          {
+            stage: "executing",
+            label: "데이터베이스 집계 실행",
+            status: "COMPLETED",
+            durationMs: 40,
+            detail: "",
+          },
+        ],
+      }),
+    )
+    .mockResolvedValueOnce(response({ message: "두 번째 답변이에요." }));
+  show();
+  const user = await ask("이번 달 매출");
+  expect(await screen.findByText("첫 답변이에요.")).toBeInTheDocument();
+  expect(screen.getByText(/처리 과정 2단계/)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "추천 질문 보기" }));
+  await user.click(screen.getByRole("button", { name: "인기 이용권 TOP 5" }));
+  expect(await screen.findByText("두 번째 답변이에요.")).toBeInTheDocument();
+  expect(screen.getByText("첫 답변이에요.")).toBeInTheDocument();
+  expect(mocks.execute).toHaveBeenLastCalledWith(
+    expect.objectContaining({ conversationId: "conv-1" }),
+    expect.any(AbortSignal),
   );
 });
 

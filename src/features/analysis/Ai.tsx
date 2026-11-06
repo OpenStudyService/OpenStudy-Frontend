@@ -22,9 +22,13 @@ import type {
   ClarificationOptionDto,
   ParsedAiResult,
   PocQuestionSpec,
+  StageSpanDto,
 } from "./domainlens";
 
-/** One question and its answer, kept only for this screen session (saved conversations: #71). */
+/**
+ * One question and its answer. The turns stay in one log, and the server keeps them in one conversation through
+ * conversationId (listing and reopening saved conversations: #71).
+ */
 interface Turn {
   id: string;
   question: string;
@@ -34,6 +38,9 @@ interface Turn {
   view: string;
   message: string;
   options: ClarificationOptionDto[];
+  /** The engine's own stage record, returned with the answer (the query runs in one request, not streamed). */
+  stages: StageSpanDto[];
+  elapsedMs: number;
 }
 
 const DOMAINS = ["전체", "매출", "좌석", "이용권", "스터디룸", "업무", "근태"];
@@ -58,6 +65,8 @@ function AiChat() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [domain, setDomain] = useState("전체");
   const [busy, setBusy] = useState(false);
+  const [conversationId, setConversationId] = useState<string>();
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
   const readiness = useQuery({
@@ -93,20 +102,30 @@ function AiChat() {
         view: "",
         message: "",
         options: [],
+        stages: [],
+        elapsedMs: 0,
       },
     ]);
     setQuestion("");
+    setSuggestionsOpen(false);
     setBusy(true);
+    const started = performance.now();
     const controller = new AbortController();
     abort.current = controller;
     try {
       const res = await executeAiQuery(
-        { question: trimmed, scope, clarificationChoice },
+        { question: trimmed, scope, clarificationChoice, conversationId },
         controller.signal,
       );
+      if (res.conversationId) setConversationId(res.conversationId);
+      const timing = {
+        stages: res.stages ?? [],
+        elapsedMs: Math.round(performance.now() - started),
+      };
       if (res.status === "COMPLETED" && res.envelope) {
         const parsed = parseAiResult(res);
         patch(id, {
+          ...timing,
           state: "completed",
           parsed,
           view: toViewMode(parsed.primaryComponent),
@@ -114,6 +133,7 @@ function AiChat() {
         });
       } else if (res.status === "CLARIFICATION") {
         patch(id, {
+          ...timing,
           state: "clarification",
           message:
             res.message ||
@@ -122,6 +142,7 @@ function AiChat() {
         });
       } else {
         patch(id, {
+          ...timing,
           state: "refused",
           message:
             res.message ||
@@ -173,6 +194,7 @@ function AiChat() {
                 onClick={() => {
                   setTurns([]);
                   setQuestion("");
+                  setConversationId(undefined);
                 }}
               >
                 새 대화
@@ -224,6 +246,15 @@ function AiChat() {
           )}
           <div ref={bottom} />
         </div>
+        {turns.length > 0 && (
+          <Suggestions
+            open={suggestionsOpen}
+            setOpen={setSuggestionsOpen}
+            salesAllowed={salesAllowed}
+            disabled={!ready || busy}
+            onPick={(q) => void ask(q.question)}
+          />
+        )}
         <form
           className="composer"
           onSubmit={(e) => {
@@ -384,11 +415,9 @@ function TurnView({
         </span>
         <div className="min-w-0 flex-1">
           <b className="text-xs">업무 AI</b>
-          {turn.state === "loading" && (
-            <p className="flex items-center gap-2 text-muted">
-              <span className="spinner !h-4 !w-4" aria-hidden="true" />
-              권한을 확인하고 데이터를 조회하고 있어요…
-            </p>
+          {turn.state === "loading" && <Working />}
+          {turn.state !== "loading" && turn.stages.length > 0 && (
+            <Stages stages={turn.stages} elapsedMs={turn.elapsedMs} />
           )}
           {turn.state === "completed" && turn.parsed && (
             <Answer
@@ -532,5 +561,106 @@ function viewLabel(view: string) {
       task_list: "목록",
       kpi: "요약",
     }[view] || view
+  );
+}
+
+/**
+ * Shown while the single /ai/queries request runs. The engine reports its stages only with the answer, so this shows
+ * the elapsed time instead of claiming a stage it cannot know.
+ */
+function Working() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <p className="flex items-center gap-2 text-muted" role="status">
+      <span className="spinner !h-4 !w-4" aria-hidden="true" />
+      AI 작업 중… 질문을 해석하고 권한 안에서 데이터를 조회하고 있어요
+      {seconds > 0 && <span className="tabular-nums"> · {seconds}초</span>}
+    </p>
+  );
+}
+
+/** The engine's stage record of one answer (접수 → 검색 → 조회 명세 → 검증 → 조회 → 결과 검증). */
+function Stages({
+  stages,
+  elapsedMs,
+}: {
+  stages: StageSpanDto[];
+  elapsedMs: number;
+}) {
+  return (
+    <details className="mt-1 text-[11px] text-muted">
+      <summary className="cursor-pointer select-none">
+        처리 과정 {stages.length}단계 · {(elapsedMs / 1000).toFixed(1)}초
+      </summary>
+      <ol className="mt-1 grid gap-0.5 pl-4">
+        {stages.map((stage, i) => (
+          <li key={`${stage.stage}-${i}`} className="list-decimal">
+            {stage.label}
+            {stage.status !== "COMPLETED" && ` (${stage.status})`}
+            <span className="tabular-nums"> · {stage.durationMs}ms</span>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+/** Suggested questions kept under the log, so picking one adds a turn to the same conversation. */
+function Suggestions({
+  open,
+  setOpen,
+  salesAllowed,
+  disabled,
+  onPick,
+}: {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  salesAllowed: boolean;
+  disabled: boolean;
+  onPick: (question: PocQuestionSpec) => void;
+}) {
+  return (
+    <div className="mx-4 -mb-2 shrink-0">
+      <button
+        type="button"
+        className="btn quiet text-xs"
+        aria-expanded={open}
+        aria-controls="ai-suggestions"
+        onClick={() => setOpen(!open)}
+      >
+        추천 질문 {open ? "접기" : "보기"}
+      </button>
+      {open && (
+        <ul
+          id="ai-suggestions"
+          className="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto"
+        >
+          {POC_QUESTIONS.map((q) => {
+            const blocked = q.requiresSalesRead && !salesAllowed;
+            return (
+              <li key={q.code}>
+                <button
+                  type="button"
+                  className="rounded-full border border-line bg-surface px-3 py-1 text-xs hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={disabled || blocked}
+                  title={
+                    blocked
+                      ? "매출 조회 권한이 있어야 볼 수 있어요."
+                      : q.question
+                  }
+                  onClick={() => onPick(q)}
+                >
+                  {q.shortLabel}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
