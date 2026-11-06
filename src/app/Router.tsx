@@ -69,7 +69,7 @@ export const router = createBrowserRouter([
         path: "members",
         element: (
           <ResourceGroup
-            title="회원·이용권"
+            title="회원 관리"
             description="회원의 이용 상황과 응대 이력을 함께 확인해요."
             tabs={[
               { resource: "members", label: "회원 목록" },
@@ -88,7 +88,7 @@ export const router = createBrowserRouter([
         path: "spaces",
         element: (
           <ResourceGroup
-            title="좌석·사물함"
+            title="공간 관리"
             description="현장 좌석 배정과 이용 이력, 사물함을 관리해요."
             tabs={[
               { resource: "seats", label: "좌석 현황" },

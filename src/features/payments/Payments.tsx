@@ -110,7 +110,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
   return (
     <section className={embedded ? "" : "page"}>
       <Heading
-        title="결제"
+        title="결제 관리"
         description="Mock 결제 내역과 이용권 발급·환불을 확인해요."
       >
         {writable && (

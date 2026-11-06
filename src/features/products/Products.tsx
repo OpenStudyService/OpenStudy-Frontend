@@ -77,7 +77,7 @@ export function ProductManagement() {
   return (
     <section className="page">
       <Heading
-        title="상품·요율"
+        title="상품 관리"
         description="시간권·기간권·정액권의 판매 조건과 변경 이력을 관리해요."
       >
         {tab === "products" && writable.length > 0 && (

@@ -96,7 +96,7 @@ export function Records({
   return (
     <section className={embedded ? "" : "page"}>
       <Heading
-        title={titles[resource]}
+        title={resource === "facilities" ? "시설 관리" : titles[resource]}
         description="지점의 운영 정보를 확인하고 처리하세요."
       >
         <Button onClick={() => setRefresh((v) => v + 1)}>새로고침</Button>

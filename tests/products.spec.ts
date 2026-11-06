@@ -15,7 +15,7 @@ test("owner registers a period pass, changes it, stops sales and reads the befor
 }) => {
   await login(page, "사장님");
   await page.goto("/app/all/products");
-  await expect(page.getByRole("heading", { name: "상품·요율" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "상품 관리" })).toBeVisible();
   await expect(
     page.getByText(/10시간\(600분\)|100시간\(6,000분\)/),
   ).toBeVisible();
@@ -85,7 +85,7 @@ test("a staff member sees only the branch's products and cannot manage sale stat
 }) => {
   await login(page, "직원");
   await page.goto("/app/all/products");
-  await expect(page.getByRole("heading", { name: "상품·요율" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "상품 관리" })).toBeVisible();
   await expect(page.getByRole("button", { name: /삭제/ })).toHaveCount(0);
   const product = page.getByRole("button", { name: /^상품 상세:/ }).first();
   await product.click();
