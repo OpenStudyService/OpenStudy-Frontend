@@ -679,3 +679,42 @@ export async function executeAiQuery(
         : `요청에 실패했습니다. (${response.status})`,
   });
 }
+
+/** One saved AI conversation of the signed-in employee (#71, M10-D12). */
+export interface AiConversationSummary {
+  id: string;
+  title: string | null;
+  scope: string;
+  createdAt: string;
+  lastAskedAt: string;
+}
+
+/**
+ * A reopened conversation: each saved question re-run under the current permissions and a new as-of time, without
+ * calling the model. A question that cannot run any more comes back with its reason and no data.
+ */
+export interface ReopenedAiConversation {
+  id: string;
+  title: string | null;
+  scope: string;
+  turns: { question: string; askedAt: string; response: AiQueryResponseDto }[];
+}
+
+export const aiConversations = {
+  list: (signal?: AbortSignal) =>
+    api<AiConversationSummary[]>("/ai/conversations", { signal }),
+  reopen: (id: string, scope: string, signal?: AbortSignal) =>
+    api<ReopenedAiConversation>(
+      `/ai/conversations/${encodeURIComponent(id)}?scope=${encodeURIComponent(scope)}`,
+      { signal },
+    ),
+  rename: (id: string, title: string) =>
+    api<{ id: string; title: string }>(
+      `/ai/conversations/${encodeURIComponent(id)}`,
+      { method: "PATCH", body: { title } },
+    ),
+  remove: (id: string) =>
+    api<void>(`/ai/conversations/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+};
