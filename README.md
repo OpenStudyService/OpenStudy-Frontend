@@ -1,6 +1,6 @@
 # OpenStudy 프론트엔드
 
-> **2026-11-06 명시적 갱신 정책**: SRS v1.15 POL-52·53에 따라 SSE·polling을 제거하고 메뉴 진입·재클릭·새로고침·사용자 조건 변경으로 조회한다. 본인 저장 결과·서버 인가·충돌 검증은 유지한다. [명시적 화면 갱신 정책](docs/design/data-refresh-policy.md)과 [#77](https://github.com/OpenStudyService/OpenStudy-Frontend/issues/77)을 따른다. 현재 코드에 남은 자동 갱신은 후속 제거 대상이다.
+> **2026-11-06 명시적 갱신 정책**: SRS v1.15 POL-52·53에 따라 SSE·polling을 제거하고 메뉴 진입·재클릭·새로고침·사용자 조건 변경으로 조회한다. 본인 저장 결과·서버 인가·충돌 검증은 유지한다. [명시적 화면 갱신 정책](docs/design/data-refresh-policy.md)과 [#77](https://github.com/OpenStudyService/OpenStudy-Frontend/issues/77)을 따른다.
 
 승인된 `docs/mockup/openstudy/` 디자인을 React로 옮긴 스터디카페 백오피스입니다. 현재 완료 범위는 **프론트엔드와 MSW 기반 통합 시연**입니다. 실제 백엔드, 이메일 발송, DomainLens 엔진은 별도 연결합니다. 기존 HTML 목업은 보존했습니다.
 
@@ -22,7 +22,7 @@ npm run dev
 
 | 명령                       | 동작                                                                      |
 | -------------------------- | ------------------------------------------------------------------------- |
-| `npm run dev`              | mock 모드, MSW HTTP·SSE 사용                                              |
+| `npm run dev`              | mock 모드, MSW HTTP 사용                                              |
 | `npm run dev:live`         | live 모드, 실제 `/api` 서버 사용                                          |
 | `npm run build`            | 실제 API 배포 빌드(`dist/`) 및 운영 산출물 검사                           |
 | `npm run build:demo`       | MSW 시연 빌드(`dist-demo/`) 및 데모 산출물 검사                           |
@@ -71,17 +71,17 @@ GitHub Actions가 검사·live 빌드 후 비공개 Amazon S3에 게시한다. A
 - `/app/:scope/...`의 `detail`, `edit`, `action`, `thread`, `tab`, 검색·필터·정렬·페이지·날짜·보기 매개변수는 주소에서 복원합니다.
 - 1100px 이상 전체 탐색, 641~1099px 보조 탐색 서랍, 640px 이하 하단 탐색과 모바일 대화·스레드 구조를 사용합니다.
 - 포레스트·네이비·샌드 토큰, Radix 상세 패널·메뉴의 포커스, 본문 건너뛰기, 오류 레이블, 모션 감소를 적용했습니다.
-- AI 시연은 **지난달 지점별 매출**만 지원합니다. SSE 진행·취소·확인 질문·실패와 표·막대·선 차트 렌더링을 제공합니다. SQL이나 HTML을 실행하지 않습니다.
+- AI 시연은 **지난달 지점별 매출**만 지원합니다. JSON 요청으로 처리 결과·확인 질문·실패를 표시하고 표·막대·선 차트를 렌더링합니다. SQL이나 HTML을 실행하지 않습니다.
 
 ## 코드 구조
 
 ```text
 src/app/             초기화, 라우트, 공통 레이아웃, 테마·UI 상태
 src/features/        인증, 홈, 운영 폼·상세, 채팅, 근태, 매출·AI, 설정
-src/shared/api/      fetch·CSRF·오류·취소, SSE 재연결, 생성 타입
+src/shared/api/      fetch·CSRF·오류·취소, 생성 타입
 src/shared/domain/   Zod 데이터 계약, 권한 함수, 화면·폼 정의
 src/shared/ui/       디자인 컴포넌트, SVG 아이콘·목업 일러스트
-src/mocks/           seed, 탭 세션 원장, 승인 규칙, MSW HTTP·SSE
+src/mocks/           seed, 탭 세션 원장, 승인 규칙, MSW HTTP
 tests/               브라우저 시나리오, 화면 크기·테마 캡처
 docs/api/            OpenAPI와 API 인계 계약
 ```

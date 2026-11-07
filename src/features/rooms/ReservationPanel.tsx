@@ -215,7 +215,7 @@ function ReservationAction({
   onSaved: () => void;
 }) {
   const { session, scope } = useApp(),
-    write = useRoomWrite(),
+    write = useRoomWrite("reservations", "rooms"),
     clock = useSalesClock(),
     [original] = useState(row),
     [reason, setReason] = useState(""),

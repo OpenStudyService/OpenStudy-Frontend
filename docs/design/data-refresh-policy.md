@@ -1,7 +1,7 @@
 # 명시적 화면 갱신 정책
 
 - 결정일: 2026-11-06
-- 상태: **사용자 확정, 구현 전환은 후속 작업**
+- 상태: **사용자 확정**
 - 정본: [Backend ADR-COM-001](https://github.com/OpenStudyService/OpenStudy-Backend/blob/docs/explicit-refresh-policy/docs/db/ADR-COM-001.md), SRS v1.15 POL-52·POL-53
 
 ## 화면 동작
@@ -18,9 +18,9 @@
 | 다른 세션의 계정·권한 변경 | 다음 API부터 서버가 재검증. 요청 없는 열린 화면의 즉시 삭제는 보장하지 않음 |
 | 401·감지된 접근 범위 변경·로그아웃·계정/지점 전환 | 해당 비공개 캐시·초안·진행 요청 정리, 늦은 응답 차단 |
 
-## 남은 전환 작업
+## 구현
 
-현재 공통 SSE 연결과 TanStack Query의 창 포커스 자동 재조회, 근태·승인 대기 등의 주기 조회가 구현에 남아 있다. 삭제를 완료한 문서로 해석하지 않는다. 최신 AI 화면의 JSON 요청·응답은 이 방향과 맞지만 남은 호환 경로·Mock 계약도 별도로 정리해야 한다.
+공통 SSE 연결, 창 포커스·재연결 재조회, 근태·승인 대기·팀 채팅의 상태 주기 조회를 제거했다. 승인 대기와 주요 업무 화면에서 새로고침과 마지막 성공 조회 시각을 제공한다. AI는 기존 JSON 요청·응답과 대화 기록을 사용한다.
 
 메뉴 재클릭은 같은 URL로 navigate하는 것만으로 재조회된다고 가정하지 않는다. 캐시 staleTime과 데이터 갱신 시점을 구분한다. 정기 `/me` 조회도 넣지 않는다. 로컬 시계·입력 debounce·사용자 요청에 따른 페이지 조회는 화면 상태 polling이 아니다.
 
@@ -41,4 +41,4 @@ AI는 JSON 응답으로 처리 중·완료·확인 필요·실패를 구분하�
 ## 후속 구현
 
 - [Backend #170](https://github.com/OpenStudyService/OpenStudy-Backend/issues/170)·[Frontend #77](https://github.com/OpenStudyService/OpenStudy-Frontend/issues/77)
-- Frontend #32의 AI SSE 인수 조건과 #36의 실서버 회귀 기준에도 이 결정을 연결한다. 이번 변경은 문서이며 코드 제거·실서버 검증을 완료한 것은 아니다.
+- Frontend #32의 AI SSE 인수 조건과 #36의 실서버 회귀 기준에도 이 결정을 연결한다. 실서버 인수 검증 결과는 Frontend #77에서 별도로 확인한다.

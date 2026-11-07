@@ -4,7 +4,6 @@ import type {
   Employee,
   Resource,
   ResourceMap,
-  WorkspaceEvent,
 } from "../shared/domain/schema";
 import { seed } from "./seed";
 import { reconcileChannels } from "../features/chat/model";
@@ -30,7 +29,18 @@ export function assert(
 ): asserts condition {
   if (!condition) throw new DomainError(status, code, message);
 }
-type Listener = (event: WorkspaceEvent) => void;
+type MockChange = {
+  id: string;
+  type: "changed" | "message" | "read" | "permissions";
+  resource:
+    | Resource
+    | "customers"
+    | "seat-sessions"
+    | "locker-assignments"
+    | "attendance-records";
+  entityId: string;
+  branchId: string;
+};
 function isCustomerSnapshot(value: unknown) {
   return (
     !!value &&
@@ -75,8 +85,7 @@ export class MockStore {
   persona: string | null = null;
   sequence = 100;
   scenario = "normal";
-  listeners = new Set<Listener>();
-  events: WorkspaceEvent[] = [];
+  events: MockChange[] = [];
   idempotency: Saved["idempotency"] = {};
   constructor(private persistent = true) {
     if (persistent)
@@ -192,10 +201,10 @@ export class MockStore {
     return row;
   }
   emit(
-    resource: WorkspaceEvent["resource"],
+    resource: MockChange["resource"],
     entityId: string,
     branchId: string,
-    type: WorkspaceEvent["type"] = "changed",
+    type: MockChange["type"] = "changed",
   ) {
     if (resource === "employees" || type === "permissions")
       reconcileChannels(this.db, this.now());
@@ -209,7 +218,6 @@ export class MockStore {
     this.events.push(e);
     if (this.events.length > 1000) this.events.shift();
     this.persist();
-    for (const listener of this.listeners) listener(e);
   }
   transaction<T>(key: string | undefined, body: unknown, fn: () => T): T {
     const scoped = key ? `${this.persona}:${key}` : undefined,

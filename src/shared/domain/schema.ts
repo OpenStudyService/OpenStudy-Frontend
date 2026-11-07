@@ -415,18 +415,6 @@ export interface Page<T> {
   total: number;
   nextCursor?: string;
 }
-export interface WorkspaceEvent {
-  id: string;
-  type: "changed" | "message" | "read" | "permissions";
-  resource:
-    | Resource
-    | "customers"
-    | "seat-sessions"
-    | "locker-assignments"
-    | "attendance-records";
-  entityId: string;
-  branchId: string;
-}
 export interface LookupData {
   preview?: boolean;
   branches: ResourceMap["branches"][];

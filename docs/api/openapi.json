@@ -13474,24 +13474,6 @@
         }
       }
     },
-    "/workspace/events": {
-      "get": {
-        "summary": "업무 공간 SSE",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "connected / workspace / heartbeat. Last-Event-ID or cursor resumes.",
-            "content": {
-              "text/event-stream": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/members/{id}/history": {
       "parameters": [
         {

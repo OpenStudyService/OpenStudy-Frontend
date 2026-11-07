@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -70,7 +71,7 @@ export function AdjustmentForm({
     (!latest || canAdjust(session.user, latest)) &&
     !denied;
   const refresh = () =>
-    query.invalidateQueries({ queryKey: ["data", session.user.id] });
+    invalidateReads(query, session.user.id, "passes", "customers");
   async function readLatest() {
     if (lock.current) return;
     lock.current = true;

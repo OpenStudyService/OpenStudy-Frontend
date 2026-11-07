@@ -138,6 +138,8 @@ describe("seat write lifecycle", () => {
   it("synchronously locks duplicate submissions before rerender and invalidates all coupled resources", async () => {
     const { client, wrapper } = setup();
     const invalidate = vi.spyOn(client, "invalidateQueries");
+    client.setQueryData(["data", "first", "a", "seat-sessions"], []);
+    client.setQueryData(["data", "first", "a", "products"], []);
     const pending = deferred<string>();
     const request = vi.fn((signal: AbortSignal) => {
       signal.throwIfAborted();
@@ -160,7 +162,17 @@ describe("seat write lifecycle", () => {
       expect(await first).toBe("done");
     });
     expect(result.current.busy).toBe(false);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["data", "first"] });
+    expect(
+      client.getQueryState(["data", "first", "a", "seat-sessions"])
+        ?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(["data", "first", "a", "products"])?.isInvalidated,
+    ).toBe(false);
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["data", "first"],
+      predicate: expect.any(Function),
+    });
   });
   it("retains the logical request key after an uncertain response and changes it for changed input", async () => {
     const { client, wrapper } = setup();
@@ -205,6 +217,8 @@ describe("seat write lifecycle", () => {
   it("invalidates the initiating user's caches after a scope/account switch and suppresses stale success", async () => {
     const { client, wrapper } = setup();
     const invalidate = vi.spyOn(client, "invalidateQueries");
+    client.setQueryData(["data", "first", "a", "seat-sessions"], []);
+    client.setQueryData(["data", "first", "a", "products"], []);
     const pending = deferred<string>();
     const request = vi.fn((signal: AbortSignal) => {
       signal.throwIfAborted();
@@ -232,9 +246,13 @@ describe("seat write lifecycle", () => {
       pending.resolve("server committed");
       await rejected;
     });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["data", "first"] });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["data", "first"],
+      predicate: expect.any(Function),
+    });
     expect(invalidate).not.toHaveBeenCalledWith({
       queryKey: ["data", "second"],
+      predicate: expect.any(Function),
     });
     expect(result.current.busy).toBe(false);
   });
@@ -259,7 +277,10 @@ describe("seat write lifecycle", () => {
       pending.resolve("server committed");
       await rejected;
     });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["data", "first"] });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["data", "first"],
+      predicate: expect.any(Function),
+    });
   });
   it.each([401, 403])(
     "refreshes session grants after HTTP %i, including lookup-only requests",
@@ -277,7 +298,10 @@ describe("seat write lifecycle", () => {
         ).rejects.toBe(error);
       });
       expect(invalidate).toHaveBeenCalledWith({ queryKey: ["session"] });
-      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["data", "first"] });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ["data", "first"],
+        predicate: expect.any(Function),
+      });
     },
   );
   it("preserves scoped 404 and conflicts without reporting success", async () => {

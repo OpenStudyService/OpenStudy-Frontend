@@ -115,7 +115,9 @@ it("discards non-string request IDs and removes control characters", async () =>
         ),
       ),
   );
-  const invalid = await api<never>("/lookups").catch((error: ApiError) => error);
+  const invalid = await api<never>("/lookups").catch(
+    (error: ApiError) => error,
+  );
   expect(invalid.detail.requestId).toBeUndefined();
   const valid = await api<never>("/lookups").catch((error: ApiError) => error);
   expect(valid.detail.requestId).toBe("req-safe");
@@ -170,4 +172,25 @@ it("does not expire the new scope when an old unauthorized body arrives after ab
   } finally {
     window.removeEventListener("openstudy:session-expired", expire);
   }
+});
+
+it("aborts concurrent private requests on 401, including callers without a signal", async () => {
+  let finish!: (response: Response) => void;
+  const transport = vi
+    .fn<typeof fetch>()
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    )
+    .mockResolvedValueOnce(new Response(null, { status: 401 }))
+    .mockResolvedValueOnce(Response.json({ ok: true }));
+  vi.stubGlobal("fetch", transport);
+  const pending = api("/lookups?scope=old");
+  await expect(api("/home")).rejects.toMatchObject({ status: 401 });
+  expect(transport.mock.calls[0][1]?.signal?.aborted).toBe(true);
+  finish(Response.json({ branches: [{ id: "old" }] }));
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  await expect(api("/lookups?scope=new")).resolves.toEqual({ ok: true });
 });

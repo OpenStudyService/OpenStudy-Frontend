@@ -1,6 +1,6 @@
 # 프론트엔드 API 인계 계약
 
-> **2026-11-06 명시적 갱신 정책**: [화면 갱신 정책](../design/data-refresh-policy.md)을 우선한다. 아래의 SSE·재연결 설명은 이전 Mock/구현 계약이며 새 필수 요구가 아니다. 현재 AI JSON 요청·응답을 재사용한다. 실제 endpoint·생성 타입·Mock 변경은 Backend #170·Frontend #77에서 동기화한다.
+> 메뉴 진입·재클릭과 새로고침은 [명시적 화면 갱신 정책](../design/data-refresh-policy.md)을 따릅니다.
 
 > 2026-10-18: 이 문서는 현재 프론트/MSW 구현 스냅샷입니다. **백엔드 구현 기준은 [OpenStudy API 명세서 v1.0](../../../docs/api/README.md)**과 [OpenAPI](../../../docs/api/openapi.json)를 사용합니다. 초대 토큰·실제 메일·동시성·근태 원본 등 차이는 [전환 목록](../../../docs/api/compatibility.md)을 확인하세요. 이 폴더의 자동 생성기는 운영용 정본을 덮어쓰지 않습니다.
 
@@ -9,7 +9,7 @@
 ## 모드·인증·에러
 
 - `VITE_API_MODE=live|mock`, `VITE_API_BASE_URL=/api`. Vite 개발 프록시의 `API_PROXY_TARGET=http://localhost:8080`은 서버 설정이며 클라이언트 번들에 노출하지 않습니다.
-- 모든 fetch와 SSE는 쿠키를 포함합니다. 서버는 운영 환경에서 `HttpOnly; Secure; SameSite=Lax` 세션을 발급합니다. 프론트는 세션 토큰을 읽거나 저장하지 않습니다.
+- 모든 fetch는 쿠키를 포함합니다. 서버는 운영 환경에서 `HttpOnly; Secure; SameSite=Lax` 세션을 발급합니다. 프론트는 세션 토큰을 읽거나 저장하지 않습니다.
 - `GET /api/auth/csrf → {token}`, 변경 요청은 `X-CSRF-Token`. 로그인·초대 수락에도 필요합니다. 모킹 CSRF 값은 공개 시연용이며 실제 세션에 결합된 CSRF 검증을 대체하지 않습니다.
 - `POST /auth/login {email,password}`, `POST /auth/logout {}`, `GET /me → {user,branches,asOf,snapshotVersion}`, `PATCH /me/profile {nickname,avatar}`.
 - 이메일은 계정 생성 시 확정되는 변경 불가 로그인 ID입니다. 본인 프로필/관리자 직원 PATCH의 email 필드는 거부합니다. 초대·로그인의 이메일 입력과 고객 원장의 연락용 이메일은 유지합니다. 최신 [정책 개정](../../../docs/revised/2026-10-18/email-login-id-policy.md)을 따릅니다.
@@ -54,29 +54,28 @@
 
 초대: `/invitations/preview?token=`, `/invitations/accept {token,email,password?}`. 24시간·일회성. 기존 직원은 본인 인증, 신규 계정은 초대 이메일에 결합합니다. 메일 발송 결과와 승인 상태는 분리합니다. MSW는 발송을 시뮬레이션합니다.
 
-## 직원 채팅 SSE
+## 직원 채팅 HTTP
 
 - `GET /chat/channels?scope=` → 참여 대화와 본인 unread.
 - `POST /chat/dm {employeeId}` → 두 참여자의 기존 DM 재사용.
 - `GET /chat/{channelId}/messages?before=&after=&parent=` → `{items,nextCursor?,total}`. 최근 30개, 이전 커서. parent가 있으면 스레드만 조회합니다.
 - `POST /chat/{channelId}/messages {text,parentId,taskId,clientMessageId}`. 재전송에 같은 clientMessageId와 멱등 키를 사용합니다.
 - `POST /chat/{channelId}/read {sequence}` → 읽음 위치를 감소시키지 않습니다.
-- `GET /workspace/events?scope=&cursor=`. `connected`, `workspace`, `heartbeat` 이벤트. workspace는 `{id,type,resource,entityId,branchId,...}`. type은 message/changed/read/permissions.
-- 서버는 `Last-Event-ID` 및 재연결 시 `cursor`를 지원해야 합니다. 클라이언트는 1~10초 백오프로 한 연결을 재생성하고, 연결 복구 시 REST 이력도 재조회합니다. 프록시는 SSE 버퍼링을 끄고 하트비트보다 긴 타임아웃을 설정합니다.
+- 대화와 이력은 화면 진입 또는 사용자가 요청할 때 조회합니다.
 
 ## DomainLens 어댑터 경계
 
-PRD 2.0의 공개 경로를 따릅니다: 대화 생성 `/conversations`, 요청 `/conversations/{id}/requests`, SSE `/requests/{id}/events`, 취소 `/requests/{id}/cancel`, 실행 `/executions/{id}`, readiness `/catalog/readiness`. 직원 채팅과 섞지 않습니다.
+준비 상태는 GET /ai/readiness, 질문과 결과는 POST /ai/queries의 JSON으로 처리합니다. 저장한 대화는 /ai/conversations에서 조회하고 열거나 이름을 바꾸고 삭제할 수 있습니다.
 
 PRD만으로 엔진의 확정 JSON Schema·실행 DTO를 제공받을 수 없으므로 현재의 `{viewSpec:{component,title},rows,asOf,start,end,currency,timeZone,refundBasis}`는 **OpenStudy 표시용 잠정 DTO**입니다. `src/features/analysis/domainlens.ts`에 검증 경계를 두었습니다. 실엔진 산출물 수령 시 엔진 소유 버전·스키마를 고정하고 이 어댑터에서 바인딩합니다. 현재는 엔진 SDK 연동 완료를 주장하지 않습니다.
 
-accepted/retrieving/generating/validating/executing/completed/clarification/failed/canceled를 처리합니다. 표·막대·선 컴포넌트만 허용하고 모르는 ViewSpec은 대체 안내를 표시합니다. 렌더링은 React 텍스트·허용 차트만 사용하며 임의 HTML·SQL·스크립트 실행 경로가 없습니다. 모킹 AI는 원장의 일반 매출 함수를 호출하는 테스트 더블입니다.
+화면은 처리 중·완료·확인 필요·실패를 구분합니다. 표·막대·선 컴포넌트만 허용하고 모르는 ViewSpec은 대체 안내를 표시합니다. 렌더링은 React 텍스트·허용 차트만 사용하며 임의 HTML·SQL·스크립트 실행 경로가 없습니다. 모킹 AI는 원장의 일반 매출 함수를 호출하는 테스트 더블입니다.
 
 ## 배포·실서버 인계
 
 1. `npm ci && npm run check && npm run build`, 결과 `dist/` 배포. 자산 경로는 `/` 기준입니다.
 2. `/api`를 백엔드에 우선 프록시하고 나머지 SPA 경로는 `index.html`로 재작성합니다. 존재하지 않는 API를 HTML로 재작성하지 않습니다.
 3. HTTPS, 쿠키 속성·도메인·Path, CSRF 토큰 회전, 세션 만료·로그아웃을 직접 검증합니다. 별도 출처라면 credentials CORS·명시 Origin 설정이 필요합니다.
-4. SSE 버퍼링 해제·연결 제한·하트비트·재연결 커서를 검증합니다. 두 실제 사용자 간 메시지·읽음·권한 회수도 검사합니다.
+4. 다른 세션의 변경이 명시적 조회에서 반영되는지, 권한 회수 후 다음 API가 접근을 차단하는지 확인합니다.
 5. 직접 API 권한 변조, 트랜잭션 경합·멱등 저장, 초대 실제 메일·만료, 서버 재시작 후 보존을 검사합니다.
 6. DomainLens 라이브러리 버전·등록 지표·권한·시계·환불 기준·DTO를 확정하고 실제 DB의 일반 매출과 AI 결과를 비교합니다.

@@ -4,7 +4,7 @@ import { useApp } from "../../app/context";
 import { admin, businessDate } from "../../shared/domain/schema";
 import type { ResourceMap } from "../../shared/domain/schema";
 import { api, MOCK } from "../../shared/api/client";
-import { asPage } from "../../shared/api/read-model";
+import { hasBlockingReadError, asPage } from "../../shared/api/read-model";
 import { DataNotice } from "../../shared/ui/DataNotice";
 import { weekly, weekDays, shiftTime as displayDate } from "./api";
 
@@ -94,7 +94,7 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
           retry={() => void leave.refetch()}
         />
       )}
-      {!data.error && (
+      {!hasBlockingReadError(data) && (
         <div className="data-scroll">
           <table className="data-table min-w-[980px]">
             <thead>

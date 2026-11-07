@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useEffect, useRef, useState } from "react";
 export { useLeaveGuard as useTaskLeaveGuard } from "../../shared/ui/leaveGuard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -67,7 +68,7 @@ export function useTaskWrite() {
       current.signal.throwIfAborted();
       if (commit) {
         idempotencyRef.current.committed();
-        void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+        void invalidateReads(query, session.user.id, "tasks", "home", "chat");
       }
       current.signal.throwIfAborted();
       return result;
@@ -80,7 +81,7 @@ export function useTaskWrite() {
           (error instanceof DOMException && error.name === "AbortError") ||
           (error instanceof ApiError && error.status === 0))
       ) {
-        void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+        void invalidateReads(query, session.user.id, "tasks", "home", "chat");
       }
       if (error instanceof ApiError && error.status === 403) {
         void query.invalidateQueries({ queryKey: ["session"] });

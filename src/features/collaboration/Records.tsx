@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -108,7 +109,7 @@ export function Records({
       </Heading>
       {resource !== "notices" && (
         <div className="mb-4" aria-label={`${titles[resource]} 집계`}>
-          {summary.data && !summary.error ? (
+          {summary.data && !hasBlockingReadError(summary) ? (
             <>
               <span>전체 {summary.data.totals.total}건 · </span>
               <span>
@@ -122,7 +123,7 @@ export function Records({
             <DataNotice
               label="집계"
               loading={summary.isPending}
-              error={summary.error}
+              error={summary.error!}
               retry={() => void summary.refetch()}
             />
           )}
@@ -150,8 +151,8 @@ export function Records({
         </div>
         {rows.isPending ? (
           <State loading />
-        ) : rows.error ? (
-          <ErrorState error={rows.error} retry={() => void rows.refetch()} />
+        ) : hasBlockingReadError(rows) ? (
+          <ErrorState error={rows.error!} retry={() => void rows.refetch()} />
         ) : rows.data?.items.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-[640px]">
@@ -211,7 +212,7 @@ export function Records({
         ) : (
           <State title="조회 결과가 없어요" />
         )}
-        {rows.data && !rows.error && (
+        {rows.data && !hasBlockingReadError(rows) && (
           <Pager
             page={rows.data.meta.page}
             total={rows.data.meta.total}

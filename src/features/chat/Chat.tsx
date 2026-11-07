@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +22,7 @@ import { chatApi } from "./api";
 import { canonicalChannel, canonicalMessage } from "./canonical";
 import { draftKey as sessionDraftKey } from "./model";
 import type { Channel } from "./model";
-import { useChatFeed, useVisibleRefresh } from "./hooks";
+import { useChatFeed } from "./hooks";
 import { MessageViewport } from "./MessageViewport";
 import {
   clearChatChannel,
@@ -135,7 +136,6 @@ function ChatWorkspace() {
       threadId ? parent.refetch() : Promise.resolve(),
     ]);
   }
-  useVisibleRefresh(refresh);
   const person = (id: string) =>
     lookups.employees.find((e) => e.id === id)?.name || id;
   function name(c: Channel) {
@@ -412,7 +412,7 @@ function ChatWorkspace() {
                       key: crypto.randomUUID(),
                     })
                       .then(async (c) => {
-                        await query.invalidateQueries({ queryKey: ["data"] });
+                        await invalidateReads(query, user.id, "chat");
                         navigate(`/app/${scope}/chat/${c.id}`);
                       })
                       .catch((e) => setDmError(e.message));

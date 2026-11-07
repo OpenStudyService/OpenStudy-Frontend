@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
@@ -128,8 +129,8 @@ function EmployeeManagementContent() {
           </Field>
           {data.isPending ? (
             <State loading />
-          ) : data.error ? (
-            <ErrorState error={data.error} retry={() => void data.refetch()} />
+          ) : !data.data || hasBlockingReadError(data) ? (
+            <ErrorState error={data.error!} retry={() => void data.refetch()} />
           ) : (
             <>
               {!data.data.items.length && (

@@ -67,7 +67,7 @@ test("leave approval/cancel and weekly schedule use one balance", async ({
   ).toBe(15);
 });
 
-test("message IME, failed retry, duplicate removal and SSE reconnect", async ({
+test("message IME, failed retry and duplicate removal after explicit refresh", async ({
   page,
 }) => {
   await login(page, "직원");
@@ -96,14 +96,9 @@ test("message IME, failed retry, duplicate removal and SSE reconnect", async ({
   await expect(
     page.locator("article p").filter({ hasText: "재전송 시험 메시지" }),
   ).toHaveCount(1);
-  await demo(page, { scenario: "disconnect" });
-  await expect(
-    page.getByRole("status").filter({ hasText: "재연결 중" }),
-  ).toBeVisible();
-  await demo(page, { scenario: "normal" });
-  await expect(
-    page.getByRole("status").filter({ hasText: "연결됨" }),
-  ).toBeVisible({ timeout: 15000 });
+  const refresh = page.getByRole("button", { name: "채팅 새로고침" });
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
   await expect(
     page.locator("article p").filter({ hasText: "재전송 시험 메시지" }),
   ).toHaveCount(1);

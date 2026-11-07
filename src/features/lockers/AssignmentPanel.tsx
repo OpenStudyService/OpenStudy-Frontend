@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -216,7 +217,14 @@ function AssignmentForm({
   const { session, scope } = useApp(),
     now = useSalesClock(),
     query = useQueryClient(),
-    write = useLockerWrite();
+    write = useLockerWrite(
+      "lockers",
+      "locker-assignments",
+      "payments",
+      "passes",
+      "customers",
+      "sales",
+    );
   const [original] = useState(assignment),
     [latest, setLatest] = useState<LockerAssignment>();
   const [customer, setCustomer] = useState(""),
@@ -258,7 +266,16 @@ function AssignmentForm({
     }
   }
   const reload = () => {
-    void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+    void invalidateReads(
+      query,
+      session.user.id,
+      "lockers",
+      "locker-assignments",
+      "payments",
+      "sales",
+      "passes",
+      "customers",
+    );
   };
   async function submit(event: React.FormEvent) {
     event.preventDefault();

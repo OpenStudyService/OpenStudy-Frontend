@@ -62,7 +62,6 @@ async function authenticatedFixture(page: Page) {
       });
     if (path === "/api/lookups")
       return json(route, { branches: [branch], employees: [owner] });
-    if (path === "/api/workspace/events") return route.fulfill({ status: 204 });
     if (path === "/api/auth/csrf") return json(route, { token: "build-csrf" });
     if (path === "/api/customers")
       return json(

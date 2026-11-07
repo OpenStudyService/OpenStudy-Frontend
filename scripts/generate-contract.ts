@@ -218,7 +218,6 @@ for (const [path, method, summary] of [
   ["/chat/{channelId}/messages", "get", "커서 이력"],
   ["/chat/{channelId}/messages", "post", "메시지 전송"],
   ["/chat/{channelId}/read", "post", "읽음 위치"],
-  ["/workspace/events", "get", "업무 공간 SSE"],
 ] as const) {
   const params = [...path.matchAll(/\{([^}]+)\}/g)].map((m) => ({
     name: m[1],
@@ -393,20 +392,6 @@ setBody(
   "post",
   object({ sequence: { type: "integer", minimum: 0 } }),
 );
-operation("/workspace/events", "get").responses = {
-  "200": {
-    description:
-      "connected / workspace / heartbeat. Last-Event-ID or cursor resumes.",
-    content: { "text/event-stream": { schema: { type: "string" } } },
-  },
-};
-components.WorkspaceEvent = object({
-  id: string,
-  type: { type: "string", enum: ["changed", "message", "read", "permissions"] },
-  resource: { type: "string", enum: resources },
-  entityId: string,
-  branchId: string,
-});
 paths["/members/{id}/history"] = {
   parameters: [{ name: "id", in: "path", required: true, schema: string }],
   get: {

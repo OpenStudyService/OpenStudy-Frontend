@@ -221,3 +221,68 @@ test("keyboard opens a form, traps focus and restores it; all themes retain visi
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
 });
+
+test("workspace reads follow menu and refresh actions", async ({ page }) => {
+  const reads: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname.startsWith("/api/"))
+      reads.push(url.pathname + url.search);
+  });
+  await login(page);
+  await page.goto("/app/gangnam/tasks?q=확인&page=2");
+  const menu = page.getByRole("link", { name: "업무 관리", exact: true });
+  const refresh = page.getByRole("button", {
+    name: "화면 새로고침",
+    exact: true,
+  });
+  const taskReads = () => reads.filter((url) => url.startsWith("/api/tasks?"));
+  await expect(page.getByText(/^마지막 조회/).locator("time")).toHaveAttribute(
+    "datetime",
+    /T/,
+  );
+  await expect(refresh).toBeEnabled();
+  const initialReads = taskReads().length;
+  expect(initialReads).toBeGreaterThan(0);
+  const idleReads = reads.length;
+
+  await page.clock.install();
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("offline"));
+    window.dispatchEvent(new Event("online"));
+  });
+  await page.clock.fastForward(60_000);
+  expect(reads).toHaveLength(idleReads);
+
+  const nextTaskResponse = () =>
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/tasks" && response.ok(),
+    );
+  const menuResponse = nextTaskResponse();
+  await menu.click();
+  await (await menuResponse).finished();
+  expect(taskReads()).toHaveLength(initialReads + 1);
+  await expect(refresh).toBeEnabled();
+
+  const refreshResponse = nextTaskResponse();
+  await refresh.click();
+  await (await refreshResponse).finished();
+  expect(taskReads()).toHaveLength(initialReads + 2);
+  expect(new Set(taskReads()).size).toBe(1);
+  await expect(page).toHaveURL(/page=2/);
+
+  await page.getByRole("link", { name: "대시보드" }).click();
+  await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
+  const entryResponse = nextTaskResponse();
+  await menu.click();
+  await (await entryResponse).finished();
+  expect(taskReads().length).toBeGreaterThan(initialReads + 2);
+  expect(
+    reads.some((url) =>
+      /\/workspace\/events|\/requests\/[^/]+\/events/.test(url),
+    ),
+  ).toBe(false);
+});

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshControl } from "../../shared/ui/RefreshControl";
 import { useSession } from "../../app/context";
 import { api } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
@@ -11,7 +12,6 @@ import {
   FieldError,
   State,
 } from "../../shared/ui/primitives";
-import { closeStreams } from "../../shared/api/stream";
 import { useUi } from "../../app/store";
 type Preview = components["schemas"]["InvitationPreview"];
 export function InvitationAccept() {
@@ -87,7 +87,6 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
           method: "POST",
           body: { email: preview.email, password },
         });
-        closeStreams();
         useUi.getState().clearPrivate();
         await query.cancelQueries();
         query.clear();
@@ -139,7 +138,6 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
     setError(null);
     try {
       await api("/auth/logout", { method: "POST", body: {} });
-      closeStreams();
       useUi.getState().clearPrivate();
       await query.cancelQueries();
       query.clear();
@@ -248,7 +246,6 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
             setError(null);
             try {
               await api("/auth/logout", { method: "POST", body: {} });
-              closeStreams();
               useUi.getState().clearPrivate();
               await query.cancelQueries();
               query.clear();
@@ -283,14 +280,12 @@ export function PendingApproval() {
       ),
     enabled: !!session.data,
     retry: false,
-    refetchInterval: 15000,
   });
   async function leave() {
     setLeaving(true);
     setError(null);
     try {
       await api("/auth/logout", { method: "POST", body: {} });
-      closeStreams();
       clearPrivate();
       await query.cancelQueries();
       query.clear();
@@ -340,9 +335,12 @@ export function PendingApproval() {
         )}
         {error && <FieldError>{error.message}</FieldError>}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void status.refetch()}>
-            승인 상태 새로고침
-          </Button>
+          <RefreshControl
+            label="승인 상태 새로고침"
+            updatedAt={status.dataUpdatedAt}
+            fetching={status.isFetching}
+            refresh={() => void status.refetch()}
+          />
           <Button disabled={leaving} onClick={() => void leave()}>
             {approved ? "다시 로그인" : "로그아웃"}
           </Button>

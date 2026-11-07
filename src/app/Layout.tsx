@@ -1,5 +1,6 @@
 import { useConfirmDiscard } from "../shared/ui/leaveGuard";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
+import type { MouseEvent } from "react";
 import {
   Link,
   NavLink,
@@ -11,10 +12,8 @@ import {
 } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu } from "radix-ui";
-import { api, API_BASE, MOCK } from "../shared/api/client";
-import { closeStreams, openStream } from "../shared/api/stream";
+import { abortPrivateRequests, api, MOCK } from "../shared/api/client";
 import { can, admin } from "../shared/domain/schema";
-import type { CurrentUser, WorkspaceEvent } from "../shared/domain/schema";
 import {
   Avatar,
   Badge,
@@ -26,6 +25,7 @@ import {
 import { Icon } from "../shared/ui/Icon";
 import { emptyLookups, normalizeLookups, useSession } from "./context";
 import { isAccessError } from "../shared/api/read-model";
+import { WorkspaceRefresh } from "./WorkspaceRefresh";
 import { DataNotice } from "../shared/ui/DataNotice";
 import { useUi } from "./store";
 export const navigation = [
@@ -98,7 +98,6 @@ export function Layout() {
     location = useLocation(),
     query = useQueryClient();
   const { navOpen, setNav, clearPrivate } = useUi();
-  const [streamState, setStreamState] = useState("연결 중");
   const user = session.data?.user;
   const lookups = useQuery({
     queryKey: ["data", user?.id, scope, "lookups"],
@@ -119,99 +118,45 @@ export function Layout() {
     user?.memberships,
   ]);
   const previous = useRef({ scope, userId: user?.id, permissionKey });
-  useEffect(() => {
+  useLayoutEffect(() => {
     const old = previous.current;
     if (old.scope !== scope || old.userId !== user?.id) {
       const oldKey =
         old.userId !== user?.id
           ? ["data", old.userId]
           : ["data", old.userId, old.scope];
+      abortPrivateRequests();
       void query.cancelQueries({ queryKey: oldKey });
       query.removeQueries({ queryKey: oldKey });
+      query.getMutationCache().clear();
       clearPrivate();
       previous.current = { scope, userId: user?.id, permissionKey };
     } else if (old.permissionKey !== permissionKey) {
-      closeStreams();
+      abortPrivateRequests();
       clearPrivate();
+      query.getMutationCache().clear();
       void query.resetQueries({ queryKey: ["data", user?.id] });
       previous.current = { scope, userId: user?.id, permissionKey };
     }
   }, [scope, user?.id, permissionKey, query, clearPrivate]);
-  useEffect(() => {
-    if (
-      !user ||
-      session.data?.sessionMode === "APPROVAL_ONLY" ||
-      !can(user, scope) ||
-      !lookups.isSuccess ||
-      lookups.data?.preview
-    )
-      return;
-    const invalidate = () => {
-      void query.invalidateQueries({ queryKey: ["data", user.id, scope] });
+  const scopeDenied = isAccessError(lookups.error);
+  useLayoutEffect(() => {
+    if (!scopeDenied || !user?.id) return;
+    const scopeReads = {
+      queryKey: ["data", user.id, scope],
+      predicate: ({ queryKey }: { queryKey: readonly unknown[] }) =>
+        queryKey[3] !== "lookups",
     };
-    const resync = () => {
-      invalidate();
-      void query.invalidateQueries({ queryKey: ["session"] });
-    };
-    const authorizationChanged = () => {
-      closeStreams();
-      clearPrivate();
-      void query.cancelQueries({ queryKey: ["data", user.id] });
-      query.removeQueries({ queryKey: ["data", user.id] });
-      void query.invalidateQueries({ queryKey: ["session"] });
-    };
-    const controller = new AbortController();
-    const stop = openStream(
-      `${API_BASE}/workspace/events?scope=${encodeURIComponent(scope)}`,
-      {
-        invalidate,
-        resync,
-        "authorization.changed": authorizationChanged,
-        connected: () => {
-          setStreamState("연결됨");
-          void query.invalidateQueries({ queryKey: ["data", user.id, scope] });
-        },
-        workspace: (event) => {
-          try {
-            const e = JSON.parse(
-              (event as MessageEvent).data,
-            ) as WorkspaceEvent;
-            if (e.type === "read") {
-              void query.invalidateQueries({
-                queryKey: ["data", user.id, scope, "chat", "channels"],
-              });
-            } else void query.invalidateQueries({ queryKey: ["data"] });
-            if (e.type === "permissions") authorizationChanged();
-          } catch {
-            setStreamState("데이터 확인 필요");
-          }
-        },
-      },
-      (connected) => {
-        if (connected) {
-          setStreamState("연결됨");
-          return;
-        }
-        setStreamState("재연결 중");
-        void api<CurrentUser>("/me", { signal: controller.signal })
-          .then(() => query.invalidateQueries({ queryKey: ["session"] }))
-          .catch(() => undefined);
-      },
-    );
-    return () => {
-      controller.abort();
-      stop();
-    };
-  }, [
-    user,
-    session.data?.sessionMode,
-    scope,
-    permissionKey,
-    query,
-    lookups.isSuccess,
-    lookups.data?.preview,
-    clearPrivate,
-  ]);
+    abortPrivateRequests();
+    void query.cancelQueries(scopeReads);
+    query.removeQueries(scopeReads);
+    query
+      .getQueryCache()
+      .find({ queryKey: ["data", user.id, scope, "lookups"], exact: true })
+      ?.setState({ data: undefined, dataUpdatedAt: 0 });
+    query.getMutationCache().clear();
+    clearPrivate();
+  }, [scopeDenied, user?.id, scope, query, clearPrivate]);
   if (session.isPending) return <State loading />;
   if (session.error)
     return (
@@ -278,14 +223,36 @@ export function Layout() {
   async function logout() {
     if (!confirmLeave()) return;
     await api("/auth/logout", { method: "POST", body: {} });
-    closeStreams();
     clearPrivate();
+    await query.cancelQueries();
     query.clear();
     navigate("/login", { replace: true });
   }
   function changeScope(next: string) {
     setNav(false);
     navigate(`/app/${next}/${section}${location.search}`);
+  }
+  const pageQueries = {
+    queryKey: ["data", activeUser.id],
+    type: "active" as const,
+  };
+  function refresh() {
+    void query.refetchQueries(pageQueries);
+  }
+  function menuClick(event: MouseEvent<HTMLAnchorElement>, path: string) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.shiftKey
+    )
+      return;
+    setNav(false);
+    if (section === path) {
+      event.preventDefault();
+      refresh();
+    }
   }
   const sidebar = (
     <aside className="sidebar">
@@ -327,7 +294,7 @@ export function Layout() {
               className={({ isActive }) =>
                 `nav-link ${isActive ? "active" : ""}`
               }
-              onClick={() => setNav(false)}
+              onClick={(event) => menuClick(event, n.path)}
             >
               <Icon name={n.icon} size={17} />
               {n.title}
@@ -350,6 +317,7 @@ export function Layout() {
           className="rail-logo"
           to={`/app/${scope}/home`}
           aria-label="OpenStudy 홈"
+          onClick={(event) => menuClick(event, "home")}
         >
           <Icon name="logo" size={30} />
         </Link>
@@ -361,6 +329,7 @@ export function Layout() {
           <NavLink
             key={p}
             to={`/app/${scope}/${p}`}
+            onClick={(event) => menuClick(event, p)}
             className={({ isActive }) =>
               `rail-link ${isActive ? "active" : ""}`
             }
@@ -370,7 +339,11 @@ export function Layout() {
           </NavLink>
         ))}
         <div className="flex-1" />
-        <NavLink className="rail-link" to={`/app/${scope}/settings`}>
+        <NavLink
+          className="rail-link"
+          to={`/app/${scope}/settings`}
+          onClick={(event) => menuClick(event, "settings")}
+        >
           <Icon name="settings" />
           설정
         </NavLink>
@@ -396,16 +369,6 @@ export function Layout() {
           <div className="flex items-center gap-3">
             <Badge>{MOCK ? "데모 데이터" : "실제 API 연결"}</Badge>
             {!MOCK && lookups.data?.preview && <Badge>로컬 샘플</Badge>}
-            <span
-              className="hidden text-[10px] text-muted lg:inline"
-              role="status"
-            >
-              {lookups.data?.preview
-                ? "샘플 조회 모드"
-                : !lookups.isSuccess
-                  ? "데이터 연결 대기"
-                  : streamState}
-            </span>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
                 <button
@@ -431,7 +394,12 @@ export function Layout() {
                   sideOffset={10}
                 >
                   <DropdownMenu.Item className="nav-link" asChild>
-                    <Link to={`/app/${scope}/settings`}>내 프로필·테마</Link>
+                    <Link
+                      to={`/app/${scope}/settings`}
+                      onClick={(event) => menuClick(event, "settings")}
+                    >
+                      내 프로필·테마
+                    </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="nav-link"
@@ -445,6 +413,9 @@ export function Layout() {
           </div>
         </header>
         <main id="main" className="content" tabIndex={-1}>
+          {section !== "settings" && section !== "ai" && section !== "chat" && (
+            <WorkspaceRefresh userId={activeUser.id} refresh={refresh} />
+          )}
           {lookups.data?.preview && (
             <p
               className="mb-4 rounded-xl border border-line bg-soft px-4 py-3 text-xs text-primary"
@@ -454,7 +425,7 @@ export function Layout() {
               지원하지 않습니다.
             </p>
           )}
-          {isAccessError(lookups.error) ? (
+          {scopeDenied ? (
             <ErrorState
               error={lookups.error!}
               retry={() => void lookups.refetch()}
@@ -468,7 +439,12 @@ export function Layout() {
                 retry={() => void lookups.refetch()}
               />
               <Outlet
-                key={`${activeUser.id}:${scope}`}
+                key={JSON.stringify([
+                  activeUser.id,
+                  scope,
+                  section,
+                  permissionKey,
+                ])}
                 context={{
                   session: current,
                   scope,
@@ -489,6 +465,7 @@ export function Layout() {
           <NavLink
             key={p}
             to={`/app/${scope}/${p}`}
+            onClick={(event) => menuClick(event, p)}
             className={({ isActive }) =>
               `rail-link ${isActive ? "active" : ""}`
             }

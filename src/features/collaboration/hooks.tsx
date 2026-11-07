@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useEffect, useRef, useState } from "react";
 export { useLeaveGuard as useRecordLeaveGuard } from "../../shared/ui/leaveGuard";
 import { useQueryClient } from "@tanstack/react-query";
@@ -5,7 +6,7 @@ import { useApp } from "../../app/context";
 import { ApiError } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
 
-export function useRecordWrite() {
+export function useRecordWrite(...resources: string[]) {
   const { session, scope } = useApp(),
     query = useQueryClient();
   const permissionKey = JSON.stringify([
@@ -55,7 +56,7 @@ export function useRecordWrite() {
           query.setQueryData(detailKey, result);
         }
         idempotencyRef.current.committed();
-        void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+        void invalidateReads(query, session.user.id, ...resources, "home");
       }
       current.signal.throwIfAborted();
       return result;
@@ -68,13 +69,11 @@ export function useRecordWrite() {
           (error instanceof DOMException && error.name === "AbortError") ||
           (error instanceof ApiError && error.status === 0))
       ) {
-        void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+        void invalidateReads(query, session.user.id, ...resources, "home");
       }
       if (error instanceof ApiError && error.status === 403) {
         void query.invalidateQueries({ queryKey: ["session"] });
-        void query.invalidateQueries({
-          queryKey: ["data", session.user.id, scope],
-        });
+        void invalidateReads(query, session.user.id, ...resources, "lookups");
       }
       throw error;
     } finally {

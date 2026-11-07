@@ -45,3 +45,13 @@ export function asPage<T>(value: unknown): Page<T> {
 export function isAccessError(error: unknown): boolean {
   return error instanceof ApiError && [401, 403].includes(error.status);
 }
+
+/** Transient read failures can display an earlier result. Access and missing-resource errors cannot. */
+export function hasBlockingReadError(read: { data: unknown; error: unknown }) {
+  return (
+    !!read.error &&
+    (read.data === undefined ||
+      isAccessError(read.error) ||
+      (read.error instanceof ApiError && read.error.status === 404))
+  );
+}

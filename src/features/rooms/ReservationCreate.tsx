@@ -19,7 +19,7 @@ export function ReservationCreate({
   onSaved: (row: RoomReservation) => void;
 }) {
   const { session, scope } = useApp(),
-    write = useRoomWrite(),
+    write = useRoomWrite("reservations", "rooms"),
     query = useQueryClient(),
     now = useSalesClock();
   const branches = session.branches.filter(

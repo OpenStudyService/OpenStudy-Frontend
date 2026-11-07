@@ -40,9 +40,9 @@ function LeaveBalances() {
   const { session, scope } = useApp();
   const balances = useQuery({
     queryKey: ["data", session.user.id, scope, "leave-balances"],
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       asArray<{ employeeId: string; name: string; balance: number }>(
-        await api(`/leave-balances?scope=${scope}`),
+        await api(`/leave-balances?scope=${scope}`, { signal }),
       ),
     retry: false,
   });

@@ -10,7 +10,10 @@ import {
 } from "../../shared/ui/primitives";
 import { DataNotice } from "../../shared/ui/DataNotice";
 import { Icon } from "../../shared/ui/Icon";
-import { isAccessError } from "../../shared/api/read-model";
+import {
+  hasBlockingReadError,
+  isAccessError,
+} from "../../shared/api/read-model";
 import { canCreateTask } from "./model";
 import { taskApi } from "./api";
 import { TaskPanel } from "./TaskPanel";
@@ -92,7 +95,9 @@ export function Tasks() {
         )}
       </Heading>
       <div className="mb-4 flex flex-wrap gap-4" aria-label="업무 집계">
-        {summary.data && !summary.error && !summary.isPending ? (
+        {summary.data &&
+        !hasBlockingReadError(summary) &&
+        !summary.isPending ? (
           [
             ["전체", summary.data.totals.total],
             ["할 일", summary.data.totals.todo],
@@ -108,7 +113,7 @@ export function Tasks() {
           <DataNotice
             label="업무 집계"
             loading={summary.isPending}
-            error={summary.error}
+            error={summary.error!}
             retry={() => void summary.refetch()}
           />
         )}
@@ -236,6 +241,15 @@ export function Tasks() {
             초기화
           </Button>
         </div>
+        {rows.data?.items.length &&
+        rows.error &&
+        !hasBlockingReadError(rows) ? (
+          <DataNotice
+            label="업무 관리 데이터"
+            error={rows.error}
+            retry={() => void rows.refetch()}
+          />
+        ) : null}
         <div className="data-scroll">
           <table className="data-table">
             <thead>
@@ -255,7 +269,9 @@ export function Tasks() {
               </tr>
             </thead>
             <tbody>
-              {rows.isPending || rows.error || !rows.data?.items.length ? (
+              {rows.isPending ||
+              hasBlockingReadError(rows) ||
+              !rows.data?.items.length ? (
                 <tr>
                   <td colSpan={6}>
                     {isAccessError(rows.error) ? (
@@ -265,7 +281,7 @@ export function Tasks() {
                         <DataNotice
                           label="업무 관리 데이터"
                           loading={rows.isPending}
-                          error={rows.error}
+                          error={rows.error!}
                           retry={() => void rows.refetch()}
                         />
                         {!rows.isPending && !rows.error && (

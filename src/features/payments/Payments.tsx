@@ -1,3 +1,5 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -205,9 +207,9 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
             />
           ) : payments.isPending ? (
             <State loading />
-          ) : payments.error ? (
+          ) : hasBlockingReadError(payments) ? (
             <ErrorState
-              error={payments.error}
+              error={payments.error!}
               retry={() => void payments.refetch()}
             />
           ) : (
@@ -303,9 +305,15 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
               onBusyChange={setBusy}
               onSaved={async (value) => {
                 setResult(value);
-                await query.invalidateQueries({
-                  queryKey: ["data", session.user.id],
-                });
+                await invalidateReads(
+                  query,
+                  session.user.id,
+                  "payments",
+                  "passes",
+                  "customers",
+                  "sales",
+                  "lookups",
+                );
               }}
             />
           )}

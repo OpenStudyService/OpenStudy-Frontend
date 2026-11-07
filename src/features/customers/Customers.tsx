@@ -2,7 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { displayDate } from "../../shared/domain/schema";
-import { isAccessError } from "../../shared/api/read-model";
+import {
+  hasBlockingReadError,
+  isAccessError,
+} from "../../shared/api/read-model";
 import { MOCK } from "../../shared/api/client";
 import {
   Badge,
@@ -184,14 +187,16 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
               </tr>
             </thead>
             <tbody>
-              {rows.isPending || rows.error || !rows.data?.items.length ? (
+              {rows.isPending ||
+              hasBlockingReadError(rows) ||
+              !rows.data?.items.length ? (
                 <tr>
                   <td colSpan={6}>
                     {rows.isPending ? (
                       <State loading />
-                    ) : rows.error ? (
+                    ) : hasBlockingReadError(rows) ? (
                       <ErrorState
-                        error={rows.error}
+                        error={rows.error!}
                         retry={
                           isAccessError(rows.error)
                             ? undefined

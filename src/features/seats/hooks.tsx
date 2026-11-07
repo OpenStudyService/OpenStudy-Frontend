@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -84,7 +85,17 @@ export function useSeatWrite() {
     setState({ key: permissionKey, busy: true });
     // Capture the initiating user: a later account/scope change cannot retarget invalidation.
     const refresh = () => {
-      void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+      void invalidateReads(
+        query,
+        session.user.id,
+        "seats",
+        "seat-sessions",
+        "usage",
+        "passes",
+        "customers",
+        "lookups",
+        "home",
+      );
     };
     try {
       const result = await request(

@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -16,16 +17,15 @@ export function ClockCard() {
   const [busy, setBusy] = useState(false),
     lock = useRef(false);
   const [error, setError] = useState("");
-  // Current work is global to the employee and survives a branch scope change.
+  // The endpoint returns the employee’s current work across branches.
   const current = useQuery({
-    queryKey: ["data", session.user.id, "me", "attendance-current"],
+    queryKey: ["data", session.user.id, scope, "attendance-current"],
     queryFn: ({ signal }) => attendanceApi.current(signal),
     retry: false,
-    refetchInterval: 30000,
   });
   const record = current.data?.attendance;
   const latest = useQuery({
-    queryKey: ["data", session.user.id, "me", "attendance-latest"],
+    queryKey: ["data", session.user.id, scope, "attendance-latest"],
     queryFn: ({ signal }) =>
       attendanceApi.list({ scope: "all", mine: "true", pageSize: 1 }, signal),
     enabled: current.isSuccess && record === null,
@@ -68,7 +68,15 @@ export function ClockCard() {
     } finally {
       // A command or replay response is never used as current state. Even a lost
       // response may have committed; always reconcile against the server.
-      await query.invalidateQueries({ queryKey: ["data", session.user.id] });
+      await invalidateReads(
+        query,
+        session.user.id,
+        "attendance-current",
+        "attendance-latest",
+        "attendance-records",
+        "shifts",
+        "home",
+      );
       const result = await current.refetch();
       if (result.error)
         setError(

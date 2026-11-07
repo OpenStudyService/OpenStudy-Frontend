@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -148,7 +149,15 @@ export function RefundForm({
         [403, 404, 409].includes(error.status) &&
         error.detail.code !== "REQUEST_IN_PROGRESS"
       )
-        await query.invalidateQueries({ queryKey: ["data", session.user.id] });
+        await invalidateReads(
+          query,
+          session.user.id,
+          "payments",
+          "passes",
+          "customers",
+          "sales",
+          "lookups",
+        );
     } finally {
       submitting.current = false;
       onBusyChange(false);
@@ -371,9 +380,15 @@ function PaymentPanelSession({
                     result,
                   );
                   setRefunding(false);
-                  await query.invalidateQueries({
-                    queryKey: ["data", session.user.id],
-                  });
+                  await invalidateReads(
+                    query,
+                    session.user.id,
+                    "payments",
+                    "passes",
+                    "customers",
+                    "sales",
+                    "lookups",
+                  );
                 }}
               />
             )}
@@ -461,9 +476,15 @@ function PassPanelSession({
                 onCancel={() => setAdjusting(false)}
                 onSaved={() => {
                   setAdjusting(false);
-                  void query.invalidateQueries({
-                    queryKey: ["data", session.user.id],
-                  });
+                  void invalidateReads(
+                    query,
+                    session.user.id,
+                    "payments",
+                    "passes",
+                    "customers",
+                    "sales",
+                    "lookups",
+                  );
                 }}
               />
             )}
@@ -489,9 +510,15 @@ function PassPanelSession({
                 onRefunded={async (value) => {
                   setResult(value);
                   setRefunding(false);
-                  await query.invalidateQueries({
-                    queryKey: ["data", session.user.id],
-                  });
+                  await invalidateReads(
+                    query,
+                    session.user.id,
+                    "payments",
+                    "passes",
+                    "customers",
+                    "sales",
+                    "lookups",
+                  );
                 }}
               />
             )}

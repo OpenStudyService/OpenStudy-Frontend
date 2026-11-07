@@ -12,7 +12,6 @@ import { handlers } from "./handlers";
 import { store } from "./store";
 import type { components } from "../shared/api/foundation.generated";
 
-vi.hoisted(() => vi.stubGlobal("EventSource", class EventSource {}));
 const server = setupServer(...handlers);
 beforeAll(() => server.listen());
 beforeEach(() => {

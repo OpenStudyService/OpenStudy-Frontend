@@ -10443,42 +10443,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/workspace/events": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 업무 공간 SSE */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description connected / workspace / heartbeat. Last-Event-ID or cursor resumes. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/event-stream": string;
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/members/{id}/history": {
     parameters: {
       query?: never;

@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -96,13 +97,13 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
           새로고침
         </Button>
       </Heading>
-      {occupancy.error ? (
+      {occupancy.isPending ? (
+        <State loading title="점유 현황을 불러오고 있어요" />
+      ) : !occupancy.data || hasBlockingReadError(occupancy) ? (
         <ErrorState
-          error={occupancy.error}
+          error={occupancy.error!}
           retry={() => void occupancy.refetch()}
         />
-      ) : occupancy.isPending ? (
-        <State loading title="점유 현황을 불러오고 있어요" />
       ) : (
         <div className="grid gap-3 mb-4" aria-label="사물함 점유 현황">
           {occupancy.data.items.map((b) => (
@@ -134,8 +135,8 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
         </div>
         {list.isPending ? (
           <State loading />
-        ) : list.error ? (
-          <ErrorState error={list.error} retry={() => void list.refetch()} />
+        ) : !list.data || hasBlockingReadError(list) ? (
+          <ErrorState error={list.error!} retry={() => void list.refetch()} />
         ) : !list.data.items.length ? (
           <State title="등록된 사물함이 없어요" />
         ) : (
@@ -190,7 +191,7 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
             </table>
           </div>
         )}
-        {list.data && !list.error && (
+        {list.data && !hasBlockingReadError(list) && (
           <Pager
             page={list.data.meta.page}
             total={list.data.meta.total}
