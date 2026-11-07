@@ -148,8 +148,9 @@ it("uses only permitted state commands with exact CSRF, version and creation-key
   const user = show();
   await user.click(await enabled("출근하기"));
   await user.click(await enabled("휴게 시작"));
+  const endBreak = await enabled("휴게 종료");
   expect(screen.queryByRole("button", { name: "퇴근하기" })).toBeNull();
-  await user.click(await enabled("휴게 종료"));
+  await user.click(endBreak);
   await user.click(await enabled("퇴근하기"));
   await screen.findByText("퇴근", { selector: ".badge" });
   expect(
