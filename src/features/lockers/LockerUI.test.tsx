@@ -368,7 +368,7 @@ it("does not disclose non-null cached charges after the payment grant is revoked
   expect(screen.queryByText(/10,000원/)).not.toBeInTheDocument();
   expect(screen.queryByText("서버 확정 결제 내역")).not.toBeInTheDocument();
 });
-it("retains the original return version while an SSE refresh observes its committed outcome", async () => {
+it("retains the original return version while a refresh observes its committed outcome", async () => {
   vi.mocked(lockerApi.returnLocker)
     .mockRejectedValueOnce(
       new ApiError(0, { code: "NETWORK_ERROR", message: "응답 유실" }),

@@ -1,17 +1,12 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { createAppQueryClient } from "./app/queryClient";
 import { router } from "./app/Router";
-import { closeStreams } from "./shared/api/stream";
 import { useUi } from "./app/store";
 import "./app/styles.css";
-const query = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false, refetchOnWindowFocus: true },
-    mutations: { retry: false },
-  },
-});
+const query = createAppQueryClient();
 function App() {
   const theme = useUi((s) => s.theme),
     notice = useUi((s) => s.notice),
@@ -21,10 +16,12 @@ function App() {
   }, [theme]);
   useEffect(() => {
     const expire = () => {
-      closeStreams();
       clear();
-      void query.cancelQueries({ queryKey: ["data"] });
-      query.removeQueries({ queryKey: ["data"] });
+      void query.cancelQueries();
+      query.removeQueries({
+        predicate: (entry) => entry.queryKey[0] !== "session",
+      });
+      query.getMutationCache().clear();
       query.setQueryData(["session"], null);
     };
     window.addEventListener("openstudy:session-expired", expire);

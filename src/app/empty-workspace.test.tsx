@@ -10,19 +10,13 @@ import {
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { createAppQueryClient } from "./queryClient";
 import { Layout } from "./Layout";
 import { Home } from "../features/home/Home";
 import { ResourcePage } from "../features/records/ResourcePage";
 import { Sales } from "../features/analysis/Sales";
 import { Chat } from "../features/chat/Chat";
 import type { CurrentUser } from "../shared/domain/schema";
-import { closeStreams, openStream } from "../shared/api/stream";
-
-vi.mock("../shared/api/stream", () => ({
-  openStream: vi.fn(() => vi.fn()),
-  closeStreams: vi.fn(),
-}));
-
 const session: CurrentUser = {
   user: {
     id: "owner",
@@ -64,9 +58,8 @@ function renderWorkspace(
       );
     }),
   );
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
+  const client = createAppQueryClient();
+  client.setQueryDefaults(["data"], { gcTime: 0 });
   clients.push(client);
   render(
     <QueryClientProvider client={client}>
@@ -327,32 +320,6 @@ it("clears every former user's scope cache on account changes", async () => {
     ).toHaveLength(0),
   );
 });
-it("handles canonical invalidation, resync and authorization events", async () => {
-  renderWorkspace(() => Response.json({}));
-  await screen.findByRole("heading", { name: "안녕하세요, 관리자님 ☀" });
-  await waitFor(() => expect(openStream).toHaveBeenCalled());
-  const client = clients[0];
-  const invalidate = vi.spyOn(client, "invalidateQueries");
-  const listeners = vi.mocked(openStream).mock.calls.at(-1)![1];
-  act(() => listeners.invalidate(new MessageEvent("invalidate")));
-  expect(invalidate).toHaveBeenCalledWith({
-    queryKey: ["data", "owner", "all"],
-  });
-  act(() => listeners.resync(new MessageEvent("resync")));
-  expect(invalidate).toHaveBeenCalledWith({ queryKey: ["session"] });
-  client.setQueryData(["data", "owner", "other-branch", "secret"], {
-    secret: true,
-  });
-  act(() =>
-    listeners["authorization.changed"](
-      new MessageEvent("authorization.changed"),
-    ),
-  );
-  expect(closeStreams).toHaveBeenCalled();
-  expect(
-    client.getQueryData(["data", "owner", "other-branch", "secret"]),
-  ).toBeUndefined();
-});
 it("preserves search and pagination conditions when switching branch", async () => {
   const current: CurrentUser = {
     ...session,
@@ -405,4 +372,72 @@ it("preserves search and pagination conditions when switching branch", async () 
       .findAll({ queryKey: ["data", "owner", "2", "tasks"] })[0]
       ?.queryKey.at(-1),
   ).toContain("page=3");
+});
+
+it("keeps idle reads quiet and refreshes the active menu only on request", async () => {
+  const user = userEvent.setup();
+  let reads = 0;
+  let fail = false;
+  renderWorkspace((path) => {
+    if (path === "/api/home") {
+      reads++;
+      if (fail) return new Response(null, { status: 503 });
+    }
+    return Response.json({});
+  });
+  const time = await waitFor(() => {
+    const element = screen.getByText(/마지막 조회/).querySelector("time");
+    expect(element).toHaveAttribute("datetime");
+    return element!.getAttribute("datetime");
+  });
+  expect(reads).toBe(1);
+
+  vi.useFakeTimers();
+  try {
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("offline"));
+      window.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(reads).toBe(1);
+  } finally {
+    vi.useRealTimers();
+  }
+
+  fail = true;
+  await user.click(screen.getByRole("link", { name: "대시보드" }));
+  expect(
+    await screen.findByText(/마지막 조회 결과를 표시합니다/),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/^마지막 조회$/).querySelector("time"),
+  ).toHaveAttribute("datetime", time);
+  expect(reads).toBe(2);
+
+  fail = false;
+  await user.click(screen.getByRole("button", { name: "화면 새로고침" }));
+  await waitFor(() => expect(reads).toBe(3));
+  await waitFor(() =>
+    expect(screen.queryByText(/마지막 조회 결과를 표시합니다/)).toBeNull(),
+  );
+});
+
+it("keeps the URL filters and page when clicking the current menu", async () => {
+  renderWorkspace(() => Response.json({}), "tasks?q=보고&page=2");
+  await screen.findByRole("heading", { name: "업무 관리" });
+  const user = userEvent.setup();
+  const taskUrls = () =>
+    vi
+      .mocked(fetch)
+      .mock.calls.map(([url]) => String(url))
+      .filter((url) => url.startsWith("/api/tasks?"));
+  await waitFor(() => expect(taskUrls()).toHaveLength(1));
+  await user.click(screen.getByRole("link", { name: "업무 관리" }));
+  await waitFor(() => expect(taskUrls()).toHaveLength(2));
+  expect(taskUrls()[1]).toBe(taskUrls()[0]);
+  expect(new URL(taskUrls()[1], "http://localhost").searchParams.get("q")).toBe(
+    "보고",
+  );
 });

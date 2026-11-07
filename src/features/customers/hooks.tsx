@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -53,7 +54,13 @@ export function useCustomerWrite() {
       current.signal.throwIfAborted();
       if (commit) {
         ids.committed();
-        void query.invalidateQueries({ queryKey: ["data", session.user.id] });
+        void invalidateReads(
+          query,
+          session.user.id,
+          "customers",
+          "members",
+          "lookups",
+        );
       }
       return result;
     } catch (error) {

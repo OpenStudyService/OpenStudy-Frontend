@@ -11,7 +11,7 @@ export function FacilityTypeCreate({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState(""),
     [days, setDays] = useState("14"),
     [error, setError] = useState<Error>();
-  const write = useRecordWrite();
+  const write = useRecordWrite("facilities");
   if (!session.user.owner) return null;
   async function save() {
     const body = { name: name.trim(), defaultInspectionDays: Number(days) };

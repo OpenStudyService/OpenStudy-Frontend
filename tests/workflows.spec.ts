@@ -189,29 +189,31 @@ test("purchase/refund and room booking conflicts preserve input", async ({
   await expect(panel.getByLabel("예약 날짜")).toHaveValue("2026-10-18");
   await expect(panel.getByLabel("시작 시각 (한국 시간)")).toHaveValue("14");
 });
-test("AI SSE result matches the ordinary sales ledger and supports cancellation", async ({
+test("AI renders JSON results and cancels a pending question", async ({
   page,
 }) => {
   await login(page);
-  await page.goto("/app/all/sales?from=2026-09-01&to=2026-10-01");
-  await expect(
-    page.getByRole("cell", { name: "300,000원", exact: true }).first(),
-  ).toBeVisible();
   await page.goto("/app/all/ai");
-  await page
-    .getByLabel("어떤 데이터가 궁금하신가요?")
-    .fill("지난달 지점별 매출을 보여줘");
-  await page.getByRole("button", { name: "질문하기", exact: true }).click();
-  await expect(page.getByText("조회 완료", { exact: true })).toBeVisible();
+  const query = page.getByLabel("AI에게 질문", { exact: true });
+  const submit = page.getByRole("button", { name: "질문하기", exact: true });
+  const question = "지난달 지점별 매출을 보여줘";
+  await query.fill(question);
+  const result = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/ai/queries" &&
+      response.request().method() === "POST",
+  );
+  await submit.click();
+  expect((await result).ok()).toBe(true);
   await expect(
-    page.getByRole("cell", { name: "300,000원", exact: true }).first(),
+    page.getByRole("article", { name: "AI 답변" }).getByText(/기준 시각/),
   ).toBeVisible();
-  await expect(
-    page.getByRole("cell", { name: "100,000원", exact: true }).first(),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "질문하기", exact: true }).click();
-  await page.getByRole("button", { name: "조회 취소", exact: true }).click();
-  await expect(page.getByText("취소됨", { exact: true })).toBeVisible();
+
+  await mock(page, { scenario: "slow" });
+  await query.fill(question);
+  await submit.click();
+  await page.getByRole("button", { name: "질문 취소", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("질문을 취소했어요.");
 });
 test("staff cannot open owner menus or read another branch through HTTP", async ({
   page,

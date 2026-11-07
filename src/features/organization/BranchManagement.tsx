@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState, type FormEvent } from "react";
 import { useApp } from "../../app/context";
@@ -62,8 +63,8 @@ function BranchManagementContent() {
       </Field>
       {data.isPending ? (
         <State loading />
-      ) : data.error ? (
-        <ErrorState error={data.error} retry={() => void data.refetch()} />
+      ) : !data.data || hasBlockingReadError(data) ? (
+        <ErrorState error={data.error!} retry={() => void data.refetch()} />
       ) : (
         <>
           {!data.data.items.length && <State title="등록된 지점이 없어요" />}

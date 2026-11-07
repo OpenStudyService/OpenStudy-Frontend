@@ -1,10 +1,11 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { api, ApiError, queryString } from "../../shared/api/client";
-import { asPage } from "../../shared/api/read-model";
+import { hasBlockingReadError, asPage } from "../../shared/api/read-model";
 import { useIdempotency } from "../../shared/api/useIdempotency";
 import { admin, businessDate } from "../../shared/domain/schema";
 import { Button, ErrorState, Panel } from "../../shared/ui/primitives";
@@ -113,7 +114,7 @@ export function Shifts() {
             error={rows.error}
             retry={() => void rows.refetch()}
           />
-          {!rows.error && (
+          {!hasBlockingReadError(rows) && (
             <div className="data-scroll">
               <table className="data-table">
                 <thead>
@@ -300,7 +301,7 @@ function ShiftEditor({
       keys.committed();
       leave.saved();
       setRevision(result.version);
-      await query.invalidateQueries({ queryKey: ["data"] });
+      await invalidateReads(query, session.user.id, "shifts", "home");
       if (!row) onCreated(result.id);
     } catch (e) {
       setError(e as Error);

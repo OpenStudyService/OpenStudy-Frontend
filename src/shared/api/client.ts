@@ -21,13 +21,19 @@ export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(
   /\/$/,
   "",
 );
+let privateRequests = new AbortController();
+export function abortPrivateRequests() {
+  privateRequests.abort();
+  privateRequests = new AbortController();
+}
 let csrfPromise: Promise<string> | undefined;
 export function clearCsrf() {
   csrfPromise = undefined;
 }
 /** The session CSRF token, fetched once and cached; non-GET requests must send it as X-CSRF-Token. */
 export async function csrf() {
-  csrfPromise ??= api<{ token: string }>("/auth/csrf")
+  if (csrfPromise) return csrfPromise;
+  const request = api<{ token: string }>("/auth/csrf")
     .then((data) => {
       if (typeof data?.token !== "string" || !data.token) {
         throw new ApiError(0, {
@@ -38,10 +44,11 @@ export async function csrf() {
       return data.token;
     })
     .catch((e) => {
-      csrfPromise = undefined;
+      if (csrfPromise === request) clearCsrf();
       throw e;
     });
-  return csrfPromise;
+  csrfPromise = request;
+  return request;
 }
 export async function api<T>(
   path: string,
@@ -52,12 +59,15 @@ export async function api<T>(
     key?: string;
   } = {},
 ): Promise<T> {
-  options.signal?.throwIfAborted();
+  const signal = options.signal
+    ? AbortSignal.any([privateRequests.signal, options.signal])
+    : privateRequests.signal;
+  signal.throwIfAborted();
   const method = (options.method || "GET").toUpperCase(),
     headers: Record<string, string> = { Accept: "application/json" };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (!["GET", "HEAD"].includes(method)) headers["X-CSRF-Token"] = await csrf();
-  options.signal?.throwIfAborted();
+  signal.throwIfAborted();
   if (options.key) headers["Idempotency-Key"] = options.key;
   let response: Response;
   try {
@@ -67,16 +77,17 @@ export async function api<T>(
       headers,
       body:
         options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
+      signal,
     });
   } catch (e) {
+    signal.throwIfAborted();
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new ApiError(0, {
       code: "NETWORK_ERROR",
       message: "연결하지 못했습니다. 네트워크와 서버를 확인해 주세요.",
     });
   }
-  options.signal?.throwIfAborted();
+  signal.throwIfAborted();
   if (!response.ok) {
     let detail: ErrorBody;
     try {
@@ -98,7 +109,7 @@ export async function api<T>(
         message: `요청에 실패했습니다. (${response.status})`,
       };
     }
-    options.signal?.throwIfAborted();
+    signal.throwIfAborted();
     const rawRequestId =
       response.headers.get("X-Request-ID") || detail.requestId;
     const requestId =
@@ -113,19 +124,22 @@ export async function api<T>(
     delete detail.requestId;
     detail = { ...detail, ...(requestId ? { requestId } : {}) };
     if (response.status === 401 || detail.code === "CSRF_INVALID") clearCsrf();
-    if (response.status === 401 && !path.startsWith("/auth/login"))
+    if (response.status === 401 && !path.startsWith("/auth/login")) {
+      abortPrivateRequests();
       window.dispatchEvent(new Event("openstudy:session-expired"));
+    }
     throw new ApiError(
       response.status,
       detail,
       response.headers.get("Retry-After") || undefined,
     );
   }
-  if (["/auth/login", "/auth/logout", "/invitations/accept"].includes(path))
+  const body = response.status === 204 ? "" : await response.text();
+  signal.throwIfAborted();
+  if (["/auth/login", "/auth/logout", "/invitations/accept"].includes(path)) {
     clearCsrf();
-  if (response.status === 204) return undefined as T;
-  const body = await response.text();
-  options.signal?.throwIfAborted();
+    abortPrivateRequests();
+  }
   return body.trim() ? (JSON.parse(body) as T) : (undefined as T);
 }
 export const queryString = (

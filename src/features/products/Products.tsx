@@ -1,3 +1,5 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -72,7 +74,7 @@ export function ProductManagement() {
   const branchName = (id: string) =>
     session.branches.find((b) => b.id === id)?.name ?? id;
   async function refresh() {
-    await query.invalidateQueries({ queryKey: ["data", user.id] });
+    await invalidateReads(query, user.id, "products", "lookups");
   }
   return (
     <section className="page">
@@ -158,9 +160,9 @@ export function ProductManagement() {
           </div>
           {products.isPending ? (
             <State loading />
-          ) : products.error ? (
+          ) : !products.data || hasBlockingReadError(products) ? (
             <ErrorState
-              error={products.error}
+              error={products.error!}
               retry={() => void products.refetch()}
             />
           ) : (

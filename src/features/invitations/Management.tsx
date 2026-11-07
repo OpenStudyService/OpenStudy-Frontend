@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -79,7 +80,13 @@ export function InvitationManagement() {
   const selected = selectedId ? detail.data : undefined;
   const commandDisabled = busy || detail.isFetching || detail.isError;
   async function refresh() {
-    await query.invalidateQueries({ queryKey: ["data", session.user.id] });
+    await invalidateReads(
+      query,
+      session.user.id,
+      "invitations",
+      "organization",
+      "lookups",
+    );
   }
   async function action(i: Invitation, command: string) {
     setBusy(true);

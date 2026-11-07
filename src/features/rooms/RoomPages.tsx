@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -83,8 +84,8 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
         </div>
         {data.isPending ? (
           <State loading />
-        ) : data.error ? (
-          <ErrorState error={data.error} retry={() => void data.refetch()} />
+        ) : !data.data || hasBlockingReadError(data) ? (
+          <ErrorState error={data.error!} retry={() => void data.refetch()} />
         ) : data.data.items.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-[600px]">
@@ -122,7 +123,7 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
         ) : (
           <State title="등록된 스터디룸이 없어요" />
         )}
-        {data.data && !data.error && (
+        {data.data && !hasBlockingReadError(data) && (
           <Pager
             page={data.data.meta.page}
             total={data.data.meta.total}

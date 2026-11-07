@@ -69,8 +69,7 @@ test("real API: approved/refunded totals agree across cards, branch comparison a
   page,
   context,
 }) => {
-  // Prepare transactions before opening a page: fixture writes should not make
-  // the unrelated home screen repeatedly refresh through workspace SSE.
+  // Prepare transactions before opening the sales screen.
   expect(
     (
       await api(context, "/auth/login", {

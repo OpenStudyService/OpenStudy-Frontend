@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -86,7 +87,13 @@ export function useRefreshOrganization() {
   const query = useQueryClient();
   const { session } = useApp();
   return async () => {
-    await query.invalidateQueries({ queryKey: ["data", session.user.id] });
+    await invalidateReads(
+      query,
+      session.user.id,
+      "organization",
+      "lookups",
+      "invitations",
+    );
     await query.invalidateQueries({ queryKey: ["session"] });
   };
 }

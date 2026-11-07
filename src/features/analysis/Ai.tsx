@@ -78,7 +78,7 @@ function AiChat() {
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
   const client = useQueryClient();
-  const historyKey = ["data", user.id, "ai", "conversations"];
+  const historyKey = ["data", user.id, scope, "ai", "conversations"];
   const history = useQuery({
     queryKey: historyKey,
     queryFn: ({ signal }) => aiConversations.list(signal),

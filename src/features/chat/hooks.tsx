@@ -6,41 +6,6 @@ import { canonicalMessage } from "./canonical";
 import { compareMessages, mergeMessages, refreshFeed } from "./model";
 import type { MessageFeed } from "./model";
 
-export function useVisibleRefresh(
-  refresh: () => Promise<unknown>,
-  enabled = true,
-) {
-  const latest = useRef(refresh);
-  useEffect(() => {
-    latest.current = refresh;
-  }, [refresh]);
-  useEffect(() => {
-    if (!enabled) return;
-    let busy = false,
-      stopped = false;
-    const run = async () => {
-      if (busy || stopped || document.visibilityState !== "visible") return;
-      busy = true;
-      try {
-        await latest.current();
-      } finally {
-        busy = false;
-      }
-    };
-    const timer = setInterval(() => void run(), 15000);
-    const visible = () => {
-      if (document.visibilityState === "visible") void run();
-    };
-    document.addEventListener("visibilitychange", visible);
-    window.addEventListener("focus", visible);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", visible);
-      window.removeEventListener("focus", visible);
-    };
-  }, [enabled]);
-}
 export function useChatFeed(
   channelId: string,
   parentId: string,

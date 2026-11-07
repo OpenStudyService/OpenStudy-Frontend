@@ -55,7 +55,7 @@ export interface paths {
     put?: never;
     /**
      * 현재 세션 종료
-     * @description 유효 세션이면 CSRF 필수. 이미 세션이 없으면 CSRF 없이도 성공. SESSION 쿠키 삭제, 스트림 종료. 모든 결과 {ok:true}.
+     * @description 유효 세션이면 CSRF 필수. 이미 세션이 없으면 CSRF 없이도 성공. SESSION 쿠키 삭제. 모든 결과 {ok:true}.
      */
     post: operations["logout"];
     delete?: never;
@@ -191,7 +191,7 @@ export interface paths {
     head?: never;
     /**
      * 직원 이름·전역 계정 상태 수정
-     * @description 로그인 이메일·owner·소속 입력은 422. PENDING 활성화는 초대 승인으로만 가능. 마지막 활성 OWNER 제한은409. 제한/비활성화는 세션·스트림 폐기.
+     * @description 로그인 이메일·owner·소속 입력은 422. PENDING 활성화는 초대 승인으로만 가능. 마지막 활성 OWNER 제한은409. 제한/비활성화는 세션 폐기.
      */
     patch: operations["updateEmployee"];
     trace?: never;
@@ -636,26 +636,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/workspace/events": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * 권한별 화면 갱신 SSE
-     * @description event: invalidate/authorization.changed/resync. data는 WorkspaceEvent JSON. 커밋 후 전달 직전 현재 권한 재검사. heartbeat는 유효 활동 아님. 재연결 즉시 resync 후 현재 화면 재조회. 재생 보장 없음. 권한 회수·만료면 연결 종료. logout 시 클라이언트가 연결/캐시 정리. 기본 500ms마다 현재 JDBC 세션·계정·소속/권한을 재확인한다. 기본 15초 heartbeat는 SSE comment이고 세션 활동/만료를 연장하지 않는다. 권한 변경은 식별자 없는 authorization.changed 후 종료한다. 세션 만료·로그아웃·계정 제한은 payload 없이 종료한다. 모든 연결/재연결에 resync를 보내며 cursor/Last-Event-ID 재생은 제공하지 않는다. 이벤트 ID는 연결별 논리 힌트이며 outbox 전역 순서를 노출하지 않는다. 개인정보 없는 본인 프로필 신호도 resync를 사용한다.
-     */
-    get: operations["subscribeWorkspaceEvents"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/me/profile": {
     parameters: {
       query?: never;
@@ -671,7 +651,7 @@ export interface paths {
     head?: never;
     /**
      * 본인 닉네임 저장
-     * @description 확정 M1 계약. ACTIVE WORKSPACE 세션의 본인 ID만 사용하며 쿼리 매개변수와 nickname/version 이외의 본문 필드는 422로 거부한다. 이메일·이름·owner·상태·소속·권한·사진·비밀번호·테마는 변경하지 않는다. 계정 version(DB+1)은 직원·소속 관리자 편집과 공유하며 성공 시 정확히 1 증가한다. 충돌은 VERSION_CONFLICT와 latestVersion, reloadUrl=/api/me를 반환한다. 입력을 보존하고 GET /me로 최신 계정을 확인한 뒤 명시적으로 다시 저장한다. 자동 덮어쓰기는 하지 않는다. 닉네임·updated_by·updated_at·감사 actor/requestId와 전후 snapshot·INVALIDATE outbox를 같은 트랜잭션에 기록한다. SSE 전달 완료를 보장하는 계약은 아니다.
+     * @description 확정 M1 계약. ACTIVE WORKSPACE 세션의 본인 ID만 사용하며 쿼리 매개변수와 nickname/version 이외의 본문 필드는 422로 거부한다. 이메일·이름·owner·상태·소속·권한·사진·비밀번호·테마는 변경하지 않는다. 계정 version(DB+1)은 직원·소속 관리자 편집과 공유하며 성공 시 정확히 1 증가한다. 충돌은 VERSION_CONFLICT와 latestVersion, reloadUrl=/api/me를 반환한다. 입력을 보존하고 GET /me로 최신 계정을 확인한 뒤 명시적으로 다시 저장한다. 자동 덮어쓰기는 하지 않는다. 닉네임·updated_by·updated_at·감사 actor/requestId와 전후 snapshot을 같은 트랜잭션에 기록한다.
      */
     patch: operations["updateMyProfile"];
     trace?: never;
@@ -3181,38 +3161,6 @@ export interface components {
       /** Format: date-time */
       asOf: string;
       snapshotVersion: string;
-    };
-    /** @description 변경 본문·타 지점 목록·개인정보는 보내지 않는다. 수신 후 현재 권한으로 재조회. 개인·전역 선택 데이터 알림은 entityId/branchId를 null로 보낸다. 일반 직원이 타 지점/타 직원의 식별자를 받지 않는다. heartbeat는 이 모델이 아닌 comment다. */
-    WorkspaceEvent: {
-      /** @enum {string} */
-      type: "invalidate" | "authorization.changed" | "resync";
-      /** @enum {string} */
-      resource:
-        | "branches"
-        | "employees"
-        | "invitations"
-        | "products"
-        | "lookups"
-        | "permissions"
-        | "customers"
-        | "payments"
-        | "passes"
-        | "seats"
-        | "seat-sessions"
-        | "tasks"
-        | "facilities"
-        | "inquiries"
-        | "notices"
-        | "rooms"
-        | "room-reservations"
-        | "lockers"
-        | "locker-assignments"
-        | "shifts"
-        | "attendance-records";
-      entityId: string | null;
-      branchId: string | null;
-      /** Format: date-time */
-      at: string;
     };
     /** @description 현재 사용자에 반환하는 활성 소속. 직원 관리 Membership의 status/version 편집 계약과 구분한다. */
     SessionMembership: {
@@ -6961,46 +6909,6 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Lookups"];
-        };
-      };
-      401: components["responses"]["Error401"];
-      403: components["responses"]["Error403"];
-      404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
-      422: components["responses"]["Error422"];
-      429: components["responses"]["Error429"];
-      500: components["responses"]["Error500"];
-    };
-  };
-  subscribeWorkspaceEvents: {
-    parameters: {
-      query?: {
-        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
-        scope?: components["parameters"]["Scope"];
-        /** @description 호환용 연결 힌트. 이 구현은 값을 재생 cursor로 사용하지 않고 항상 resync로 현재 데이터를 다시 조회한다. */
-        cursor?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
-      200: {
-        headers: {
-          "X-Request-ID"?: string;
-          /** @description no-store */
-          "Cache-Control"?: string;
-          "X-Accel-Buffering"?: "no";
-          [name: string]: unknown;
-        };
-        content: {
-          /**
-           * @example event: invalidate
-           *     data: {"type":"invalidate","resource":"products","entityId":"1","branchId":"1","at":"2026-10-23T00:00:00Z"}
-           */
-          "text/event-stream": string;
         };
       };
       401: components["responses"]["Error401"];

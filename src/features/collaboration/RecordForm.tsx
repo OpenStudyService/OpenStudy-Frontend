@@ -96,7 +96,7 @@ export function RecordForm({
   const [latest, setLatest] = useState<Detail>();
   const [error, setError] = useState<Error | null>(null),
     [blocked, setBlocked] = useState(false);
-  const write = useRecordWrite();
+  const write = useRecordWrite(resource);
   const branchId = row && "branchId" in row ? row.branchId : draft.branchId;
   const types = useQuery({
     queryKey: ["data", session.user.id, scope, "facilities", "types"],

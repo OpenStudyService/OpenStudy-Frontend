@@ -1,3 +1,5 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -192,9 +194,9 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
         {!branchId ? (
           occupancy.isPending ? (
             <State loading />
-          ) : occupancy.error ? (
+          ) : hasBlockingReadError(occupancy) ? (
             <ErrorState
-              error={occupancy.error}
+              error={occupancy.error!}
               retry={() => void occupancy.refetch()}
             />
           ) : (
@@ -218,8 +220,8 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
           <State title="이 지점의 좌석을 조회할 권한이 없어요" />
         ) : board.isPending ? (
           <State loading />
-        ) : board.error ? (
-          <ErrorState error={board.error} retry={() => void board.refetch()} />
+        ) : hasBlockingReadError(board) ? (
+          <ErrorState error={board.error!} retry={() => void board.refetch()} />
         ) : (
           board.data && (
             <>
@@ -544,10 +546,26 @@ function SeatEditor({
         false,
       );
       setVersion(latest.version);
-      await query.invalidateQueries({ queryKey: ["data"] });
+      await invalidateReads(
+        query,
+        session.user.id,
+        "seats",
+        "seat-sessions",
+        "usage",
+        "lookups",
+        "home",
+      );
       return `${latest.zone} · ${latest.seatNo} · ${latest.kind} · ${latest.status} (버전 ${latest.version})`;
     }
-    await query.invalidateQueries({ queryKey: ["data"] });
+    await invalidateReads(
+      query,
+      session.user.id,
+      "seats",
+      "seat-sessions",
+      "usage",
+      "lookups",
+      "home",
+    );
     await query.invalidateQueries({ queryKey: ["session"] });
   });
   const allowed = canWriteSeats(session.user, branchId) && !errors.denied;
@@ -669,7 +687,15 @@ function StatusEditor({ seat, onSaved }: { seat: Seat; onSaved: () => void }) {
       false,
     );
     setVersion(latest.version);
-    await query.invalidateQueries({ queryKey: ["data"] });
+    await invalidateReads(
+      query,
+      session.user.id,
+      "seats",
+      "seat-sessions",
+      "usage",
+      "lookups",
+      "home",
+    );
     await query.invalidateQueries({ queryKey: ["session"] });
     return `${latest.zone} · ${latest.seatNo} · ${latest.kind} · ${latest.status} (버전 ${latest.version})`;
   });
@@ -748,7 +774,15 @@ function CheckInForm({
       `seat-lookup:${seat.id}`,
       body,
       async (signal) => {
-        await query.invalidateQueries({ queryKey: ["data"] });
+        await invalidateReads(
+          query,
+          session.user.id,
+          "seats",
+          "seat-sessions",
+          "usage",
+          "lookups",
+          "home",
+        );
         await query.invalidateQueries({ queryKey: ["session"] });
         signal.throwIfAborted();
         return candidates ? seatApi.lookup(body, signal) : null;
@@ -963,7 +997,15 @@ function SessionAction({
     (CheckOut & { toSeatId?: string }) | null
   >(null);
   const errors = useFormErrors(async () => {
-    await query.invalidateQueries({ queryKey: ["data"] });
+    await invalidateReads(
+      query,
+      session.user.id,
+      "seats",
+      "seat-sessions",
+      "usage",
+      "lookups",
+      "home",
+    );
     await query.invalidateQueries({ queryKey: ["session"] });
   });
   const latest = current.data || usage;
@@ -1024,9 +1066,9 @@ function SessionAction({
             </p>
             {board.isPending ? (
               <State loading />
-            ) : board.error ? (
+            ) : hasBlockingReadError(board) ? (
               <ErrorState
-                error={board.error}
+                error={board.error!}
                 retry={() => void board.refetch()}
               />
             ) : (

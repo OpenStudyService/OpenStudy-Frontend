@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import {
   PanelDrafts,
   confirmDiscard,
@@ -42,7 +43,13 @@ function CategoryManagementSession() {
   const [edit, setEdit] = useState<ProductCategory | null>(null);
   const [editorDrafts] = useState(() => new Set<RefObject<boolean>>());
   async function refresh() {
-    await query.invalidateQueries({ queryKey: ["data", session.user.id] });
+    await invalidateReads(
+      query,
+      session.user.id,
+      "product-categories",
+      "products",
+      "lookups",
+    );
   }
   async function guard(task: () => Promise<void>) {
     setBusy(true);

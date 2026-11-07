@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import {
@@ -124,8 +125,8 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
       </div>
       {passes.isPending ? (
         <State loading />
-      ) : passes.error ? (
-        <ErrorState error={passes.error} retry={() => void passes.refetch()} />
+      ) : hasBlockingReadError(passes) ? (
+        <ErrorState error={passes.error!} retry={() => void passes.refetch()} />
       ) : (
         passes.data && (
           <>

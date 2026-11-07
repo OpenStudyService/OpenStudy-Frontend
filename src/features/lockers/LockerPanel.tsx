@@ -208,7 +208,7 @@ function LockerForm({
   onSaved: () => void;
 }) {
   const { session, scope } = useApp(),
-    write = useLockerWrite();
+    write = useLockerWrite("lockers", "lookups");
   const branches = session.branches.filter(
     (b) =>
       (scope === "all" || b.id === scope) &&

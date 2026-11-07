@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -270,7 +271,7 @@ function ChannelEditor({
         chatApi.saveChannel(base?.id, payload, signal, key),
       );
       leave.saved();
-      void client.invalidateQueries({ queryKey: ["data", session.user.id] });
+      void invalidateReads(client, session.user.id, "chat");
       onSaved();
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;

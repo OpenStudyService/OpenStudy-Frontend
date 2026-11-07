@@ -1,3 +1,4 @@
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { Rooms, Reservations } from "../rooms/RoomPages";
 import { RoomPanel } from "../rooms/RoomPanel";
 import { Lockers } from "../lockers/Lockers";
@@ -11,7 +12,11 @@ import { useSearchParams } from "react-router";
 import { Tabs } from "radix-ui";
 import { api, MOCK, queryString } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
-import { asPage, isAccessError } from "../../shared/api/read-model";
+import {
+  hasBlockingReadError,
+  asPage,
+  isAccessError,
+} from "../../shared/api/read-model";
 import { DataNotice } from "../../shared/ui/DataNotice";
 import {
   admin,
@@ -198,6 +203,22 @@ function availableActions(
   if (resource === "employees") return isAdmin ? ["permissions"] : [];
   return [];
 }
+const relatedReads: Partial<Record<Resource, string[]>> = {
+  branches: ["lookups", "organization"],
+  employees: ["lookups", "organization"],
+  invitations: ["organization", "lookups"],
+  corrections: [
+    "attendance-records",
+    "attendance-current",
+    "attendance-latest",
+    "shifts",
+    "home",
+  ],
+  leaveRequests: ["leave-balances", "shifts", "home"],
+  leaveGrants: ["leave-balances"],
+  substitutions: ["shifts", "home"],
+};
+
 export function ResourcePage(props: {
   resource: Resource;
   embedded?: boolean;
@@ -330,7 +351,12 @@ function GenericResourcePage({
     );
     idempotency.committed();
     committed();
-    await query.invalidateQueries({ queryKey: ["data"] });
+    await invalidateReads(
+      query,
+      user.id,
+      resource,
+      ...(relatedReads[resource] ?? []),
+    );
     if (resource === "employees" || resource === "branches")
       await query.invalidateQueries({ queryKey: ["session"] });
     toast(
@@ -504,7 +530,9 @@ function GenericResourcePage({
                 </tr>
               </thead>
               <tbody>
-                {data.isPending || data.error || !data.data?.items.length ? (
+                {data.isPending ||
+                hasBlockingReadError(data) ||
+                !data.data?.items.length ? (
                   <tr>
                     <td colSpan={def.columns.length}>
                       {isAccessError(data.error) ? (
@@ -514,7 +542,7 @@ function GenericResourcePage({
                           <DataNotice
                             label={`${def.title} 데이터`}
                             loading={data.isPending}
-                            error={data.error}
+                            error={data.error!}
                             retry={() => void data.refetch()}
                           />
                           {!data.isPending && !data.error && (
@@ -699,7 +727,12 @@ function GenericRecordPanel({
       }),
     onSuccess: async () => {
       idempotency.committed();
-      await query.invalidateQueries({ queryKey: ["data"] });
+      await invalidateReads(
+        query,
+        user.id,
+        resource,
+        ...(relatedReads[resource] ?? []),
+      );
       if (resource === "employees" || resource === "invitations")
         await query.invalidateQueries({ queryKey: ["session"] });
       toast("처리 결과를 저장했어요.");
@@ -747,7 +780,12 @@ function GenericRecordPanel({
       key: crypto.randomUUID(),
     });
     committed();
-    await query.invalidateQueries({ queryKey: ["data"] });
+    await invalidateReads(
+      query,
+      user.id,
+      resource,
+      ...(relatedReads[resource] ?? []),
+    );
     if (resource === "employees")
       await query.invalidateQueries({ queryKey: ["session"] });
     toast("변경 내용을 저장했어요.");
@@ -1154,7 +1192,7 @@ function SeatMap({
       <DataNotice
         label="좌석 정보"
         loading={data.isPending}
-        error={data.error}
+        error={data.error!}
         retry={() => void data.refetch()}
       />
       <div className="flex gap-2 px-5 pt-4">
@@ -1285,7 +1323,7 @@ function ReservationCalendar({ onSelect }: { onSelect: (id: string) => void }) {
       <DataNotice
         label="예약 정보"
         loading={data.isPending}
-        error={data.error}
+        error={data.error!}
         retry={() => void data.refetch()}
       />
       {!data.isPending && !data.error && !data.data?.items.length && (

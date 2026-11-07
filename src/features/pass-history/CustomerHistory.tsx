@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
@@ -120,9 +121,9 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
           />
           {validation ? (
             <FieldError>{validation}</FieldError>
-          ) : query.error ? (
+          ) : hasBlockingReadError(query) ? (
             <ErrorState
-              error={query.error}
+              error={query.error!}
               retry={() => void query.refetch()}
             />
           ) : query.isPending ? (

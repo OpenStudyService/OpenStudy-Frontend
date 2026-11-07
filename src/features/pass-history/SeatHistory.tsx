@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -211,8 +212,8 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
       />
       {validation ? (
         <FieldError>{validation}</FieldError>
-      ) : rows.error ? (
-        <ErrorState error={rows.error} retry={() => void rows.refetch()} />
+      ) : hasBlockingReadError(rows) ? (
+        <ErrorState error={rows.error!} retry={() => void rows.refetch()} />
       ) : rows.isPending ? (
         <State loading />
       ) : (

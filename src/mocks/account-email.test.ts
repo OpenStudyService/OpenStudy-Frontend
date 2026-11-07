@@ -11,10 +11,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "./handlers";
 import { store } from "./store";
 
-vi.hoisted(() => {
-  // Register unrelated SSE handlers in jsdom; these tests do not exercise SSE.
-  vi.stubGlobal("EventSource", class EventSource {});
-});
+vi.hoisted(() => {});
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen());

@@ -1,3 +1,4 @@
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -259,9 +260,9 @@ function SalesWorkspace() {
           <section aria-label="매출 요약" className="mb-5">
             {revenue.isPending ? (
               <State loading />
-            ) : revenue.error ? (
+            ) : hasBlockingReadError(revenue) ? (
               <ErrorState
-                error={revenue.error}
+                error={revenue.error!}
                 retry={() => void revenue.refetch()}
               />
             ) : (
@@ -319,9 +320,9 @@ function SalesWorkspace() {
             </header>
             {comparison.isPending ? (
               <State loading />
-            ) : comparison.error ? (
+            ) : hasBlockingReadError(comparison) ? (
               <ErrorState
-                error={comparison.error}
+                error={comparison.error!}
                 retry={() => void comparison.refetch()}
               />
             ) : (
@@ -393,9 +394,9 @@ function SalesWorkspace() {
             </header>
             {ledger.isPending ? (
               <State loading />
-            ) : ledger.error ? (
+            ) : hasBlockingReadError(ledger) ? (
               <ErrorState
-                error={ledger.error}
+                error={ledger.error!}
                 retry={() => void ledger.refetch()}
               />
             ) : (

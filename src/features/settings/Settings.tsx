@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import { api, MOCK } from "../../shared/api/client";
+import { abortPrivateRequests, api, MOCK } from "../../shared/api/client";
 import { useApp } from "../../app/context";
 import type { CurrentUser } from "../../shared/domain/schema";
 import { admin } from "../../shared/domain/schema";
@@ -96,19 +96,19 @@ export function Settings() {
   );
 }
 function DemoControls() {
-  const { session } = useApp(),
+  const { session, scope } = useApp(),
     query = useQueryClient(),
     navigate = useNavigate(),
     clear = useUi((s) => s.clearPrivate),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const data = useQuery({
-    queryKey: ["demo-controls"],
-    queryFn: () =>
+    queryKey: ["data", session.user.id, scope, "demo-controls"],
+    queryFn: ({ signal }) =>
       api<{
         scenario: string;
         personas: { id: string; name: string; status: string }[];
-      }>("/_demo"),
+      }>("/_demo", { signal }),
   });
   async function change(body: Record<string, unknown>) {
     setBusy(true);
@@ -116,7 +116,9 @@ function DemoControls() {
     try {
       await api("/_demo", { method: "POST", body });
       if (body.persona || body.expire) {
+        abortPrivateRequests();
         clear();
+        await query.cancelQueries();
         query.clear();
         if (body.expire) navigate("/login");
         else {
@@ -180,7 +182,6 @@ function DemoControls() {
               ["payment-failure", "Mock 결제 실패"],
               ["message-failure", "메시지 전송 실패"],
               ["email-failure", "초대 발송 실패"],
-              ["disconnect", "SSE 연결 단절"],
               ["ai-failure", "AI 실행 실패"],
               ["ai-unavailable", "AI 준비 안 됨"],
               ["ai-view-fallback", "미지원 AI 결과 화면"],

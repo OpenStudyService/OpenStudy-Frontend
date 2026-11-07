@@ -322,7 +322,7 @@ it("allows a write-only cashier to refund from a pass without reading payment de
   expect(getPayment).not.toHaveBeenCalled();
 });
 
-it("retains the refund intent after an in-flight expiry/SSE update and lost response, while locking duplicate submits", async () => {
+it("retains the refund intent after an in-flight expiry and refresh and lost response, while locking duplicate submits", async () => {
   let rejectFirst!: (error: Error) => void;
   const first = new Promise<Payment>((_resolve, reject) => {
     rejectFirst = reject;

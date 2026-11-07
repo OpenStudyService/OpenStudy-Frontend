@@ -3,7 +3,6 @@ import { relative, resolve } from "node:path";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { configureSseProxy } from "./scripts/sse-proxy.ts";
 
 function buildIsolation(mode: "live" | "mock", root: string): Plugin {
   return {
@@ -79,7 +78,6 @@ export default defineConfig(({ mode, command, isPreview }) => {
         "/api": {
           target: env.API_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
-          configure: configureSseProxy,
         },
       },
     },

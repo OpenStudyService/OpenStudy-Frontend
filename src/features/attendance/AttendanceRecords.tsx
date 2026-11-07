@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { admin } from "../../shared/domain/schema";
 import { Button, ErrorState, Panel } from "../../shared/ui/primitives";
+import { hasBlockingReadError } from "../../shared/api/read-model";
 import { DataNotice } from "../../shared/ui/DataNotice";
 import {
   attendanceApi,
@@ -137,7 +138,7 @@ export function AttendanceRecords() {
         error={rows.error}
         retry={() => void rows.refetch()}
       />
-      {!rows.error && (
+      {!hasBlockingReadError(rows) && (
         <div className="data-scroll">
           <table className="data-table">
             <thead>
