@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
-import { can, won } from "../../shared/domain/schema";
+import { formatBusinessDate, formatKrw } from "../../shared/domain/format";
+import { can } from "../../shared/domain/schema";
 import {
   Badge,
   Button,
@@ -32,7 +33,7 @@ function calendarDayStart(input: string) {
   const timestamp = Date.parse(`${input}T00:00:00+09:00`);
   if (
     !Number.isFinite(timestamp) ||
-    new Date(timestamp + 9 * 3600000).toISOString().slice(0, 10) !== input
+    formatBusinessDate(new Date(timestamp).toISOString()) !== input
   )
     return undefined;
   return timestamp;
@@ -245,7 +246,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
                               {session.branches.find((b) => b.id === p.branchId)
                                 ?.name ?? p.branchId}
                             </td>
-                            <td>{won(p.amountKrw)}</td>
+                            <td>{formatKrw(p.amountKrw)}</td>
                             <td>
                               <Badge>{p.status}</Badge>
                             </td>

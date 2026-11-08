@@ -1,5 +1,8 @@
 /** Shared display rules. Ratios use percentage points (12.5 means 12.5%). */
 const numbers = new Intl.NumberFormat("ko-KR");
+const signedNumbers = new Intl.NumberFormat("ko-KR", {
+  signDisplay: "exceptZero",
+});
 const dateOptions = {
   timeZone: "Asia/Seoul",
   month: "2-digit",
@@ -18,15 +21,21 @@ const businessDay = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Seoul",
 });
 
-export function formatNumber(value: number | bigint | null | undefined) {
+export function formatNumber(
+  value: number | bigint | null | undefined,
+  signed = false,
+) {
   return typeof value === "bigint" ||
     (typeof value === "number" && Number.isFinite(value))
-    ? numbers.format(value)
+    ? (signed ? signedNumbers : numbers).format(value)
     : "—";
 }
 
-export function formatKrw(value: number | bigint | null | undefined) {
-  const number = formatNumber(value);
+export function formatKrw(
+  value: number | bigint | null | undefined,
+  signed = false,
+) {
+  const number = formatNumber(value, signed);
   return number === "—" ? number : `${number}원`;
 }
 

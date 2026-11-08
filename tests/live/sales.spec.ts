@@ -117,6 +117,22 @@ test("real API: approved/refunded totals agree across cards, branch comparison a
       .getByText(formatKrw(revenue.totals.netAmountKrw), { exact: true })
       .first(),
   ).toBeVisible();
+  const volume = await (await api(context, "/sales/passes/volume")).json();
+  await expect(
+    page
+      .getByRole("region", { name: "이용권 판매량", exact: true })
+      .getByText(`${volume.totals.netSoldQuantity}개`, { exact: true })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("table", { name: "이용권 상품 판매 순위" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "순매출 추세 차트", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "순판매량 추세 차트", exact: true }),
+  ).toBeVisible();
   const origin = page.getByRole("region", {
     name: "매출 최소 원장",
     exact: true,

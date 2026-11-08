@@ -13,6 +13,8 @@ describe("shared display formats", () => {
     expect(formatKrw(0)).toBe("0원");
     expect(formatKrw(-1234567)).toBe("-1,234,567원");
     expect(formatKrw(9007199254740993n)).toBe("9,007,199,254,740,993원");
+    expect(formatKrw(1234, true)).toBe("+1,234원");
+    expect(formatKrw(0, true)).toBe("0원");
     expect(formatNumber(1234)).toBe("1,234");
   });
 
@@ -25,6 +27,8 @@ describe("shared display formats", () => {
 
   it("distinguishes a zero percent from an inapplicable or invalid rate", () => {
     expect(formatPercent(0)).toBe("0.0%");
+    expect(formatPercent(12.35)).toBe("12.4%");
+    expect(formatPercent(-12.35)).toBe("-12.4%");
     expect(formatPercent(12.34)).toBe("12.3%");
     expect(formatPercent(100)).toBe("100.0%");
     expect(formatPercent(-12.34)).toBe("-12.3%");

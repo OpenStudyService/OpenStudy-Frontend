@@ -223,7 +223,21 @@ it("keeps sale-time product/category snapshots after renaming and ignores failed
   expect(failed.status).toBe(201);
   const ledger = await (await request(`/sales/ledger?${query}`)).json();
   expect(ledger.meta.total).toBe(1);
-  expect(ledger.items[0]).toMatchObject(old);
+  expect(ledger.items[0]).toMatchObject({
+    productName: old.productName,
+    categoryCode: old.categoryCode,
+    categoryName: old.categoryName,
+  });
+  const products = await (
+    await request(`/sales/passes/products?${query}`)
+  ).json();
+  expect(products.items).toHaveLength(1);
+  expect(products.items[0]).toMatchObject({
+    ...old,
+    rank: 1,
+    netSoldQuantity: 1,
+  });
+  expect(products.totals).toMatchObject({ paymentCount: 1, issuedCount: 1 });
 });
 
 it("rejects unknown/unauthorized branches together, and separately protects payment links", async () => {

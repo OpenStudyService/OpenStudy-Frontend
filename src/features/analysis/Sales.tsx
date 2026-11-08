@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { ApiError } from "../../shared/api/client";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
@@ -5,13 +7,20 @@ import { useApp } from "../../app/context";
 import { can } from "../../shared/domain/schema";
 import {
   formatDateTime,
+  formatBusinessDate,
   formatKrw,
   formatNumber,
 } from "../../shared/domain/format";
 import { Button, ErrorState, Heading, State } from "../../shared/ui/primitives";
 import { salesApi, salesPeriod } from "./sales-api";
-import type { SalesCondition, BranchSort, RevenueSummary } from "./sales-api";
-import { SalesChart } from "./Charts";
+import type {
+  SalesCondition,
+  BranchSort,
+  RevenueSummary,
+  SalesTrend,
+  TrendGranularity,
+} from "./sales-api";
+import { SalesChart, SalesTrendChart } from "./Charts";
 
 type Meta = RevenueSummary["aggregation"];
 type Amounts = RevenueSummary["totals"];
@@ -38,6 +47,8 @@ function SalesWorkspace() {
   const entryType = params.get("entryType") || "",
     ledgerDirection = params.get("ledgerDirection") || "desc";
   const page = Number(params.get("ledgerPage") || "1");
+  const productPage = Number(params.get("productPage") || "1");
+  const granularity = (params.get("granularity") || "day") as TrendGranularity;
   let condition: SalesCondition = {},
     invalid = "";
   try {
@@ -60,7 +71,10 @@ function SalesWorkspace() {
       !["asc", "desc"].includes(ledgerDirection) ||
       !["", "승인", "환불"].includes(entryType) ||
       !Number.isSafeInteger(page) ||
-      page < 1
+      page < 1 ||
+      !Number.isSafeInteger(productPage) ||
+      productPage < 1 ||
+      !["day", "week", "month"].includes(granularity)
     )
       throw new Error("조회 조건을 확인해 주세요.");
     condition = {
@@ -122,11 +136,60 @@ function SalesWorkspace() {
     enabled,
     retry: false,
   });
+  const passApplicable = !purpose || purpose === "이용권";
+  const volume = useQuery({
+    queryKey: [...key, "volume"],
+    queryFn: ({ signal }) => salesApi.volume(condition, signal),
+    enabled: enabled && passApplicable,
+  });
+  const products = useQuery({
+    queryKey: [...key, "products", productPage],
+    queryFn: ({ signal }) => salesApi.products(condition, productPage, signal),
+    enabled: enabled && passApplicable,
+  });
+  const trend = useQuery({
+    queryKey: [...key, "trend", "revenue", granularity],
+    queryFn: ({ signal }) =>
+      salesApi.trend(condition, "revenue", granularity, signal),
+    enabled,
+  });
+  const passTrend = useQuery({
+    queryKey: [...key, "trend", "passes", granularity],
+    queryFn: ({ signal }) =>
+      salesApi.trend(condition, "passes", granularity, signal),
+    enabled: enabled && passApplicable,
+  });
+  const reads = [
+    revenue,
+    comparison,
+    ledger,
+    trend,
+    ...(passApplicable ? [volume, products, passTrend] : []),
+  ];
+  const forbidden = reads.some(
+    ({ error }) => error instanceof ApiError && error.status === 403,
+  );
+  const defaultPeriod =
+    !from && !to && !hasBlockingReadError(revenue)
+      ? revenue.data?.aggregation.condition
+      : undefined;
   function change(name: string, value: string) {
     setParams((p) => {
       if (value) p.set(name, value);
       else p.delete(name);
-      if (name !== "ledgerPage") p.delete("ledgerPage");
+      if (
+        [
+          "from",
+          "to",
+          "purpose",
+          "refundBasis",
+          "entryType",
+          "ledgerDirection",
+        ].includes(name)
+      )
+        p.delete("ledgerPage");
+      if (["from", "to", "purpose", "refundBasis"].includes(name))
+        p.delete("productPage");
       return p;
     });
   }
@@ -138,6 +201,7 @@ function SalesWorkspace() {
       p.delete("branchIds");
       next.forEach((v) => p.append("branchIds", v));
       p.delete("ledgerPage");
+      p.delete("productPage");
       return p;
     });
   }
@@ -150,9 +214,7 @@ function SalesWorkspace() {
       >
         <Button
           onClick={() => {
-            void revenue.refetch();
-            void comparison.refetch();
-            void ledger.refetch();
+            reads.forEach((read) => void read.refetch());
           }}
           disabled={!enabled}
         >
@@ -183,6 +245,7 @@ function SalesWorkspace() {
                 p.delete("from");
                 p.delete("to");
                 p.delete("ledgerPage");
+                p.delete("productPage");
                 return p;
               })
             }
@@ -223,6 +286,7 @@ function SalesWorkspace() {
                   setParams((p) => {
                     p.delete("branchIds");
                     p.delete("ledgerPage");
+                    p.delete("productPage");
                     return p;
                   })
                 }
@@ -244,6 +308,12 @@ function SalesWorkspace() {
             ))}
           </fieldset>
         )}
+        {defaultPeriod && !forbidden && (
+          <p className="help px-5" aria-label="적용된 기본 날짜">
+            {formatBusinessDate(defaultPeriod.from)} ~{" "}
+            {formatBusinessDate(defaultPeriod.to)} (종료일 미포함)
+          </p>
+        )}
         <p className="help px-5 pb-5">
           기간을 비우면 이번 달 1일부터 내일 0시까지 조회합니다. 직접 입력하는
           기간은 최대 366일입니다. 날짜는 한국 시간 기준입니다.
@@ -254,6 +324,11 @@ function SalesWorkspace() {
           title="조회 조건을 확인해 주세요"
           message={invalid}
           action={<Button onClick={() => setParams({})}>조건 초기화</Button>}
+        />
+      ) : forbidden ? (
+        <State
+          title="매출 조회 권한이 필요해요"
+          message="선택한 모든 지점의 매출 조회 권한을 확인해 주세요."
         />
       ) : (
         <>
@@ -365,6 +440,150 @@ function SalesWorkspace() {
               )
             )}
           </section>
+          {passApplicable ? (
+            <>
+              <SalesSection title="이용권 판매량" read={volume}>
+                {({ totals, aggregation }) => (
+                  <>
+                    <MetricCards
+                      values={[
+                        ["이용권 결제 건수", totals.paymentCount, "건"],
+                        ["판매 수량", totals.soldQuantity, "개"],
+                        ["환불 수량", totals.refundedQuantity, "개"],
+                        ["순판매량", totals.netSoldQuantity, "개"],
+                        ["발급 건수", totals.issuedCount, "개"],
+                      ]}
+                      noData={totals.dataStatus === "noData"}
+                    />
+                    <AggregationMeta
+                      meta={aggregation}
+                      branches={session.branches}
+                    />
+                  </>
+                )}
+              </SalesSection>
+              <SalesSection title="상품 판매 순위" read={products}>
+                {({ items, meta, aggregation }) => (
+                  <>
+                    {items.length ? (
+                      <div className="data-scroll" tabIndex={0}>
+                        <table className="data-table">
+                          <caption className="sr-only">
+                            이용권 상품 판매 순위
+                          </caption>
+                          <thead>
+                            <tr>
+                              {[
+                                "순위",
+                                "판매 당시 상품",
+                                "분류",
+                                "유형",
+                                "결제 건수",
+                                "판매 수량",
+                                "환불 수량",
+                                "순판매량",
+                                "발급 건수",
+                              ].map((title) => (
+                                <th key={title}>{title}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {items.map((row) => (
+                              <tr
+                                key={JSON.stringify([
+                                  row.productId,
+                                  row.productName,
+                                  row.categoryCode,
+                                  row.categoryName,
+                                ])}
+                              >
+                                <td>{formatNumber(row.rank)}</td>
+                                <th scope="row">{row.productName}</th>
+                                <td>{row.categoryName}</td>
+                                <td>{row.kind}</td>
+                                <td>{formatNumber(row.paymentCount)}건</td>
+                                <td>{formatNumber(row.soldQuantity)}개</td>
+                                <td>{formatNumber(row.refundedQuantity)}개</td>
+                                <td>{formatNumber(row.netSoldQuantity)}개</td>
+                                <td>{formatNumber(row.issuedCount)}개</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <State
+                        title={
+                          meta.total
+                            ? "이 페이지에 상품이 없어요"
+                            : "조회 조건에 맞는 상품 판매가 없어요"
+                        }
+                      />
+                    )}
+                    <nav
+                      className="flex items-center justify-between gap-3 p-5"
+                      aria-label="상품 순위 페이지"
+                    >
+                      <Button
+                        disabled={productPage <= 1}
+                        onClick={() =>
+                          change("productPage", String(productPage - 1))
+                        }
+                      >
+                        이전
+                      </Button>
+                      <span className="text-xs">
+                        {formatNumber(meta.total)}개 상품 행 · {productPage} /{" "}
+                        {Math.max(1, Math.ceil(meta.total / meta.pageSize))}
+                        페이지
+                      </span>
+                      <Button
+                        disabled={productPage * meta.pageSize >= meta.total}
+                        onClick={() =>
+                          change("productPage", String(productPage + 1))
+                        }
+                      >
+                        다음
+                      </Button>
+                    </nav>
+                    <AggregationMeta
+                      meta={aggregation}
+                      branches={session.branches}
+                    />
+                  </>
+                )}
+              </SalesSection>
+            </>
+          ) : (
+            <State
+              title="이용권 판매 지표 · 해당 없음"
+              message="선택한 용도에는 이용권 판매량, 상품 순위, 판매량 추세가 적용되지 않아요."
+            />
+          )}
+          <label className="field mb-5">
+            추세 집계 단위
+            <select
+              value={granularity}
+              onChange={(e) => change("granularity", e.target.value)}
+            >
+              <option value="day">일별</option>
+              <option value="week">주별</option>
+              <option value="month">월별</option>
+            </select>
+          </label>
+          <SalesSection title="매출 추세" read={trend}>
+            {(data) => (
+              <TrendResults trend={data} branches={session.branches} />
+            )}
+          </SalesSection>
+          {passApplicable && (
+            <SalesSection title="이용권 판매량 추세" read={passTrend}>
+              {(data) => (
+                <TrendResults trend={data} branches={session.branches} />
+              )}
+            </SalesSection>
+          )}
           <section className="card mb-5" aria-label="매출 최소 원장">
             <header className="card-header">
               <h2>최소 원장</h2>
@@ -511,25 +730,121 @@ function SalesWorkspace() {
           </section>
         </>
       )}
-      <p className="help">
-        이용권 판매량·상품 순위·기간별 추세는 준비 중입니다.
-      </p>
     </div>
   );
 }
+function SalesSection<T>({
+  title,
+  read,
+  children,
+}: {
+  title: string;
+  read: {
+    isPending: boolean;
+    error: Error | null;
+    data: T | undefined;
+    refetch: () => Promise<unknown>;
+  };
+  children: (data: T) => ReactNode;
+}) {
+  return (
+    <section className="card mb-5" aria-label={title}>
+      <header className="card-header">
+        <h2>{title}</h2>
+      </header>
+      {read.isPending ? (
+        <State loading />
+      ) : read.error && hasBlockingReadError(read) ? (
+        <ErrorState error={read.error} retry={() => void read.refetch()} />
+      ) : (
+        read.data && children(read.data)
+      )}
+    </section>
+  );
+}
+function TrendResults({
+  trend,
+  branches,
+}: {
+  trend: SalesTrend;
+  branches: { id: string; name: string }[];
+}) {
+  const revenue = trend.measure === "revenue";
+  const label = revenue ? "순매출" : "순판매량";
+  const format = revenue
+    ? formatKrw
+    : (value: number) => `${formatNumber(value)}개`;
+  const rows = trend.items.map((item) => ({
+    label: item.label,
+    value: item.revenue?.netAmountKrw ?? item.passes!.netSoldQuantity,
+    noData: (item.revenue ?? item.passes)?.dataStatus === "noData",
+    partial: item.partial,
+  }));
+  return (
+    <>
+      {trend.aggregation.dataStatus === "noData" ? (
+        <State title="조회 조건에 맞는 추세 데이터가 없어요" />
+      ) : (
+        <div className="p-5">
+          <SalesTrendChart rows={rows} label={label} format={format} />
+        </div>
+      )}
+      <div className="data-scroll max-h-80" tabIndex={0}>
+        <table className="data-table">
+          <caption className="sr-only">{label} 추세 상세</caption>
+          <thead>
+            <tr>
+              <th>구간</th>
+              <th>{label}</th>
+              <th>데이터</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <th scope="row">
+                  {row.label}
+                  {row.partial ? " · 부분 구간" : ""}
+                </th>
+                <td>{format(row.value)}</td>
+                <td>{row.noData ? "거래 없음" : "거래 있음"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <AggregationMeta meta={trend.aggregation} branches={branches} />
+    </>
+  );
+}
 function AmountCards({ amounts }: { amounts: Amounts }) {
-  const values: [string, number][] = [
-    ["승인 결제액", amounts.approvedAmountKrw],
-    ["환불액", amounts.refundAmountKrw],
-    ["순매출", amounts.netAmountKrw],
-  ];
+  return (
+    <MetricCards
+      values={[
+        ["승인 결제액", amounts.approvedAmountKrw, "원"],
+        ["환불액", amounts.refundAmountKrw, "원"],
+        ["순매출", amounts.netAmountKrw, "원"],
+      ]}
+      noData={amounts.dataStatus === "noData"}
+    />
+  );
+}
+function MetricCards({
+  values,
+  noData,
+}: {
+  values: [string, number, "원" | "건" | "개"][];
+  noData: boolean;
+}) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {values.map(([label, value]) => (
+      {values.map(([label, value, unit]) => (
         <div className="card p-5" key={label}>
           <small>{label}</small>
-          <p className="stat-value text-2xl">{formatKrw(value)}</p>
-          {amounts.dataStatus === "noData" && <small>거래 없음</small>}
+          <p className="stat-value text-2xl">
+            {unit === "원" ? formatKrw(value) : `${formatNumber(value)}${unit}`}
+          </p>
+          {noData && <small>거래 없음</small>}
         </div>
       ))}
     </div>

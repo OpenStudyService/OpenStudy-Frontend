@@ -2619,6 +2619,158 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/ai/catalog/readiness": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * AI 준비 상태
+     * @description 의미 카탈로그·모델 모드·기준 시각을 돌려준다. 화면이 AI 채팅을 열 때 읽는다.
+     */
+    get: operations["getAiReadiness"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * AI 대화 목록
+     * @description 본인 대화를 마지막 질문 시각(lastAskedAt) 내림차순으로 돌려준다. 제목 변경은 순서를 바꾸지 않는다.
+     */
+    get: operations["listAiConversations"];
+    put?: never;
+    /**
+     * AI 대화 생성
+     * @description 빈 대화를 만든다. 질문을 conversationId 없이 보내도 새 대화가 생기므로 선택 사항이다.
+     */
+    post: operations["createAiConversation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/conversations/{conversationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * AI 대화 다시 열기
+     * @description 저장된 질문을 turns로 돌려준다. 실행됐던 질문은 저장 명세를 현재 권한·지점 범위로 다시 검증하고 새 기준 시각으로 다시 실행한다. 모델을 호출하지 않는다. 실행할 수 없으면 결과 대신 사유 코드(status REFUSED, errorCode)를 준다. scope를 생략하면 대화의 범위를 쓴다.
+     */
+    get: operations["reopenAiConversation"];
+    put?: never;
+    post?: never;
+    /**
+     * AI 대화 삭제
+     * @description 대화와 저장 질문을 지운다. 목록·다시 열기에서 빠진다. 진단 로그는 자체 30일 보관(M10-D04)을 따른다.
+     */
+    delete: operations["deleteAiConversation"];
+    options?: never;
+    head?: never;
+    /**
+     * AI 대화 제목 변경
+     * @description 제목을 1~200자로 바꾼다. 목록 순서는 바뀌지 않는다.
+     */
+    patch: operations["renameAiConversation"];
+    trace?: never;
+  };
+  "/ai/conversations/{conversationId}/requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * AI 대화에 질문 제출
+     * @description askAiQuestion과 같은 처리를 하고 접수 결과만 돌려준다. 실패는 HTTP 상태와 공통 오류(code, message)로 돌려준다. 결과는 getAiExecution으로 조회한다. 남의 대화 ID는 404.
+     */
+    post: operations["submitAiConversationRequest"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/queries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * AI 질문
+     * @description 질문 하나를 받아 결과까지 한 번에 돌려준다(SSE 없음, ADR-COM-001). 입력·안전 검사, 명세 생성, 권한·범위 검사, 검증된 QuerySpec 실행 순서다. 확인 질문·지원 불가는 200, 입력·안전 거절은 400, 권한 거절은 403, 빈도 초과는 429다. 실패해도 본문은 AiQueryResponse다. conversationId가 없으면 새 대화를 만든다.
+     */
+    post: operations["askAiQuestion"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/requests/{requestId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * AI 요청 취소
+     * @description 본인 요청(요청 ID 또는 실행 ID)을 CANCELED로 표시한다. 질문 처리는 동기식이라 응답 뒤의 취소는 저장 상태만 바꾼다.
+     */
+    post: operations["cancelAiRequest"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/executions/{executionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * AI 실행 다시 조회
+     * @description 저장된 실행을 원래 지점 범위로, 현재 권한을 다시 확인해 다시 실행한다. 결과는 저장본이 아니다(M10-D12). 권한이 없어졌으면 403, 실행된 질문이 아니면 422 NOT_EXECUTABLE, 카탈로그에서 빠진 분석은 422 ANALYSIS_UNAVAILABLE.
+     */
+    get: operations["getAiExecution"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5336,6 +5488,308 @@ export interface components {
       startsAt: string;
       /** Format: date-time */
       endsAt: string;
+    };
+    AiReadiness: {
+      ready: boolean;
+      /** @description playback(고정 생성기) 또는 live */
+      mode: string;
+      model?: string;
+      /** @description 의미 카탈로그 버전 */
+      version: string;
+      sourcesCount?: number;
+      metricsCount?: number;
+      embeddingDimensions?: number;
+      /** Format: date-time */
+      asOfKst: string;
+      message?: string;
+    };
+    AiConversationCreate: {
+      /** @default all */
+      scope: string;
+      /** @description 생략하면 '새 AI 분석 대화' */
+      title?: string;
+    };
+    AiConversationCreated: {
+      id: string;
+      scope: string;
+      title: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    AiConversationSummary: {
+      id: string;
+      title: string;
+      scope: string;
+      /** Format: date-time */
+      createdAt: string;
+      /**
+       * Format: date-time
+       * @description 마지막 질문 시각. 목록 정렬 기준
+       */
+      lastAskedAt: string;
+    };
+    AiConversationRename: {
+      title: string;
+    };
+    AiConversationTitle: {
+      id: string;
+      title: string;
+    };
+    AiConversationTurn: {
+      question: string;
+      /** Format: date-time */
+      askedAt: string;
+      response: components["schemas"]["AiQueryResponse"];
+    };
+    /** @description turns[].response.status: COMPLETED(재실행, behavior REOPEN), CLARIFICATION·REFUSED(당시 실행되지 않았거나 지금 실행할 수 없음). REFUSED면 errorCode가 사유 코드(ANALYSIS_UNAVAILABLE, REOPEN_NOT_EXECUTABLE, 권한 판정 코드)이고 envelope는 null */
+    AiReopenedConversation: {
+      id: string;
+      title: string;
+      scope: string;
+      turns: components["schemas"]["AiConversationTurn"][];
+    };
+    AiQueryRequest: {
+      question: string;
+      /** @default all */
+      scope: string;
+      /** @description 직전 응답 clarificationOptions[].id */
+      clarificationChoice?: string;
+      /** @description 없으면 새 대화 */
+      conversationId?: string;
+    };
+    AiConversationQuestion: {
+      question: string;
+      /** @default all */
+      scope: string;
+      clarificationChoice?: string;
+    };
+    AiQueryAccepted: {
+      requestId: string;
+      executionId?: string;
+      conversationId?: string;
+      /** @enum {string} */
+      status: "COMPLETED" | "CLARIFICATION" | "UNSUPPORTED";
+    };
+    AiStage: {
+      /** @description accepted, retrieving, generating, validating, executing, completed */
+      stage: string;
+      label?: string;
+      status: string;
+      durationMs?: number;
+      detail?: string;
+    };
+    /** @description M10-D03 상한과 잘림 여부 */
+    AiTruncation: {
+      /** @description 1000 */
+      maxRows: number;
+      /** @description 50 */
+      pageSize: number;
+      /** @description 20 */
+      maxChartCategories: number;
+      isTruncated: boolean;
+      /** @description ROW_LIMIT_CLAMPED */
+      warningCode?: string | null;
+      message?: string | null;
+    };
+    AiClarificationOption: {
+      id: string;
+      label: string;
+      targetAnalysisId?: string;
+      targetScope?: string;
+    };
+    /** @description 서버가 검증한 조회 명세. 모델이 만든 SQL·JPQL은 실행하지 않는다(M10-D07) */
+    AiQuerySpec: {
+      id: string;
+      source: string;
+      grain: string;
+      /** @enum {string} */
+      mode: "DETAIL" | "AGGREGATE" | "REGISTERED_ANALYSIS";
+      dimensions: {
+        field: string;
+        alias: string;
+      }[];
+      metrics: {
+        field: string;
+        alias: string;
+      }[];
+      filter?: Record<string, never> | null;
+      orderBy: {
+        alias: string;
+        /** @enum {string} */
+        direction: "ASC" | "DESC";
+      }[];
+      pagination: {
+        page: number;
+        size: number;
+      };
+      limit: number;
+      analysisId?: string | null;
+    };
+    /** @description 화면 명세. catalogVersion openstudy-ui-1.0.0 */
+    AiViewSpec: {
+      catalogVersion: string;
+      components: {
+        id: string;
+        componentRef: {
+          /** @enum {string} */
+          id:
+            | "KPI"
+            | "BAR_CHART"
+            | "RANKED_BAR_CHART"
+            | "LINE_CHART"
+            | "DATA_TABLE"
+            | "HEATMAP"
+            | "SEAT_MAP"
+            | "WEEK_CALENDAR"
+            | "TASK_LIST";
+          version: string;
+        };
+        datasetId?: string | null;
+        bindings?: Record<string, never>;
+        options?: Record<string, never>;
+        events?: {
+          event?: string;
+          actionId?: string;
+        }[];
+      }[];
+      layout?: Record<string, never> | null;
+    };
+    AiDataset: {
+      id: string;
+      columns: {
+        alias: string;
+        /** @enum {string} */
+        type:
+          "STRING" | "INTEGER" | "DECIMAL" | "BOOLEAN" | "DATE" | "TIMESTAMP";
+        unit?: string | null;
+        precision?: number | null;
+      }[];
+      rows: Record<string, never>[];
+      totalElements: number;
+      page?: number;
+      size?: number;
+      /** Format: date-time */
+      snapshotAt?: string;
+      /** Format: date-time */
+      asOf: string;
+    };
+    /** @description 서버가 만든 결과. 저장하지 않으며 조회할 때마다 다시 계산한다(M10-D12) */
+    AiResultEnvelope: {
+      requestId: string;
+      executionId?: string | null;
+      status: string;
+      datasets: components["schemas"]["AiDataset"][];
+      view?: components["schemas"]["AiViewSpec"] | null;
+      warnings: string[];
+      errorCode?: string | null;
+      /**
+       * Format: date-time
+       * @description 기준 시각
+       */
+      asOf?: string | null;
+      snapshotVersion?: string | null;
+      policyVersion?: string | null;
+      notice?: {
+        code?: string;
+        /** @enum {string} */
+        kind?:
+          | "KNOWLEDGE"
+          | "CLARIFICATION"
+          | "UNSUPPORTED"
+          | "VALIDATION"
+          | "DENIED"
+          | "FAILURE";
+        message?: string;
+        nextAction?: string;
+      } | null;
+    };
+    /**
+     * @deprecated
+     * @description 폐지 예정. 첫 AI 화면이 쓰던 옛 형식. rows는 지점별 매출이며 매출 질문일 때 요청자가 sales:read를 가진 지점만 채운다(#182). 새 화면은 envelope·viewSpec만 쓴다
+     */
+    AiLegacyExecution: {
+      id?: string;
+      status?: string;
+      asOf?: string;
+      /** Format: date */
+      start?: string;
+      /** Format: date */
+      end?: string;
+      currency?: string;
+      timeZone?: string;
+      /** @enum {string} */
+      refundBasis?: "processed" | "original";
+      viewSpec?: Record<string, never>;
+      rows?: {
+        branchId?: string;
+        branch?: string;
+        approved?: number;
+        refunds?: number;
+        net?: number;
+      }[];
+    } | null;
+    AiQueryResponse: {
+      requestId: string;
+      executionId?: string | null;
+      conversationId?: string | null;
+      traceId?: string | null;
+      /**
+       * @description REFUSED는 다시 열기에서 지금 실행할 수 없는 질문
+       * @enum {string}
+       */
+      status:
+        | "COMPLETED"
+        | "CLARIFICATION"
+        | "UNSUPPORTED"
+        | "INVALID"
+        | "DENIED"
+        | "RATE_LIMITED"
+        | "REFUSED";
+      httpStatus: number;
+      errorCode?: string | null;
+      resultCategory?: string | null;
+      /** @description REOPEN이면 다시 열기 결과 */
+      behavior?: string | null;
+      message?: string | null;
+      pocCode?: string | null;
+      analysisId?: string | null;
+      /** @description sales, seats, passes, rooms, tasks, attendance */
+      intentDomain?: string | null;
+      semanticStatus?: string | null;
+      querySpec?: components["schemas"]["AiQuerySpec"] | null;
+      viewSpec?: components["schemas"]["AiViewSpec"] | null;
+      envelope?: components["schemas"]["AiResultEnvelope"] | null;
+      summary?: Record<string, never>;
+      truncation?: components["schemas"]["AiTruncation"];
+      clarificationOptions?: components["schemas"]["AiClarificationOption"][];
+      stages?: components["schemas"]["AiStage"][];
+      retrievedCandidates?: {
+        id?: string;
+        kind?: string;
+        score?: number;
+      }[];
+      /** @description 진단용 판정 정보 */
+      securityGate?: Record<string, never>;
+      legacyExecution?: components["schemas"]["AiLegacyExecution"];
+    };
+    AiCancelResult: {
+      ok: boolean;
+      requestId: string;
+      /** @enum {string} */
+      status: "CANCELED";
+    };
+    /** @description 저장된 실행을 지금 다시 실행한 결과. 옛 형식 필드(rows, viewSpec, start, end 등)는 폐지 예정 */
+    AiExecution: components["schemas"]["AiLegacyExecution"] & {
+      id: string;
+      requestId?: string;
+      conversationId?: string;
+      question?: string;
+      pocCode?: string | null;
+      analysisId?: string;
+      intentDomain?: string;
+      resultCategory?: string | null;
+      envelope: components["schemas"]["AiResultEnvelope"];
+      querySpec?: components["schemas"]["AiQuerySpec"] | null;
     };
   };
   responses: {
@@ -11678,6 +12132,364 @@ export interface operations {
       409: components["responses"]["Error409"];
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getAiReadiness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiReadiness"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listAiConversations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiConversationSummary"][];
+        };
+      };
+      401: components["responses"]["Error401"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createAiConversation: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AiConversationCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiConversationCreated"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  reopenAiConversation: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        /** @description 대화 ID */
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiReopenedConversation"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      404: components["responses"]["Error404"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  deleteAiConversation: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        /** @description 대화 ID */
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 삭제됨 */
+      204: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  renameAiConversation: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        /** @description 대화 ID */
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AiConversationRename"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiConversationTitle"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      422: components["responses"]["Error422"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  submitAiConversationRequest: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        /** @description 대화 ID */
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AiConversationQuestion"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiQueryAccepted"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  askAiQuestion: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AiQueryRequest"];
+      };
+    };
+    responses: {
+      /** @description COMPLETED·CLARIFICATION·UNSUPPORTED */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiQueryResponse"];
+        };
+      };
+      /** @description 입력·기간·안전 정책 거절(status INVALID·DENIED) */
+      400: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiQueryResponse"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      /** @description 권한·범위·개인정보 거절(status DENIED) 또는 CSRF 오류 */
+      403: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiQueryResponse"];
+        };
+      };
+      404: components["responses"]["Error404"];
+      422: components["responses"]["Error422"];
+      /** @description 빈도 제한(status RATE_LIMITED). Retry-After: 60 */
+      429: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          "Retry-After"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiQueryResponse"];
+        };
+      };
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelAiRequest: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        /** @description 요청 ID 또는 실행 ID */
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiCancelResult"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getAiExecution: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description 실행 ID 또는 요청 ID */
+        executionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiExecution"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      422: components["responses"]["Error422"];
       500: components["responses"]["Error500"];
     };
   };

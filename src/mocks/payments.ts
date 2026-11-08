@@ -144,6 +144,7 @@ export function salesProductSnapshot(row: PaymentRow) {
     productName: saved.productName,
     categoryName: saved.categoryName,
     categoryCode: saved.categoryCode,
+    kind: saved.terms.kind,
   };
 }
 function paymentView(actor: Employee, row: PaymentRow): Payment {

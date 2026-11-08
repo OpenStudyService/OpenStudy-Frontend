@@ -1,3 +1,4 @@
+import { formatKrw, formatNumber } from "../../shared/domain/format";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -17,8 +18,6 @@ import { timeRange } from "./model";
 import type { Ledger } from "./model";
 import { RangeFilter } from "./RangeFilter";
 
-const number = (value: number) =>
-  value.toLocaleString("ko-KR", { signDisplay: "exceptZero" });
 function LedgerRow({ pass }: { pass: Ledger }) {
   const time = pass.kind === "시간권",
     period = pass.kind === "기간권";
@@ -37,14 +36,12 @@ function LedgerRow({ pass }: { pass: Ledger }) {
         <td colSpan={4}>기간권 · 잔량 대조 대상 아님</td>
       ) : (
         <>
+          <td>{time ? `${formatNumber(issued)}분` : formatKrw(issued)}</td>
           <td>
-            {issued?.toLocaleString("ko-KR")} {time ? "분" : "원"}
+            {time ? `${formatNumber(ledger, true)}분` : formatKrw(ledger, true)}
           </td>
           <td>
-            {number(ledger)} {time ? "분" : "원"}
-          </td>
-          <td>
-            {remaining?.toLocaleString("ko-KR")} {time ? "분" : "원"}
+            {time ? `${formatNumber(remaining)}분` : formatKrw(remaining)}
           </td>
           <td>
             {issued !== null &&
@@ -186,14 +183,11 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
                           {dateTime(event.at)} · {branchName(event.branchId)}
                         </p>
                         <p>
-                          증감: {number(event.deltaMinutes)}분 ·{" "}
-                          {number(event.deltaKrw)}원
+                          증감: {formatNumber(event.deltaMinutes, true)}분 ·{" "}
+                          {formatKrw(event.deltaKrw, true)}
                         </p>
                         {inScope && event.usedMinutes !== null && (
-                          <p>
-                            이용 시간:{" "}
-                            {event.usedMinutes.toLocaleString("ko-KR")}분
-                          </p>
+                          <p>이용 시간: {formatNumber(event.usedMinutes)}분</p>
                         )}
                         {inScope && event.actor && (
                           <p>처리자: {event.actor.name}</p>

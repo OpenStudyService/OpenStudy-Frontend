@@ -1,3 +1,4 @@
+import { formatKrw } from "../../shared/domain/format";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -278,9 +279,10 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
                             {row.usedMinutes}분 이용
                             <br />
                             차감 {row.deductedMinutes}분 ·{" "}
-                            {row.deductedKrw.toLocaleString("ko-KR")}원<br />
+                            {formatKrw(row.deductedKrw)}
+                            <br />
                             초과 {row.overageMinutes}분 ·{" "}
-                            {row.overageKrw.toLocaleString("ko-KR")}원
+                            {formatKrw(row.overageKrw)}
                           </>
                         )}
                       </td>
@@ -349,11 +351,11 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
                     ],
                     [
                       "차감",
-                      `${detail.data.deductedMinutes}분 · ${detail.data.deductedKrw.toLocaleString("ko-KR")}원`,
+                      `${detail.data.deductedMinutes}분 · ${formatKrw(detail.data.deductedKrw)}`,
                     ],
                     [
                       "초과량",
-                      `${detail.data.overageMinutes}분 · ${detail.data.overageKrw.toLocaleString("ko-KR")}원`,
+                      `${detail.data.overageMinutes}분 · ${formatKrw(detail.data.overageKrw)}`,
                     ],
                     ["입실 처리자", detail.data.checkedInBy?.name ?? "—"],
                     ["입실 사유", detail.data.checkInReason ?? "—"],

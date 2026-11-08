@@ -48,7 +48,58 @@ function invalid(
 ): asserts condition {
   assert(condition, message, 422, code);
 }
-function build(request: Request, kind: "revenue" | "branches" | "ledger") {
+type SalesRead =
+  "revenue" | "branches" | "ledger" | "volume" | "products" | "trend";
+type ProductSnapshot = NonNullable<ReturnType<typeof salesProductSnapshot>>;
+function volume(rows: Entry[]) {
+  const paymentCount = rows.filter((row) => row.entryType === "승인").length;
+  const refundedQuantity = rows.length - paymentCount;
+  return {
+    paymentCount,
+    soldQuantity: paymentCount,
+    refundedQuantity,
+    netSoldQuantity: paymentCount - refundedQuantity,
+    issuedCount: paymentCount,
+    dataStatus: rows.length ? "hasData" : "noData",
+  };
+}
+function trendBuckets(
+  from: string,
+  to: string,
+  granularity: "day" | "week" | "month",
+) {
+  const offset = 9 * 3600000;
+  const first = Date.parse(from),
+    last = Date.parse(to);
+  const cursor = new Date(first + offset);
+  cursor.setUTCHours(0, 0, 0, 0);
+  if (granularity === "week")
+    cursor.setUTCDate(cursor.getUTCDate() - ((cursor.getUTCDay() + 6) % 7));
+  if (granularity === "month") cursor.setUTCDate(1);
+  const items = [];
+  while (cursor.getTime() - offset < last) {
+    const label = cursor
+      .toISOString()
+      .slice(0, granularity === "month" ? 7 : 10);
+    const bucketStart = cursor.getTime() - offset;
+    if (granularity === "month") cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    else
+      cursor.setUTCDate(cursor.getUTCDate() + (granularity === "week" ? 7 : 1));
+    const bucketEnd = cursor.getTime() - offset;
+    const start = Math.max(bucketStart, first),
+      end = Math.min(bucketEnd, last);
+    items.push({
+      label,
+      bucketStart: new Date(bucketStart).toISOString(),
+      bucketEnd: new Date(bucketEnd).toISOString(),
+      start: new Date(start).toISOString(),
+      end: new Date(end).toISOString(),
+      partial: start !== bucketStart || end !== bucketEnd,
+    });
+  }
+  return items;
+}
+function build(request: Request, kind: SalesRead) {
   const actor = store.activeUser(),
     q = new URL(request.url).searchParams;
   const selected = q.getAll("branchIds");
@@ -85,13 +136,27 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
   const refundBasis = z
     .enum(["processedDate", "paymentDate"])
     .parse(q.get("refundBasis") ?? "processedDate");
-  const purpose = q.has("purpose")
-    ? z.enum(purposes).parse(q.get("purpose"))
-    : null;
+  const measure =
+    kind === "trend"
+      ? z.enum(["revenue", "passes"]).parse(q.get("measure") ?? "revenue")
+      : null;
+  const granularity =
+    kind === "trend"
+      ? z.enum(["day", "week", "month"]).parse(q.get("granularity") ?? "day")
+      : null;
+  const passes =
+    kind === "volume" || kind === "products" || measure === "passes";
+  const purpose = passes
+    ? "이용권"
+    : q.has("purpose")
+      ? z.enum(purposes).parse(q.get("purpose"))
+      : null;
   invalid(
-    !q.has("productId") && !q.has("categoryCode"),
-    "매출은 상품 필터를 지원하지 않습니다.",
+    passes ? !q.has("purpose") : !q.has("productId") && !q.has("categoryCode"),
+    "집계에 적용할 수 없는 필터입니다.",
   );
+  const productId = q.get("productId"),
+    categoryCode = q.get("categoryCode");
   assert(
     branchIds.length &&
       branchIds.every(
@@ -108,6 +173,7 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
       ? z.enum(["승인", "환불"]).parse(q.get("entryType"))
       : null;
   const rows: Entry[] = [];
+  const snapshots = new Map<string, ProductSnapshot>();
   const within = (at: string) =>
     Date.parse(at) >= Date.parse(from) &&
     Date.parse(at) < Date.parse(to) &&
@@ -125,6 +191,10 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
       if (purpose && purpose !== p) continue;
       const snapshot =
         p === "이용권" && row.productId ? salesProductSnapshot(row) : null;
+      if (productId !== null && row.productId !== productId) continue;
+      if (categoryCode !== null && snapshot?.categoryCode !== categoryCode)
+        continue;
+      if (snapshot) snapshots.set(row.id, snapshot);
       const approvedAt = row.canonical?.approvedAt ?? row.approvedAt;
       const refund = row.canonical?.refund;
       const refundedAt = refund?.refundedAt ?? row.refundAt;
@@ -175,7 +245,11 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
       purpose: p,
       ...totals(items.filter((r) => r.purpose === p)),
     }));
-  const aggregation = (rowCount: number) => ({
+  const aggregation = (
+    rowCount: number,
+    firstBucketPartial: boolean | null = null,
+    lastBucketPartial: boolean | null = null,
+  ) => ({
     condition: {
       branchIds: [...branchIds].sort(),
       allBranches: !selected.length,
@@ -183,9 +257,9 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
       to: new Date(to).toISOString(),
       refundBasis,
       purpose,
-      productId: null,
-      categoryCode: null,
-      granularity: null,
+      productId,
+      categoryCode,
+      granularity,
     },
     defaultPeriod,
     timeZone: "Asia/Seoul",
@@ -196,16 +270,24 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
     dataStatus: rows.length ? "hasData" : "noData",
     partial: {
       periodOpen: Date.parse(to) > Date.parse(asOf),
-      firstBucketPartial: null,
-      lastBucketPartial: null,
+      firstBucketPartial,
+      lastBucketPartial,
     },
-    metrics: [
-      { id: "sales.approved_amount", unit: "원" },
-      { id: "sales.refund_amount", unit: "원" },
-      { id: "sales.net_amount", unit: "원" },
-      { id: "sales.approved_payment_count", unit: "건" },
-      { id: "sales.refund_count", unit: "건" },
-    ],
+    metrics: passes
+      ? [
+          { id: "pass.payment_count", unit: "건" },
+          { id: "pass.sold_quantity", unit: "개" },
+          { id: "pass.refunded_quantity", unit: "개" },
+          { id: "pass.net_sold_quantity", unit: "개" },
+          { id: "pass.issued_count", unit: "개" },
+        ]
+      : [
+          { id: "sales.approved_amount", unit: "원" },
+          { id: "sales.refund_amount", unit: "원" },
+          { id: "sales.net_amount", unit: "원" },
+          { id: "sales.approved_payment_count", unit: "건" },
+          { id: "sales.refund_count", unit: "건" },
+        ],
   });
   if (kind === "revenue")
     return {
@@ -213,6 +295,35 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
       totals: totals(rows),
       byPurpose: byPurpose(rows),
     };
+  if (kind === "volume")
+    return { aggregation: aggregation(1), totals: volume(rows) };
+  if (kind === "trend" && granularity) {
+    const values = (items: Entry[]) => ({
+      revenue: passes ? null : totals(items),
+      passes: passes ? volume(items) : null,
+    });
+    const items = trendBuckets(from, to, granularity).map((bucket) => ({
+      ...bucket,
+      ...values(
+        rows.filter(
+          (row) =>
+            Date.parse(row.basisAt) >= Date.parse(bucket.start) &&
+            Date.parse(row.basisAt) < Date.parse(bucket.end),
+        ),
+      ),
+    }));
+    return {
+      aggregation: aggregation(
+        items.length,
+        items[0]?.partial,
+        items.at(-1)?.partial,
+      ),
+      measure,
+      granularity,
+      totals: values(rows),
+      items,
+    };
+  }
   const direction = z.enum(["asc", "desc"]).parse(q.get("direction") ?? "desc"),
     factor = direction === "asc" ? 1 : -1;
   if (kind === "branches") {
@@ -258,6 +369,44 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
       .min(1)
       .max(100)
       .parse(q.get("pageSize") ?? 20);
+  if (kind === "products") {
+    const groups = new Map<
+      string,
+      { product: ProductSnapshot & { productId: string }; rows: Entry[] }
+    >();
+    for (const row of rows) {
+      const snapshot = snapshots.get(row.paymentId);
+      if (!snapshot || !row.productId) continue;
+      const product = { productId: row.productId, ...snapshot };
+      const key = JSON.stringify(product);
+      const group = groups.get(key) ?? { product, rows: [] };
+      group.rows.push(row);
+      groups.set(key, group);
+    }
+    const compare = (a: string, b: string) => (a === b ? 0 : a < b ? -1 : 1);
+    const items = [...groups.values()]
+      .map(({ product, rows }) => ({ ...product, ...volume(rows), rank: 0 }))
+      .sort(
+        (a, b) =>
+          b.netSoldQuantity - a.netSoldQuantity ||
+          compare(a.productId, b.productId) ||
+          compare(a.productName, b.productName) ||
+          compare(a.categoryCode, b.categoryCode) ||
+          compare(a.categoryName, b.categoryName),
+      );
+    items.forEach((item, i) => {
+      item.rank =
+        i > 0 && item.netSoldQuantity === items[i - 1].netSoldQuantity
+          ? items[i - 1].rank
+          : i + 1;
+    });
+    return {
+      aggregation: aggregation(items.length),
+      totals: volume(rows),
+      items: items.slice((page - 1) * pageSize, page * pageSize),
+      meta: { page, pageSize, total: items.length },
+    };
+  }
   rows.sort(
     (a, b) =>
       factor *
@@ -276,7 +425,7 @@ function build(request: Request, kind: "revenue" | "branches" | "ledger") {
     },
   };
 }
-function handler(kind: "revenue" | "branches" | "ledger") {
+function handler(kind: SalesRead) {
   return async ({ request }: { request: Request }) => {
     try {
       const actor = store.activeUser().id;
@@ -326,4 +475,7 @@ export const salesHandlers = [
   http.get("/api/sales/revenue", handler("revenue")),
   http.get("/api/sales/revenue/branches", handler("branches")),
   http.get("/api/sales/ledger", handler("ledger")),
+  http.get("/api/sales/passes/volume", handler("volume")),
+  http.get("/api/sales/passes/products", handler("products")),
+  http.get("/api/sales/trend", handler("trend")),
 ];
