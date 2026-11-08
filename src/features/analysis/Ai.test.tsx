@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Ai } from "./Ai";
@@ -27,12 +27,6 @@ vi.mock("./domainlens", async (load) => ({
   executeAiQuery: mocks.execute,
   aiConversations: mocks.history,
 }));
-vi.mock("./Charts", () => ({
-  ViewSpecRenderer: ({ activeView }: { activeView?: string }) => (
-    <p>결과 화면: {activeView}</p>
-  ),
-}));
-
 function session(permissions: string[]): CurrentUser {
   return {
     user: {
@@ -69,10 +63,16 @@ function response(over: Partial<AiQueryResponseDto>): AiQueryResponseDto {
       catalogVersion: "openstudy-ui-1.0.0",
       components: [
         {
+          id: "kpi",
+          componentRef: { id: "KPI", version: "1.0.0" },
+          datasetId: "salesTotals",
+          bindings: { values: ["net_krw"] },
+        },
+        {
           id: "comp_bar",
           componentRef: { id: "BAR_CHART", version: "1.0.0" },
           datasetId: "branchSales",
-          bindings: {},
+          bindings: { category: "branch_name", value: "net_krw" },
           options: {},
           events: [],
         },
@@ -112,6 +112,13 @@ function response(over: Partial<AiQueryResponseDto>): AiQueryResponseDto {
             },
           ],
         },
+        {
+          id: "salesTotals",
+          columns: [
+            { alias: "net_krw", type: "INTEGER", unit: "KRW", precision: 0 },
+          ],
+          rows: [{ net_krw: 25000 }],
+        },
       ],
       asOf: "2026-11-06T05:00:00Z",
       snapshotVersion: "s1",
@@ -119,12 +126,10 @@ function response(over: Partial<AiQueryResponseDto>): AiQueryResponseDto {
       warnings: [],
     },
     summary: {},
-    truncation: null,
     clarificationOptions: [],
     stages: [],
     retrievedCandidates: [],
     securityGate: {},
-    legacyExecution: null,
     ...over,
   } as AiQueryResponseDto;
 }
@@ -143,11 +148,13 @@ function show() {
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return render(
+  const view = () => (
     <QueryClientProvider client={client}>
       <Ai />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const rendered = render(view());
+  return () => rendered.rerender(view());
 }
 async function ask(text: string) {
   const user = userEvent.setup();
@@ -172,15 +179,21 @@ it("asks with the current scope and shows the answer with its sales totals", asy
   show();
   await ask("이번 달 매출");
   expect(mocks.execute).toHaveBeenCalledWith(
-    { question: "이번 달 매출", scope: "1", clarificationChoice: undefined },
+    expect.objectContaining({
+      question: "이번 달 매출",
+      scope: "1",
+      clientRequestKey: expect.stringMatching(/^[\w.:-]{1,100}$/),
+    }),
     expect.any(AbortSignal),
   );
   expect(await screen.findByText("강남점 매출이에요.")).toBeInTheDocument();
   expect(screen.getByText("이번 달 매출")).toBeInTheDocument();
-  expect(screen.getByText("25,000원")).toBeInTheDocument();
-  expect(screen.getByText("결과 화면: bar")).toBeInTheDocument();
+  expect(screen.getAllByText("25,000원")[0]).toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "결과 보기" })).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "표" }));
-  expect(screen.getByText("결과 화면: table")).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "표", pressed: true }),
+  ).toBeInTheDocument();
 });
 
 it("explains a refused question without showing any result", async () => {
@@ -197,7 +210,9 @@ it("explains a refused question without showing any result", async () => {
   expect(
     await screen.findByText("이 지점의 매출 조회 권한이 없어요."),
   ).toBeInTheDocument();
-  expect(screen.queryByText(/결과 화면/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("group", { name: "결과 보기" }),
+  ).not.toBeInTheDocument();
 });
 
 it("resends a clarification choice with its option id", async () => {
@@ -206,26 +221,27 @@ it("resends a clarification choice with its option id", async () => {
       response({
         status: "CLARIFICATION",
         envelope: null,
-        message: "어떤 매출을 볼까요?",
+        errorCode: "BRANCH_REQUIRED",
         clarificationOptions: [
-          { id: "branch-sales", label: "이번 달 지점별 매출을 비교해줘" },
+          { id: "branch:1:openstudy.seats.hourlyCongestion", label: "강남점" },
         ],
       }),
     )
     .mockResolvedValueOnce(response({}));
   show();
-  const user = await ask("매출");
+  const user = await ask("좌석 혼잡도");
   await user.click(
     await screen.findByRole("button", {
-      name: "이번 달 지점별 매출을 비교해줘",
+      name: "강남점",
     }),
   );
   await waitFor(() =>
     expect(mocks.execute).toHaveBeenLastCalledWith(
       {
-        question: "이번 달 지점별 매출을 비교해줘",
+        question: "좌석 혼잡도",
         scope: "1",
-        clarificationChoice: "branch-sales",
+        clarificationChoice: "branch:1:openstudy.seats.hourlyCongestion",
+        clientRequestKey: expect.any(String),
         conversationId: "conv-1",
       },
       expect.any(AbortSignal),
@@ -313,7 +329,7 @@ it("reopens a saved conversation with each question re-run, and keeps asking in 
         response: response({
           status: "REFUSED",
           envelope: null,
-          message: "지금 권한이나 지점 범위로는 다시 조회할 수 없어요.",
+          errorCode: "ANALYSIS_UNAVAILABLE",
         }),
       },
     ],
@@ -331,9 +347,9 @@ it("reopens a saved conversation with each question re-run, and keeps asking in 
   );
   expect(await screen.findByText("다시 조회했어요.")).toBeInTheDocument();
   expect(
-    screen.getByText("지금 권한이나 지점 범위로는 다시 조회할 수 없어요."),
+    screen.getByText("저장된 질문의 분석은 현재 제공되지 않아요."),
   ).toBeInTheDocument();
-  expect(screen.getAllByText(/결과 화면/)).toHaveLength(1);
+  expect(screen.getAllByRole("group", { name: "결과 보기" })).toHaveLength(1);
   await ask("이어서 질문");
   expect(await screen.findByText("이어서 답했어요.")).toBeInTheDocument();
   expect(mocks.execute).toHaveBeenLastCalledWith(
@@ -365,4 +381,124 @@ it("renames and deletes a saved conversation from the history", async () => {
     expect(mocks.history.remove).toHaveBeenCalledWith("conv-1"),
   );
   confirm.mockRestore();
+});
+
+it("shows readiness reasons after a 503 and retries the same request as a normal result", async () => {
+  mocks.execute
+    .mockResolvedValueOnce(
+      response({
+        status: "NOT_READY",
+        httpStatus: 503,
+        errorCode: "AI_NOT_READY",
+        envelope: null,
+      }),
+    )
+    .mockResolvedValueOnce(response({ behavior: "REPLAY" }));
+  mocks.api
+    .mockResolvedValueOnce({ ready: true })
+    .mockResolvedValueOnce({
+      ready: false,
+      reasons: ["등록 분석을 준비하고 있어요."],
+    })
+    .mockResolvedValueOnce({ ready: true });
+  show();
+  const user = await ask("매출");
+  expect(await screen.findByText("등록 분석을 준비하고 있어요.")).toBeVisible();
+  const retry = screen.getByRole("button", { name: "같은 질문 다시 시도" });
+  expect(retry).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "다시 확인" }));
+  await waitFor(() => expect(retry).toBeEnabled());
+  await user.click(retry);
+  expect(mocks.execute.mock.calls[1][0]).toEqual(
+    mocks.execute.mock.calls[0][0],
+  );
+  expect(await screen.findByText("순매출")).toBeVisible();
+});
+
+it.each([
+  ["QUESTION_LENGTH_EXCEEDED", 400, "질문을 1~500자로 입력해 주세요."],
+  ["VALIDATION_FAILED", 422, "조회 지점이나 선택한 조건을 확인해 주세요."],
+  [
+    "REJECT_RAW_SQL",
+    400,
+    "코드 실행이나 변경 요청은 처리할 수 없어요. 조회할 내용을 질문해 주세요.",
+  ],
+  [
+    "PII_MINIMIZATION",
+    403,
+    "개인정보, 인증 정보 또는 제한된 원천은 조회할 수 없어요.",
+  ],
+  [
+    "BRANCH_SCOPE_DENIED",
+    403,
+    "현재 권한과 지점 범위로는 이 질문을 조회할 수 없어요.",
+  ],
+  ["DATE_RANGE_LIMIT_EXCEEDED", 400, "조회 기간을 366일 이내로 줄여 주세요."],
+  [
+    "RATE_LIMITED",
+    429,
+    "질문 요청이 너무 많아요. 잠시 기다린 뒤 다시 시도해 주세요.",
+  ],
+  ["OUT_OF_DOMAIN", 200, "지원하는 업무 지표로 질문해 주세요."],
+])(
+  "shows a specific message for %s",
+  async (errorCode, httpStatus, message) => {
+    mocks.execute.mockResolvedValue(
+      response({ status: "DENIED", errorCode, httpStatus, envelope: null }),
+    );
+    show();
+    await ask("조회");
+    expect(await screen.findByText(message)).toBeVisible();
+  },
+);
+
+it("announces truncation and clears old results on a scope change and on session expiry", async () => {
+  mocks.execute.mockResolvedValue(
+    response({
+      truncation: {
+        maxRows: 1000,
+        pageSize: 50,
+        maxChartCategories: 20,
+        isTruncated: true,
+      },
+    }),
+  );
+  const rerender = show();
+  await ask("매출");
+  expect(await screen.findByText(/최대 1000행/)).toBeVisible();
+  mocks.context.scope = "all";
+  rerender();
+  expect(screen.queryByText("순매출")).toBeNull();
+  await ask("새 범위 매출");
+  expect(await screen.findByText("순매출")).toBeVisible();
+  expect(mocks.execute.mock.calls[1][0].scope).toBe("all");
+  act(() => window.dispatchEvent(new Event("openstudy:session-expired")));
+  expect(screen.queryByText("순매출")).toBeNull();
+});
+
+it("clears sales results when permission is revoked within the same scope", async () => {
+  mocks.execute.mockResolvedValue(response({}));
+  const rerender = show();
+  await ask("매출");
+  expect(await screen.findByText("순매출")).toBeVisible();
+  mocks.context.session = session(["ai:read"]);
+  rerender();
+  expect(screen.queryByText("순매출")).toBeNull();
+});
+
+it("blocks duplicate submissions and discards a response received after cancellation", async () => {
+  let complete!: (res: AiQueryResponseDto) => void;
+  mocks.execute.mockReturnValue(
+    new Promise((resolve) => {
+      complete = resolve;
+    }),
+  );
+  show();
+  const user = await ask("매출");
+  await user.type(screen.getByLabelText("AI에게 질문"), "다른 질문{Enter}");
+  expect(mocks.execute).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole("button", { name: "질문 대기 취소" }));
+  await act(async () => complete(response({})));
+  expect(await screen.findByText("질문 대기를 취소했어요.")).toBeVisible();
+  expect(screen.queryByText("순매출")).toBeNull();
 });

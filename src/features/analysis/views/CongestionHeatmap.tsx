@@ -40,7 +40,7 @@ function cellBackground(pct: number, isPeak: boolean) {
 
 export function CongestionHeatmap({
   rows,
-  branchName = "강남점 (데모)",
+  branchName = "",
 }: {
   rows: Record<string, unknown>[];
   branchName?: string;
@@ -68,7 +68,7 @@ export function CongestionHeatmap({
       className="flex flex-col gap-4"
       data-testid="viewspec-heatmap"
       role="region"
-      aria-label={`${branchName} 요일·시간대별 좌석 혼잡도 히트맵`}
+      aria-label={`${branchName ? `${branchName} ` : ""}요일·시간대별 좌석 혼잡도 히트맵`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-soft px-4 py-3 text-xs">
         <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ export function CongestionHeatmap({
           </span>
         </div>
         <span className="text-muted">
-          최근 30일 5개 대표 시각(09·12·15·18·21시 KST) 샘플 기준
+          5개 대표 시각(09·12·15·18·21시 KST) 샘플 기준
         </span>
       </div>
 
@@ -114,7 +114,9 @@ export function CongestionHeatmap({
                 {SAMPLED_HOURS.map((hr) => {
                   const cell = cellMap.get(`${wd}:${hr}`);
                   const pct = cell ? cell.pct : 0;
-                  const isPeak = maxPct > 0 && Math.abs(pct - maxPct) < 0.05;
+                  const isPeak = Boolean(
+                    cell && maxPct > 0 && Math.abs(pct - maxPct) < 0.05,
+                  );
                   return (
                     <td key={hr} className="p-1">
                       <div
@@ -125,7 +127,9 @@ export function CongestionHeatmap({
                             : undefined
                         }
                       >
-                        <div className="text-xs">{pct.toFixed(1)}%</div>
+                        <div className="text-xs">
+                          {cell ? `${pct.toFixed(1)}%` : "해당 없음"}
+                        </div>
                         {cell && (
                           <div className="text-[10px] opacity-80">
                             {cell.occupied}/{cell.capacity}석

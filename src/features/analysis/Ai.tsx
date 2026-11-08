@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, MOCK } from "../../shared/api/client";
-import { can, displayDate, won } from "../../shared/domain/schema";
+import { api, ApiError, MOCK } from "../../shared/api/client";
+import { formatDateTime } from "../../shared/domain/format";
+import { can, displayDate } from "../../shared/domain/schema";
 import { useApp } from "../../app/context";
 import {
   Avatar,
@@ -22,6 +23,8 @@ import {
 } from "./domainlens";
 import type {
   AiConversationSummary,
+  AiQueryRequest,
+  AiReadiness,
   AiQueryResponseDto,
   ClarificationOptionDto,
   ParsedAiResult,
@@ -44,11 +47,12 @@ interface Turn {
   options: ClarificationOptionDto[];
   /** The engine's own stage record, returned with the answer (the query runs in one request, not streamed). */
   stages: StageSpanDto[];
-  elapsedMs: number;
+  retry?: AiQueryRequest;
 }
 
 const DOMAINS = ["전체", "매출", "좌석", "이용권", "스터디룸", "업무", "근태"];
-const MAX_QUESTION = 1000;
+const MAX_QUESTION = 500;
+const QUERY_TIMEOUT_MS = 60_000;
 
 /**
  * The AI chat (DomainLens natural-language reads). A refused answer explains itself; it never shows partial data.
@@ -57,7 +61,13 @@ const MAX_QUESTION = 1000;
  */
 export function Ai() {
   const { session, scope } = useApp();
-  return <AiChat key={`${session.user.id}:${scope}`} />;
+  const { user } = session;
+  const access = session.branches.map(({ id }) => [
+    id,
+    can(user, id, "ai:read"),
+    can(user, id, "sales:read"),
+  ]);
+  return <AiChat key={JSON.stringify([user.id, scope, access])} />;
 }
 
 function AiChat() {
@@ -68,6 +78,7 @@ function AiChat() {
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [domain, setDomain] = useState("전체");
+  const [notReady, setNotReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [conversationId, setConversationId] = useState<string>();
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -81,20 +92,32 @@ function AiChat() {
   const historyKey = ["data", user.id, scope, "ai", "conversations"];
   const history = useQuery({
     queryKey: historyKey,
-    queryFn: ({ signal }) => aiConversations.list(signal),
+    queryFn: ({ signal }) => clearOnDenial(() => aiConversations.list(signal)),
     enabled: allowed,
     retry: false,
   });
   const readiness = useQuery({
     queryKey: ["data", user.id, scope, "ai", "readiness"],
     queryFn: ({ signal }) =>
-      api<{ ready: boolean; message?: string }>("/catalog/readiness", {
-        signal,
-      }),
+      clearOnDenial(() =>
+        api<AiReadiness>("/ai/catalog/readiness", { signal }),
+      ),
     enabled: allowed,
     retry: false,
   });
-  useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => {
+    function expire() {
+      abort.current?.abort();
+      setTurns([]);
+      setQuestion("");
+      setConversationId(undefined);
+    }
+    window.addEventListener("openstudy:session-expired", expire);
+    return () => {
+      window.removeEventListener("openstudy:session-expired", expire);
+      abort.current?.abort();
+    };
+  }, []);
   useEffect(() => {
     bottom.current?.scrollIntoView?.({ block: "end" });
   }, [turns]);
@@ -103,37 +126,77 @@ function AiChat() {
     setTurns((all) => all.map((t) => (t.id === id ? { ...t, ...next } : t)));
   }
 
-  async function ask(text: string, clarificationChoice?: string) {
+  async function checkReadiness() {
+    const result = await readiness.refetch();
+    if (result.isSuccess) setNotReady(!result.data.ready);
+  }
+
+  async function ask(
+    text: string,
+    clarificationChoice?: string,
+    retry?: AiQueryRequest,
+  ) {
     const trimmed = text.trim();
-    if (!trimmed || busy || !readiness.data?.ready) return;
+    if (!trimmed || trimmed.length > MAX_QUESTION || abort.current || !ready)
+      return;
+    const payload = retry ?? {
+      question: trimmed,
+      scope,
+      clarificationChoice,
+      conversationId,
+      clientRequestKey: crypto.randomUUID(),
+    };
     const turn = emptyTurn(trimmed, new Date().toISOString());
     const id = turn.id;
-    setTurns((all) => [...all, turn]);
+    setTurns((all) => [...all.map((t) => ({ ...t, retry: undefined })), turn]);
     setQuestion("");
     setSuggestionsOpen(false);
     setBusy(true);
-    const started = performance.now();
     const controller = new AbortController();
+    const timeout = AbortSignal.timeout(QUERY_TIMEOUT_MS);
+    const signal = AbortSignal.any([controller.signal, timeout]);
     abort.current = controller;
     try {
-      const res = await executeAiQuery(
-        { question: trimmed, scope, clarificationChoice, conversationId },
-        controller.signal,
-      );
+      const res = await executeAiQuery(payload, signal);
+      signal.throwIfAborted();
       if (res.conversationId) setConversationId(res.conversationId);
+      if (res.status === "NOT_READY") {
+        setNotReady(true);
+        void checkReadiness();
+      }
+      if (res.httpStatus === 403 && isAccessFailure(res.errorCode)) {
+        setTurns([turn]);
+      }
       patch(id, {
         ...outcome(res),
-        elapsedMs: Math.round(performance.now() - started),
+        retry:
+          res.status === "NOT_READY" || res.status === "RATE_LIMITED"
+            ? payload
+            : undefined,
       });
       void client.invalidateQueries({ queryKey: historyKey });
     } catch (e) {
-      if (controller.signal.aborted)
-        patch(id, { state: "error", message: "질문을 취소했어요." });
-      else
-        patch(id, {
-          state: "error",
-          message: (e as Error).message || "AI 조회에 실패했어요.",
-        });
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        setTurns(e.status === 403 ? [turn] : []);
+      }
+      patch(id, {
+        state: "error",
+        retry:
+          signal.aborted ||
+          (e instanceof ApiError &&
+            (e.status === 0 || e.status === 429 || e.status >= 500))
+            ? payload
+            : undefined,
+        message: controller.signal.aborted
+          ? "질문 대기를 취소했어요."
+          : timeout.aborted
+            ? "응답 제한 시간을 넘겼어요. 다시 시도해 주세요."
+            : failureMessage(
+                e instanceof ApiError ? e.detail.code : undefined,
+                e instanceof ApiError ? e.status : undefined,
+                (e as Error).message,
+              ),
+      });
     } finally {
       if (abort.current === controller) abort.current = null;
       setBusy(false);
@@ -151,8 +214,7 @@ function AiChat() {
 
   /** Reopens a saved conversation: the server re-runs its questions under the current permissions and as-of time. */
   async function reopen(id: string) {
-    if (busy || reopening) return;
-    abort.current?.abort();
+    if (abort.current) return;
     const controller = new AbortController();
     abort.current = controller;
     setReopening(true);
@@ -162,6 +224,7 @@ function AiChat() {
     setConversationId(id);
     try {
       const saved = await aiConversations.reopen(id, scope, controller.signal);
+      controller.signal.throwIfAborted();
       setTurns(
         saved.turns.map((t) => ({
           ...emptyTurn(t.question, t.askedAt),
@@ -180,14 +243,24 @@ function AiChat() {
   }
 
   async function rename(id: string, title: string) {
-    await aiConversations.rename(id, title);
+    await clearOnDenial(() => aiConversations.rename(id, title));
     await client.invalidateQueries({ queryKey: historyKey });
   }
 
   async function remove(id: string) {
-    await aiConversations.remove(id);
+    await clearOnDenial(() => aiConversations.remove(id));
     if (id === conversationId) startNew();
     await client.invalidateQueries({ queryKey: historyKey });
+  }
+
+  async function clearOnDenial<T>(action: () => Promise<T>): Promise<T> {
+    try {
+      return await action();
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403))
+        startNew();
+      throw e;
+    }
   }
 
   if (!allowed)
@@ -197,7 +270,18 @@ function AiChat() {
         message="관리자에게 현재 지점의 AI 조회 권한을 확인해 주세요."
       />
     );
-  const ready = Boolean(readiness.data?.ready);
+  const historyAccessDenied =
+    history.error instanceof ApiError &&
+    [401, 403].includes(history.error.status);
+  const readinessAccessDenied =
+    readiness.error instanceof ApiError &&
+    [401, 403].includes(readiness.error.status);
+  const ready = Boolean(
+    readiness.data?.ready &&
+    !readiness.error &&
+    !notReady &&
+    !historyAccessDenied,
+  );
   const examples = POC_QUESTIONS.filter(
     (q) => domain === "전체" || q.domain === domain,
   );
@@ -205,7 +289,11 @@ function AiChat() {
     // has-channel shows the conversation on phones; without it the history list is shown (as in the team chat).
     <div className={`chat-shell ${historyOpen ? "" : "has-channel"}`}>
       <History
-        conversations={history.data}
+        conversations={
+          historyAccessDenied || readinessAccessDenied
+            ? undefined
+            : history.data
+        }
         loading={history.isPending}
         error={history.error}
         retry={() => void history.refetch()}
@@ -236,14 +324,19 @@ function AiChat() {
           {readiness.error ? (
             <ErrorState
               error={readiness.error}
-              retry={() => void readiness.refetch()}
+              retry={() => void checkReadiness()}
             />
-          ) : readiness.data && !ready ? (
+          ) : notReady || readiness.data?.ready === false ? (
             <div className="tip mb-4 flex flex-wrap items-center gap-3">
               AI 엔진이 아직 준비되지 않았어요.
-              <Button onClick={() => void readiness.refetch()}>
-                다시 확인
-              </Button>
+              {readiness.data?.reasons?.length ? (
+                <ul>
+                  {readiness.data.reasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <Button onClick={() => void checkReadiness()}>다시 확인</Button>
             </div>
           ) : null}
           {MOCK && (
@@ -257,7 +350,7 @@ function AiChat() {
               <FieldError>{reopenError}</FieldError>
             </div>
           )}
-          {reopening ? (
+          {historyAccessDenied || readinessAccessDenied ? null : reopening ? (
             <State
               loading
               title="대화를 다시 여는 중이에요"
@@ -284,9 +377,10 @@ function AiChat() {
                 turn={turn}
                 userName={user.name}
                 scope={scope}
-                disabled={busy}
+                disabled={busy || !ready}
+                onRetry={() => void ask(turn.question, undefined, turn.retry)}
                 onView={(view) => patch(turn.id, { view })}
-                onChoose={(option) => void ask(option.label, option.id)}
+                onChoose={(option) => void ask(turn.question, option.id)}
               />
             ))
           )}
@@ -349,13 +443,13 @@ function AiChat() {
             </div>
             {busy ? (
               <Button type="button" onClick={() => abort.current?.abort()}>
-                질문 취소
+                질문 대기 취소
               </Button>
             ) : (
               <Button
                 type="submit"
                 variant="primary"
-                disabled={!question.trim() || !ready}
+                disabled={!question.trim() || !ready || reopening}
               >
                 <Icon name="ai" size={16} />
                 질문하기
@@ -441,6 +535,7 @@ function TurnView({
   disabled,
   onView,
   onChoose,
+  onRetry,
 }: {
   turn: Turn;
   userName: string;
@@ -448,6 +543,7 @@ function TurnView({
   disabled: boolean;
   onView: (view: string) => void;
   onChoose: (option: ClarificationOptionDto) => void;
+  onRetry: () => void;
 }) {
   const time = new Date(turn.askedAt).toLocaleTimeString("ko-KR", {
     hour: "2-digit",
@@ -478,7 +574,7 @@ function TurnView({
           <b className="text-xs">업무 AI</b>
           {turn.state === "loading" && <Working />}
           {turn.state !== "loading" && turn.stages.length > 0 && (
-            <Stages stages={turn.stages} elapsedMs={turn.elapsedMs} />
+            <Stages stages={turn.stages} />
           )}
           {turn.state === "completed" && turn.parsed && (
             <Answer
@@ -510,6 +606,11 @@ function TurnView({
               {turn.message}
             </p>
           )}
+          {turn.retry && (
+            <Button disabled={disabled} onClick={onRetry}>
+              같은 질문 다시 시도
+            </Button>
+          )}
         </div>
       </article>
     </>
@@ -529,17 +630,10 @@ function Answer({
   scope: string;
   onView: (view: string) => void;
 }) {
-  const primary = toViewMode(parsed.primaryComponent);
   const views = [
-    primary,
-    ...(parsed.salesRows.length > 0 ? ["bar", "line"] : []),
-    "table",
-  ].filter((v, i, all) => all.indexOf(v) === i);
-  const sales = parsed.salesRows;
-  const total = (key: "approved" | "refunds" | "net") =>
-    sales.reduce((sum, row) => sum + row[key], 0);
-  const empty =
-    sales.length === 0 && parsed.datasetList.every((d) => d.rows.length === 0);
+    ...new Set([...parsed.componentTypes.map(toViewMode), "table"]),
+  ];
+  const empty = parsed.datasetList.every((d) => d.rows.length === 0);
   return (
     <>
       {message && <p>{message}</p>}
@@ -567,29 +661,11 @@ function Answer({
         <div className="p-4">
           {empty ? (
             <State
-              title="조회된 데이터가 없어요"
+              title="결과 없음"
               message="기간과 허용 지점을 확인해 주세요."
             />
           ) : (
             <>
-              {sales.length > 0 && (
-                <dl className="mb-4 grid grid-cols-3 gap-2 text-xs">
-                  {(
-                    [
-                      ["순매출", total("net")],
-                      ["승인 결제액", total("approved")],
-                      ["환불액", total("refunds")],
-                    ] as const
-                  ).map(([label, value]) => (
-                    <div key={label} className="rounded-lg bg-soft p-3">
-                      <dt className="text-muted">{label}</dt>
-                      <dd className="m-0 mt-1 text-base font-semibold">
-                        {won(value)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
               <ViewSpecRenderer
                 parsed={parsed}
                 activeView={view}
@@ -598,10 +674,17 @@ function Answer({
             </>
           )}
         </div>
+        {parsed.truncation?.isTruncated && (
+          <p className="tip mx-4 mb-3">
+            {parsed.truncation.message ||
+              `일부 결과만 표시해요. 최대 ${parsed.truncation.maxRows}행까지 조회했어요.`}
+          </p>
+        )}
         <p className="help border-t border-line px-4 py-3">
-          기준 시각{" "}
-          {parsed.asOf ? parsed.asOf.slice(0, 16).replace("T", " ") : "-"}
+          기준 시각 {formatDateTime(parsed.asOf)}
           {" · "}Asia/Seoul
+          {" · "}선택 범위 {scope === "all" ? "허용된 지점" : scope}
+          {parsed.notice && ` · ${parsed.notice}`}
           {parsed.warnings.length > 0 && ` · ${parsed.warnings.join(" · ")}`}
         </p>
       </section>
@@ -645,13 +728,11 @@ function Working() {
 }
 
 /** The engine's stage record of one answer (접수 → 검색 → 조회 명세 → 검증 → 조회 → 결과 검증). */
-function Stages({
-  stages,
-  elapsedMs,
-}: {
-  stages: StageSpanDto[];
-  elapsedMs: number;
-}) {
+function Stages({ stages }: { stages: StageSpanDto[] }) {
+  const elapsedMs = stages.reduce(
+    (total, stage) => total + (stage.durationMs ?? 0),
+    0,
+  );
   return (
     <details className="mt-1 text-[11px] text-muted">
       <summary className="cursor-pointer select-none">
@@ -722,7 +803,6 @@ function emptyTurn(question: string, askedAt: string): Turn {
     message: "",
     options: [],
     stages: [],
-    elapsedMs: 0,
   };
 }
 
@@ -744,16 +824,71 @@ function outcome(res: AiQueryResponseDto): Partial<Turn> {
       stages,
       state: "clarification",
       message:
-        res.message ||
-        "어떤 지표를 볼지 확인이 필요해요. 아래에서 하나를 골라 주세요.",
+        res.errorCode === "BRANCH_REQUIRED"
+          ? "조회할 지점을 골라 주세요."
+          : res.message ||
+            "어떤 지표를 볼지 확인이 필요해요. 아래에서 하나를 골라 주세요.",
       options: res.clarificationOptions || [],
     };
   return {
     stages,
     state: "refused",
-    message:
-      res.message || "이 질문은 지금 권한이나 조회 범위에서 답할 수 없어요.",
+    message: failureMessage(res.errorCode, res.httpStatus, res.message),
   };
+}
+
+const ACCESS_FAILURES = new Set([
+  "AI_PERMISSION_DENIED",
+  "BRANCH_SCOPE_DENIED",
+  "SALES_PERMISSION_DENIED",
+  "AUTHORIZATION_SCOPE_CHECK",
+]);
+
+function isAccessFailure(code?: string | null) {
+  return !code || code === "FORBIDDEN" || ACCESS_FAILURES.has(code);
+}
+
+function failureMessage(
+  code?: string | null,
+  status?: number,
+  fallback?: string | null,
+) {
+  if (status === 429)
+    return "질문 요청이 너무 많아요. 잠시 기다린 뒤 다시 시도해 주세요.";
+  switch (code) {
+    case "QUESTION_EMPTY":
+    case "QUESTION_LENGTH_EXCEEDED":
+      return "질문을 1~500자로 입력해 주세요.";
+    case "VALIDATION_FAILED":
+      return "조회 지점이나 선택한 조건을 확인해 주세요.";
+    case "DATE_RANGE_LIMIT_EXCEEDED":
+      return "조회 기간을 366일 이내로 줄여 주세요.";
+    case "REJECT_ARBITRARY_HTML":
+    case "REJECT_RAW_SQL":
+    case "UNSUPPORTED_MODIFICATION_INTENT":
+      return "코드 실행이나 변경 요청은 처리할 수 없어요. 조회할 내용을 질문해 주세요.";
+    case "PII_OR_SCOPE_DENIED":
+    case "PII_MINIMIZATION":
+    case "CREDENTIAL_ACCESS_DENIED":
+    case "FORBIDDEN_SOURCE_DENIED":
+      return "개인정보, 인증 정보 또는 제한된 원천은 조회할 수 없어요.";
+    case "AI_PERMISSION_DENIED":
+    case "BRANCH_SCOPE_DENIED":
+    case "SALES_PERMISSION_DENIED":
+    case "AUTHORIZATION_SCOPE_CHECK":
+    case "FORBIDDEN":
+      return "현재 권한과 지점 범위로는 이 질문을 조회할 수 없어요.";
+    case "AI_NOT_READY":
+      return "AI 엔진이 준비되지 않아 질문을 실행하지 못했어요.";
+    case "ANALYSIS_UNAVAILABLE":
+      return "저장된 질문의 분석은 현재 제공되지 않아요.";
+    case "REOPEN_NOT_EXECUTABLE":
+      return "저장된 질문을 지금 다시 실행할 수 없어요.";
+    case "OUT_OF_DOMAIN":
+      return "지원하는 업무 지표로 질문해 주세요.";
+    default:
+      return fallback || "AI 조회를 완료하지 못했어요.";
+  }
 }
 
 /** The employee's saved AI conversations (#71): open, rename and delete. */

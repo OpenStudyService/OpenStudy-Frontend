@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -10,7 +11,13 @@ import {
   YAxis,
 } from "recharts";
 import { won } from "../../shared/domain/schema";
-import type { ParsedAiResult, TypedDatasetDto } from "./domainlens";
+import {
+  normalizeComponentType,
+  toViewMode,
+  type ParsedAiResult,
+  type TypedDatasetDto,
+  type ViewSpecComponentDto,
+} from "./domainlens";
 import { CongestionHeatmap } from "./views/CongestionHeatmap";
 import { RankedBarChart } from "./views/RankedBarChart";
 import { SeatMapCard } from "./views/SeatMapCard";
@@ -169,48 +176,345 @@ export function SalesTable({ rows }: { rows: SalesRow[] }) {
   );
 }
 
+function cellText(value: unknown, unit?: string | null) {
+  if (value == null) return "해당 없음";
+  return unit === "KRW" && typeof value === "number"
+    ? won(value)
+    : String(value);
+}
+
 export function DomainDataTable({ dataset }: { dataset: TypedDatasetDto }) {
-  const columns =
-    dataset.columns.length > 0
-      ? dataset.columns
-      : Object.keys(dataset.rows[0] || {}).map((alias) => ({
-          alias,
-          type: "STRING",
-          unit: null,
-          precision: null,
-        }));
+  const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<{ alias: string; desc: boolean }>();
+  const rows = sort
+    ? [...dataset.rows].sort((a, b) => {
+        const left = a[sort.alias];
+        const right = b[sort.alias];
+        if (left == null || right == null)
+          return Number(left == null) - Number(right == null);
+        const cmp =
+          typeof left === "number" && typeof right === "number"
+            ? left - right
+            : String(left).localeCompare(String(right), "ko", {
+                numeric: true,
+              });
+        return sort.desc ? -cmp : cmp;
+      })
+    : dataset.rows;
+  const pageSize = 50;
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(page, pages - 1);
 
   return (
     <div className="data-scroll" data-testid="viewspec-data-table">
       <table className="data-table">
+        <caption className="sr-only">결과 데이터 표</caption>
         <thead>
           <tr>
-            {columns.map((c) => (
-              <th key={c.alias}>
-                {c.alias}
-                {c.unit ? ` (${c.unit})` : ""}
+            {dataset.columns.map((column) => (
+              <th
+                key={column.alias}
+                scope="col"
+                aria-sort={
+                  sort?.alias === column.alias
+                    ? sort.desc
+                      ? "descending"
+                      : "ascending"
+                    : undefined
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSort({
+                      alias: column.alias,
+                      desc: sort?.alias === column.alias && !sort.desc,
+                    });
+                    setPage(0);
+                  }}
+                >
+                  {column.alias}
+                  {column.unit ? ` (${column.unit})` : ""}
+                </button>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {dataset.rows.map((row, idx) => (
-            <tr key={idx}>
-              {columns.map((c) => {
-                const val = row[c.alias];
-                const formatted =
-                  c.unit === "KRW" && typeof val === "number"
-                    ? won(val)
-                    : val === null || val === undefined
-                      ? "-"
-                      : String(val);
-                return <td key={c.alias}>{formatted}</td>;
-              })}
-            </tr>
-          ))}
+          {rows
+            .slice(current * pageSize, (current + 1) * pageSize)
+            .map((row, idx) => (
+              <tr key={idx}>
+                {dataset.columns.map((c) => (
+                  <td key={c.alias}>{cellText(row[c.alias], c.unit)}</td>
+                ))}
+              </tr>
+            ))}
         </tbody>
       </table>
+      {pages > 1 && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!current}
+            onClick={() => setPage(current - 1)}
+          >
+            이전 페이지
+          </button>
+          <span>
+            {current + 1} / {pages}
+          </span>
+          <button
+            type="button"
+            disabled={current + 1 >= pages}
+            onClick={() => setPage(current + 1)}
+          >
+            다음 페이지
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+function matchesType(value: unknown, type: string): boolean {
+  if (value === null) return true;
+  switch (type) {
+    case "INTEGER":
+      return Number.isInteger(value);
+    case "DECIMAL":
+      return typeof value === "number" && Number.isFinite(value);
+    case "BOOLEAN":
+      return typeof value === "boolean";
+    case "DATE":
+    case "TIMESTAMP":
+      return typeof value === "string" && Number.isFinite(Date.parse(value));
+    case "STRING":
+      return typeof value === "string";
+    default:
+      return false;
+  }
+}
+
+function boundFields(
+  component: ViewSpecComponentDto,
+  dataset: TypedDatasetDto,
+) {
+  const values = Object.values(component.bindings).flat();
+  if (!values.length) return null;
+  const fields = values.flatMap((value) => {
+    const column = dataset.columns.find((c) => c.alias === value);
+    return column &&
+      dataset.rows.every((row) => matchesType(row[column.alias], column.type))
+      ? [column]
+      : [];
+  });
+  return fields.length === values.length ? fields : null;
+}
+
+const KPI_LABELS: Record<string, string> = {
+  net_krw: "순매출",
+  approved_krw: "승인 결제액",
+  refund_krw: "환불액",
+};
+
+function ComponentView({
+  component,
+  dataset,
+  scope,
+}: {
+  component: ViewSpecComponentDto;
+  dataset: TypedDatasetDto;
+  scope: string;
+}) {
+  const type = component.componentRef.id;
+  const fields = boundFields(component, dataset);
+  const { category, value, series, columns, values } = component.bindings;
+  const hasFields = (...aliases: string[]) =>
+    aliases.every((alias) => fields?.some((f) => f.alias === alias));
+  const table = <DomainDataTable dataset={dataset} />;
+  const invalid = (
+    <>
+      <p role="status">표시 명세와 데이터가 일치하지 않아 표로 표시해요.</p>
+      {table}
+    </>
+  );
+  if (!dataset.rows.length) return <p>결과 없음</p>;
+  if (!fields) return invalid;
+  if (type === "DATA_TABLE") {
+    return Array.isArray(columns) ? (
+      <DomainDataTable dataset={{ ...dataset, columns: fields }} />
+    ) : (
+      invalid
+    );
+  }
+  if (type === "KPI") {
+    if (!Array.isArray(values)) return invalid;
+    return (
+      <>
+        <dl className="mb-4 flex flex-wrap gap-2 text-xs">
+          {dataset.rows.flatMap((row, index) =>
+            fields.map((column) => (
+              <div
+                key={`${index}:${column.alias}`}
+                className="rounded-lg bg-soft p-3"
+              >
+                <dt>{KPI_LABELS[column.alias] ?? column.alias}</dt>
+                <dd className="m-0 mt-1 text-base font-semibold">
+                  {cellText(row[column.alias], column.unit)}
+                </dd>
+              </div>
+            )),
+          )}
+        </dl>
+        {table}
+      </>
+    );
+  }
+
+  let chart;
+  switch (type) {
+    case "BAR_CHART":
+    case "LINE_CHART": {
+      if (typeof category !== "string" || typeof value !== "string")
+        return invalid;
+      const metric = fields.find((column) => column.alias === value);
+      if (
+        !metric ||
+        !["INTEGER", "DECIMAL"].includes(metric.type) ||
+        (type === "LINE_CHART" &&
+          dataset.rows.some(
+            (row) =>
+              typeof row[category] !== "string" ||
+              !Number.isFinite(Date.parse(row[category])),
+          ))
+      )
+        return invalid;
+      const ordered =
+        type === "LINE_CHART"
+          ? [...dataset.rows].sort(
+              (a, b) =>
+                Date.parse(String(a[category])) -
+                Date.parse(String(b[category])),
+            )
+          : dataset.rows;
+      const displayed = ordered.slice(0, 20).map((row) => ({
+        category: row[category],
+        value: row[value],
+      }));
+      const title =
+        typeof component.options.title === "string"
+          ? component.options.title
+          : "결과 차트";
+      const Chart = type === "LINE_CHART" ? LineChart : BarChart;
+      chart = (
+        <>
+          <p className="sr-only">
+            {title}.{" "}
+            {displayed
+              .map(
+                (row) =>
+                  `${cellText(row.category)} ${cellText(row.value, metric.unit)}`,
+              )
+              .join(", ")}
+          </p>
+          <ResponsiveContainer width="100%" height={220}>
+            <Chart data={displayed} accessibilityLayer>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="category" />
+              <YAxis />
+              <Tooltip />
+              {type === "LINE_CHART" ? (
+                <Line
+                  dataKey="value"
+                  name={metric.alias}
+                  stroke="var(--primary)"
+                />
+              ) : (
+                <Bar
+                  dataKey="value"
+                  name={metric.alias}
+                  fill="var(--primary)"
+                />
+              )}
+            </Chart>
+          </ResponsiveContainer>
+          {ordered.length > 20 && (
+            <p className="help">
+              차트에 20개 항목을 표시해요. 전체 조회 행은 표에서 볼 수 있어요.
+            </p>
+          )}
+        </>
+      );
+      return (
+        <>
+          {chart}
+          <DomainDataTable dataset={{ ...dataset, rows: ordered }} />
+        </>
+      );
+    }
+    case "HEATMAP":
+      if (
+        category !== "weekday" ||
+        series !== "hour_kst" ||
+        value !== "sampled_occupancy_pct" ||
+        dataset.rows.some((row) =>
+          [
+            category,
+            series,
+            value,
+            "occupied_seat_samples",
+            "seat_sample_capacity",
+          ].some((field) => typeof row[field] !== "number"),
+        )
+      )
+        return invalid;
+      chart = <CongestionHeatmap rows={dataset.rows} />;
+      break;
+    case "RANKED_BAR_CHART":
+      if (
+        category !== "product" ||
+        value !== "net_units" ||
+        dataset.rows.some((row) => typeof row.net_units !== "number")
+      )
+        return invalid;
+      chart = <RankedBarChart rows={dataset.rows.slice(0, 20)} />;
+      break;
+    case "SEAT_MAP":
+      if (!hasFields("seat_id", "seat_no", "occupancy_state")) return invalid;
+      chart = <SeatMapCard seats={dataset.rows} summary={null} />;
+      break;
+    case "WEEK_CALENDAR":
+      if (
+        !hasFields(
+          "reservation_id",
+          "room_name",
+          "start_at",
+          "end_at",
+          "status",
+        )
+      )
+        return invalid;
+      chart = (
+        <RoomWeekCalendar branchSummaries={[]} reservations={dataset.rows} />
+      );
+      break;
+    case "TASK_LIST":
+      if (
+        !hasFields("id", "title", "branch_name", "priority", "status", "due_at")
+      )
+        return invalid;
+      chart = <UrgentTaskList rows={dataset.rows} scope={scope} />;
+      break;
+  }
+  return (
+    <>
+      {chart}
+      {type === "RANKED_BAR_CHART" && dataset.rows.length > 20 && (
+        <p>차트에 상위 20개 항목을 표시해요.</p>
+      )}
+      {table}
+    </>
   );
 }
 
@@ -223,109 +527,72 @@ export function ViewSpecRenderer({
   activeView?: string;
   scope?: string;
 }) {
-  const comp = (activeView || parsed.primaryComponent).toUpperCase();
-
-  if (comp === "HEATMAP" || activeView === "heatmap") {
-    const rows =
-      parsed.datasets.heatmapRows ?? parsed.datasetList[0]?.rows ?? [];
-    return <CongestionHeatmap rows={rows} />;
+  const spec = parsed.viewSpec;
+  const components =
+    spec?.components.filter(
+      (component) =>
+        normalizeComponentType(component.componentRef.id) &&
+        component.componentRef.version === "1.0.0" &&
+        component.events.length === 0,
+    ) ?? [];
+  const mode = activeView ?? toViewMode(parsed.primaryComponent);
+  const selected = components.filter((component) => {
+    const type = normalizeComponentType(component.componentRef.id);
+    return type && toViewMode(type) === mode;
+  });
+  if (spec?.catalogVersion !== "openstudy-ui-1.0.0" || !components.length) {
+    return <p role="alert">지원하는 결과 표시 명세가 없어요.</p>;
   }
-
-  if (comp === "RANKED_BAR_CHART" || activeView === "ranked_bar") {
-    const rows =
-      parsed.datasets.topProducts ?? parsed.datasetList[0]?.rows ?? [];
-    return <RankedBarChart rows={rows} />;
-  }
-
-  if (comp === "SEAT_MAP" || activeView === "seat_map") {
-    const seats =
-      parsed.datasets.seatMap ??
-      parsed.datasetList[1]?.rows ??
-      parsed.datasetList[0]?.rows ??
-      [];
-    const summary =
-      parsed.datasets.seatSummary?.[0] ??
-      (parsed.summary as Record<string, unknown>) ??
-      null;
-    return <SeatMapCard seats={seats} summary={summary} />;
-  }
-
-  if (comp === "WEEK_CALENDAR" || activeView === "week_calendar") {
-    const branchSummaries = parsed.datasets.branchSummaries ?? [];
-    const reservations =
-      parsed.datasets.reservationRows ?? parsed.datasetList[0]?.rows ?? [];
-    return (
-      <RoomWeekCalendar
-        branchSummaries={branchSummaries}
-        reservations={reservations}
-      />
-    );
-  }
-
-  if (comp === "TASK_LIST" || activeView === "task_list") {
-    const rows =
-      parsed.datasets.urgentTasks ?? parsed.datasetList[0]?.rows ?? [];
-    return <UrgentTaskList rows={rows} scope={scope} />;
-  }
-
-  if (comp === "DATA_TABLE" || comp === "TABLE" || activeView === "table") {
-    if (parsed.datasetList.length > 0) {
-      return <DomainDataTable dataset={parsed.datasetList[0]} />;
-    }
-    return <SalesTable rows={parsed.salesRows} />;
-  }
-
-  // Default BAR_CHART / LINE_CHART / KPI
-  const kind = comp === "LINE_CHART" || activeView === "line" ? "line" : "bar";
-  if (parsed.salesRows.length > 0) {
-    return (
-      <div className="flex flex-col gap-4">
-        <SalesChart rows={parsed.salesRows} kind={kind} />
-        <SalesTable rows={parsed.salesRows} />
-      </div>
-    );
-  }
-  if (parsed.datasets.dailySales) {
-    const dailyRows: SalesRow[] = parsed.datasets.dailySales.map((r, i) => ({
-      branchId: String(r.date_kst ?? i),
-      branch: String(r.date_kst ?? "").slice(5),
-      approved: Number(r.approved_krw ?? 0),
-      refunds: Number(r.refund_krw ?? 0),
-      net: Number(r.net_krw ?? 0),
-    }));
-    return (
-      <div className="flex flex-col gap-4">
-        <SalesChart rows={dailyRows} kind="line" />
-        <DomainDataTable dataset={parsed.datasetList[0]} />
-      </div>
-    );
-  }
-  if (parsed.datasets.purposeSales) {
-    const purposeRows: SalesRow[] = parsed.datasets.purposeSales.map(
-      (r, i) => ({
-        branchId: String(r.purpose ?? i),
-        branch:
-          r.purpose === "PASS"
-            ? "이용권 (PASS)"
-            : r.purpose === "ROOM"
-              ? "스터디룸 (ROOM)"
-              : r.purpose === "LOCKER"
-                ? "사물함 (LOCKER)"
-                : String(r.purpose ?? ""),
-        approved: Number(r.approved_krw ?? 0),
-        refunds: Number(r.refund_krw ?? 0),
-        net: Number(r.net_krw ?? 0),
-      }),
+  if (mode === "table") {
+    const displayed = new Set(selected.map((component) => component.datasetId));
+    const primary = components.find(
+      (component) => component.componentRef.id === parsed.primaryComponent,
     );
     return (
-      <div className="flex flex-col gap-4">
-        <SalesChart rows={purposeRows} kind="bar" />
-        <DomainDataTable dataset={parsed.datasetList[0]} />
-      </div>
+      <>
+        {selected.map((component) => renderComponent(component))}
+        {primary &&
+          !displayed.has(primary.datasetId) &&
+          renderComponent(primary, true)}
+      </>
     );
   }
-  if (parsed.datasetList.length > 0) {
-    return <DomainDataTable dataset={parsed.datasetList[0]} />;
+  return (
+    <>
+      {components
+        .filter(
+          (component) => component.componentRef.id === "KPI" && mode !== "kpi",
+        )
+        .map((component) => renderComponent(component))}
+      {selected.length ? (
+        selected.map((component) => renderComponent(component))
+      ) : (
+        <p role="alert">이 결과 화면은 표시할 수 없어요.</p>
+      )}
+    </>
+  );
+
+  function renderComponent(component: ViewSpecComponentDto, tableOnly = false) {
+    const dataset = parsed.datasetList.find(
+      (d) => d.id === component.datasetId,
+    );
+    return (
+      <section className="mb-4 grid gap-2" key={component.id}>
+        {typeof component.options.title === "string" && (
+          <h4>{component.options.title}</h4>
+        )}
+        {!dataset ? (
+          <p role="alert">표시할 데이터가 없어요.</p>
+        ) : tableOnly ? (
+          <DomainDataTable dataset={dataset} />
+        ) : (
+          <ComponentView
+            component={component}
+            dataset={dataset}
+            scope={scope}
+          />
+        )}
+      </section>
+    );
   }
-  return <SalesTable rows={parsed.salesRows} />;
 }

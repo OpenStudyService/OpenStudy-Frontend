@@ -1,3 +1,4 @@
+import type { components } from "../../shared/api/foundation.generated";
 import { z } from "zod";
 import {
   api,
@@ -7,101 +8,40 @@ import {
   csrf,
 } from "../../shared/api/client";
 
-/**
- * Supported ViewSpec component types across OpenStudy × DomainLens (OS-DL-0601).
- * Includes the 9 canonical ViewSpec component types from expected_viewspec.json
- * plusCLARIFICATION and legacy lowercase aliases ("bar", "line", "table").
- */
 export const COMPONENT_TYPES = [
-  "KPI",
-  "BAR_CHART",
-  "LINE_CHART",
-  "RANKED_BAR_CHART",
-  "DATA_TABLE",
-  "TABLE",
   "HEATMAP",
+  "RANKED_BAR_CHART",
   "SEAT_MAP",
   "WEEK_CALENDAR",
   "TASK_LIST",
-  "CLARIFICATION",
+  "LINE_CHART",
+  "BAR_CHART",
+  "KPI",
+  "DATA_TABLE",
 ] as const;
 
 export type ViewComponentType = (typeof COMPONENT_TYPES)[number];
 
-export const LEGACY_VIEW_MODES = [
-  "table",
-  "bar",
-  "line",
-  "ranked_bar",
-  "heatmap",
-  "seat_map",
-  "week_calendar",
-  "task_list",
-  "kpi",
-] as const;
+export function normalizeComponentType(
+  raw: string,
+): ViewComponentType | undefined {
+  return COMPONENT_TYPES.find((type) => type === raw);
+}
 
-export type LegacyViewMode = (typeof LEGACY_VIEW_MODES)[number];
-
-const COMPONENT_LOOKUP: Record<string, ViewComponentType> = {
-  KPI: "KPI",
-  kpi: "KPI",
-  BAR_CHART: "BAR_CHART",
-  bar: "BAR_CHART",
-  LINE_CHART: "LINE_CHART",
-  line: "LINE_CHART",
-  RANKED_BAR_CHART: "RANKED_BAR_CHART",
-  ranked_bar: "RANKED_BAR_CHART",
-  DATA_TABLE: "DATA_TABLE",
-  TABLE: "TABLE",
-  table: "DATA_TABLE",
-  HEATMAP: "HEATMAP",
-  heatmap: "HEATMAP",
-  SEAT_MAP: "SEAT_MAP",
-  seat_map: "SEAT_MAP",
-  WEEK_CALENDAR: "WEEK_CALENDAR",
-  week_calendar: "WEEK_CALENDAR",
-  TASK_LIST: "TASK_LIST",
-  task_list: "TASK_LIST",
-  CLARIFICATION: "CLARIFICATION",
-  clarification: "CLARIFICATION",
+const VIEW_MODE: Record<ViewComponentType, string> = {
+  HEATMAP: "heatmap",
+  RANKED_BAR_CHART: "ranked_bar",
+  SEAT_MAP: "seat_map",
+  WEEK_CALENDAR: "week_calendar",
+  TASK_LIST: "task_list",
+  LINE_CHART: "line",
+  BAR_CHART: "bar",
+  KPI: "kpi",
+  DATA_TABLE: "table",
 };
 
-export function isSupportedComponentType(raw: string): boolean {
-  return Boolean(raw && COMPONENT_LOOKUP[raw]);
-}
-
-export function normalizeComponentType(
-  raw: string | undefined | null,
-): ViewComponentType | null {
-  if (!raw) return null;
-  return COMPONENT_LOOKUP[raw] ?? COMPONENT_LOOKUP[raw.toUpperCase()] ?? null;
-}
-
-export function toViewMode(raw: string | undefined | null): string {
-  const norm = normalizeComponentType(raw);
-  switch (norm) {
-    case "BAR_CHART":
-      return "bar";
-    case "LINE_CHART":
-      return "line";
-    case "DATA_TABLE":
-    case "TABLE":
-      return "table";
-    case "RANKED_BAR_CHART":
-      return "ranked_bar";
-    case "HEATMAP":
-      return "heatmap";
-    case "SEAT_MAP":
-      return "seat_map";
-    case "WEEK_CALENDAR":
-      return "week_calendar";
-    case "TASK_LIST":
-      return "task_list";
-    case "KPI":
-      return "kpi";
-    default:
-      return raw || "bar";
-  }
+export function toViewMode(type: ViewComponentType) {
+  return VIEW_MODE[type];
 }
 
 export const datasetColumnSchema = z.object({
@@ -165,342 +105,59 @@ export const resultEnvelopeSchema = z.object({
 
 export type ResultEnvelopeDto = z.infer<typeof resultEnvelopeSchema>;
 
-export const salesRowSchema = z.object({
-  branchId: z.string(),
-  branch: z.string(),
-  approved: z.number(),
-  refunds: z.number(),
-  net: z.number(),
-});
-
-export const executionSchema = z.object({
-  id: z.string(),
-  status: z.literal("READY"),
-  asOf: z.string(),
-  start: z.string(),
-  end: z.string(),
-  currency: z.literal("KRW"),
-  timeZone: z.literal("Asia/Seoul"),
-  refundBasis: z.enum(["processed", "original"]),
-  viewSpec: z.object({ component: z.string(), title: z.string() }),
-  rows: z.array(salesRowSchema),
-  // Extended DomainLens Phase 5/6 fields
-  requestId: z.string().optional(),
-  conversationId: z.string().nullable().optional(),
-  question: z.string().optional(),
-  pocCode: z.string().nullable().optional(),
-  analysisId: z.string().nullable().optional(),
-  intentDomain: z.string().nullable().optional(),
-  resultCategory: z.string().nullable().optional(),
-  semanticStatus: z.string().nullable().optional(),
-  snapshotVersion: z.string().nullable().optional(),
-  policyVersion: z.string().nullable().optional(),
-  warnings: z.array(z.string()).optional(),
-  exportApprovalStatus: z.string().nullable().optional(),
-  querySpec: z.record(z.string(), z.unknown()).nullable().optional(),
-  envelope: resultEnvelopeSchema.nullable().optional(),
-});
-
-export type Execution = z.infer<typeof executionSchema>;
-
-export interface StageSpanDto {
-  stage: string;
-  label: string;
-  status: string;
-  durationMs: number;
-  detail: string;
-}
-
-export interface RetrievalCandidateDto {
-  id: string;
-  kind: string;
-  score: number;
-}
-
-export interface ClarificationOptionDto {
-  id: string;
-  label: string;
-  targetAnalysisId?: string;
-  targetScope?: string;
-}
-
-export interface TruncationInfoDto {
-  maxRows: number;
-  pageSize: number;
-  maxChartCategories: number;
-  isTruncated: boolean;
-  warningCode: string | null;
-  message: string | null;
-}
-
-export interface AiQueryResponseDto {
-  requestId: string;
-  executionId: string;
-  conversationId: string;
-  traceId: string;
-  status: string;
-  httpStatus: number;
-  errorCode: string | null;
-  resultCategory: string;
-  behavior: string;
-  message: string | null;
-  pocCode: string | null;
-  analysisId: string | null;
-  intentDomain: string | null;
-  semanticStatus: string | null;
-  querySpec: Record<string, unknown> | null;
-  viewSpec: ViewSpecEnvelopeDto | null;
-  envelope: ResultEnvelopeDto | null;
-  summary: Record<string, unknown>;
-  truncation: TruncationInfoDto | null;
-  clarificationOptions: ClarificationOptionDto[];
-  stages: StageSpanDto[];
-  retrievedCandidates: RetrievalCandidateDto[];
-  securityGate: Record<string, unknown>;
-  legacyExecution: Execution | null;
-}
+type AiSchema = components["schemas"];
+export type AiQueryResponseDto = AiSchema["AiQueryResponse"];
+export type AiQueryRequest = AiSchema["AiQueryRequest"];
+export type AiReadiness = AiSchema["AiReadiness"];
+export type AiConversationSummary = AiSchema["AiConversationSummary"];
+export type StageSpanDto = AiSchema["AiStage"];
+export type ClarificationOptionDto = AiSchema["AiClarificationOption"];
 
 export interface ParsedAiResult {
-  id: string;
-  requestId: string;
-  executionId: string;
-  status: string;
   title: string;
   primaryComponent: ViewComponentType;
   componentTypes: ViewComponentType[];
-  datasets: Record<string, Record<string, unknown>[]>;
   datasetList: TypedDatasetDto[];
-  salesRows: z.infer<typeof salesRowSchema>[];
-  asOf: string;
-  snapshotVersion: string;
-  policyVersion: string;
-  warnings: string[];
-  pocCode: string | null;
-  analysisId: string | null;
-  intentDomain: string | null;
-  semanticStatus: string | null;
-  resultCategory: string | null;
-  exportApprovalStatus: string | null;
-  querySpec: Record<string, unknown> | null;
   viewSpec: ViewSpecEnvelopeDto | null;
-  envelope: ResultEnvelopeDto | null;
-  summary: Record<string, unknown>;
-  stages: StageSpanDto[];
-  retrievedCandidates: RetrievalCandidateDto[];
-  securityGate: Record<string, unknown>;
-  clarificationOptions: ClarificationOptionDto[];
+  asOf: string | null;
+  snapshotVersion: string | null;
+  policyVersion: string | null;
+  warnings: string[];
+  truncation?: AiSchema["AiTruncation"];
+  notice?: string;
 }
 
-/**
- * Parses either a legacy Execution payload, a ResultEnvelope, or an AiQueryResponseDto
- * into a unified ParsedAiResult supporting all 9 ViewSpec component types (OS-DL-0601).
- */
+// Parse untrusted results before passing datasets and ViewSpec to the renderer.
 export function parseAiResult(raw: unknown): ParsedAiResult {
-  if (!raw || typeof raw !== "object") {
-    throw new Error("AI 결과의 형식이 지원되는 화면 계약과 일치하지 않습니다.");
-  }
-  const obj = raw as Record<string, unknown>;
+  const response = raw as AiQueryResponseDto;
+  const envelope = resultEnvelopeSchema.safeParse(response.envelope);
+  if (!envelope.success) throw new Error("AI 결과의 형식이 올바르지 않아요.");
 
-  const envelopeRaw =
-    obj.envelope && typeof obj.envelope === "object"
-      ? obj.envelope
-      : obj.datasets && Array.isArray(obj.datasets)
-        ? obj
-        : null;
-
-  const parsedEnvelope = envelopeRaw
-    ? resultEnvelopeSchema.safeParse(envelopeRaw)
-    : null;
-  const envelope =
-    parsedEnvelope && parsedEnvelope.success ? parsedEnvelope.data : null;
-
-  const viewSpecRaw =
-    obj.viewSpec &&
-    typeof obj.viewSpec === "object" &&
-    "components" in (obj.viewSpec as Record<string, unknown>)
-      ? obj.viewSpec
-      : envelope?.view;
-  const parsedView = viewSpecRaw
-    ? viewSpecEnvelopeSchema.safeParse(viewSpecRaw)
-    : null;
-  const viewSpec =
-    parsedView && parsedView.success
-      ? parsedView.data
-      : (envelope?.view ?? null);
-
-  const componentTypes: ViewComponentType[] = [];
-  if (viewSpec && viewSpec.components.length > 0) {
-    for (const comp of viewSpec.components) {
-      const norm = normalizeComponentType(comp.componentRef.id);
-      if (norm && !componentTypes.includes(norm)) {
-        componentTypes.push(norm);
-      }
-    }
-  }
-
-  if (
-    obj.viewSpec &&
-    typeof obj.viewSpec === "object" &&
-    "component" in (obj.viewSpec as Record<string, unknown>)
-  ) {
-    const legacyComp = String(
-      (obj.viewSpec as Record<string, unknown>).component || "",
-    );
-    const norm = normalizeComponentType(legacyComp);
-    if (!norm) {
-      throw new Error("지원하지 않는 ViewSpec 컴포넌트입니다: " + legacyComp);
-    }
-    if (!componentTypes.includes(norm)) {
-      componentTypes.unshift(norm);
-    }
-  }
-
-  if (
-    obj.status === "CLARIFICATION" ||
-    (Array.isArray(obj.clarificationOptions) &&
-      obj.clarificationOptions.length > 0)
-  ) {
-    if (!componentTypes.includes("CLARIFICATION")) {
-      componentTypes.unshift("CLARIFICATION");
-    }
-  }
-
-  // Prefer specialized visualization component as primaryComponent over KPI/DATA_TABLE when present
-  const specializedOrder: ViewComponentType[] = [
-    "HEATMAP",
-    "RANKED_BAR_CHART",
-    "SEAT_MAP",
-    "WEEK_CALENDAR",
-    "TASK_LIST",
-    "LINE_CHART",
-    "BAR_CHART",
-    "KPI",
-    "DATA_TABLE",
-    "TABLE",
-    "CLARIFICATION",
-  ];
-  const primaryComponent: ViewComponentType =
-    specializedOrder.find((t) => componentTypes.includes(t)) ??
-    componentTypes[0] ??
-    "BAR_CHART";
-
-  const datasets: Record<string, Record<string, unknown>[]> = {};
-  const datasetList: TypedDatasetDto[] = envelope?.datasets ?? [];
-  for (const ds of datasetList) {
-    datasets[ds.id] = ds.rows;
-  }
-
-  let salesRows: z.infer<typeof salesRowSchema>[] = [];
-  if (datasets.branchSales) {
-    salesRows = datasets.branchSales.map((r) => ({
-      branchId: String(r.branch_id ?? ""),
-      branch: String(r.branch_name ?? ""),
-      approved: Number(r.approved_krw ?? 0),
-      refunds: Number(r.refund_krw ?? 0),
-      net: Number(r.net_krw ?? 0),
-    }));
-  } else if (datasetList.length === 0 && Array.isArray(obj.rows)) {
-    const parsedRows = z.array(salesRowSchema).safeParse(obj.rows);
-    if (parsedRows.success) {
-      salesRows = parsedRows.data;
-    }
-  } else if (
-    datasetList.length === 0 &&
-    obj.legacyExecution &&
-    typeof obj.legacyExecution === "object" &&
-    Array.isArray((obj.legacyExecution as Record<string, unknown>).rows)
-  ) {
-    const parsedRows = z
-      .array(salesRowSchema)
-      .safeParse((obj.legacyExecution as Record<string, unknown>).rows);
-    if (parsedRows.success) {
-      salesRows = parsedRows.data;
-    }
-  }
-
-  const executionId = String(
-    obj.executionId ?? obj.id ?? envelope?.executionId ?? "exec-unknown",
+  const data = envelope.data;
+  const view = viewSpecEnvelopeSchema.safeParse(response.viewSpec ?? data.view);
+  const viewSpec = view.success ? view.data : null;
+  const componentTypes = COMPONENT_TYPES.filter((type) =>
+    viewSpec?.components.some(
+      (component) => component.componentRef.id === type,
+    ),
   );
-  const requestId = String(obj.requestId ?? envelope?.requestId ?? executionId);
-  const matchedPoc = POC_QUESTIONS.find(
-    (q) =>
-      (obj.pocCode && q.code === String(obj.pocCode)) ||
-      (obj.analysisId && q.analysisId === String(obj.analysisId)),
+  const question = POC_QUESTIONS.find(
+    (q) => q.code === response.pocCode || q.analysisId === response.analysisId,
   );
-  const title = String(
-    (obj.viewSpec &&
-    typeof obj.viewSpec === "object" &&
-    "title" in (obj.viewSpec as Record<string, unknown>)
-      ? (obj.viewSpec as Record<string, unknown>).title
-      : undefined) ??
-      matchedPoc?.shortLabel ??
-      obj.question ??
-      "AI 데이터 분석 결과",
-  );
-
+  const notice = z.object({ message: z.string() }).safeParse(data.notice);
   return {
-    id: executionId,
-    requestId,
-    executionId,
-    status: String(obj.status ?? envelope?.status ?? "READY"),
-    title,
-    primaryComponent,
-    componentTypes:
-      componentTypes.length > 0 ? componentTypes : [primaryComponent],
-    datasets,
-    datasetList,
-    salesRows,
-    asOf: String(obj.asOf ?? envelope?.asOf ?? "2026-11-02T14:00:00+09:00"),
-    snapshotVersion: String(
-      obj.snapshotVersion ??
-        envelope?.snapshotVersion ??
-        "openstudy-semantic-1.0.0",
-    ),
-    policyVersion: String(
-      obj.policyVersion ?? envelope?.policyVersion ?? "openstudy-policy-v1",
-    ),
-    warnings: Array.isArray(obj.warnings)
-      ? obj.warnings.map(String)
-      : (envelope?.warnings ?? []),
-    pocCode: obj.pocCode ? String(obj.pocCode) : null,
-    analysisId: obj.analysisId ? String(obj.analysisId) : null,
-    intentDomain: obj.intentDomain ? String(obj.intentDomain) : null,
-    semanticStatus: obj.semanticStatus ? String(obj.semanticStatus) : null,
-    resultCategory: obj.resultCategory ? String(obj.resultCategory) : null,
-    exportApprovalStatus: obj.exportApprovalStatus
-      ? String(obj.exportApprovalStatus)
-      : null,
-    querySpec:
-      obj.querySpec && typeof obj.querySpec === "object"
-        ? (obj.querySpec as Record<string, unknown>)
-        : null,
+    title: question?.shortLabel ?? "AI 데이터 분석 결과",
+    primaryComponent: componentTypes[0] ?? "DATA_TABLE",
+    componentTypes,
+    datasetList: data.datasets,
     viewSpec,
-    envelope,
-    summary:
-      obj.summary && typeof obj.summary === "object"
-        ? (obj.summary as Record<string, unknown>)
-        : {},
-    stages: Array.isArray(obj.stages) ? (obj.stages as StageSpanDto[]) : [],
-    retrievedCandidates: Array.isArray(obj.retrievedCandidates)
-      ? (obj.retrievedCandidates as RetrievalCandidateDto[])
-      : [],
-    securityGate:
-      obj.securityGate && typeof obj.securityGate === "object"
-        ? (obj.securityGate as Record<string, unknown>)
-        : {},
-    clarificationOptions: Array.isArray(obj.clarificationOptions)
-      ? (obj.clarificationOptions as ClarificationOptionDto[])
-      : [],
+    asOf: data.asOf ?? null,
+    snapshotVersion: data.snapshotVersion ?? null,
+    policyVersion: data.policyVersion ?? null,
+    warnings: data.warnings,
+    truncation: response.truncation,
+    notice: notice.success ? notice.data.message : undefined,
   };
-}
-
-// Engine wire DTO -> OpenStudy display contract. Keep engine-specific changes here.
-export async function getExecution(id: string): Promise<Execution> {
-  const result = await api<unknown>(`/executions/${id}`);
-  const parsed = executionSchema.safeParse(result);
-  if (!parsed.success)
-    throw new Error("AI 결과의 형식이 지원되는 화면 계약과 일치하지 않습니다.");
-  return parsed.data;
 }
 
 export interface PocQuestionSpec {
@@ -624,14 +281,11 @@ export const POC_QUESTIONS: PocQuestionSpec[] = [
  * every other command; a lost session raises the shared session-expired event.
  */
 export async function executeAiQuery(
-  payload: {
-    question: string;
-    scope?: string;
-    conversationId?: string;
-    clarificationChoice?: string;
-  },
+  payload: AiQueryRequest,
   signal?: AbortSignal,
 ): Promise<AiQueryResponseDto> {
+  const token = await csrf();
+  signal?.throwIfAborted();
   let response: Response;
   try {
     response = await fetch(`${API_BASE}/ai/queries`, {
@@ -640,8 +294,7 @@ export async function executeAiQuery(
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "X-CSRF-Token": await csrf(),
-        "Idempotency-Key": crypto.randomUUID(),
+        "X-CSRF-Token": token,
       },
       body: JSON.stringify(payload),
       signal,
@@ -660,6 +313,7 @@ export async function executeAiQuery(
   } catch {
     body = null;
   }
+  signal?.throwIfAborted();
   const record =
     body && typeof body === "object" && !Array.isArray(body)
       ? (body as Record<string, unknown>)
@@ -669,7 +323,12 @@ export async function executeAiQuery(
     window.dispatchEvent(new Event("openstudy:session-expired"));
   }
   if (record?.code === "CSRF_INVALID") clearCsrf();
-  if (record && ("resultCategory" in record || "status" in record))
+  if (
+    response.status !== 401 &&
+    record &&
+    typeof record.status === "string" &&
+    typeof record.requestId === "string"
+  )
     return record as unknown as AiQueryResponseDto;
   throw new ApiError(response.status, {
     code: typeof record?.code === "string" ? record.code : "HTTP_ERROR",
@@ -680,36 +339,16 @@ export async function executeAiQuery(
   });
 }
 
-/** One saved AI conversation of the signed-in employee (#71, M10-D12). */
-export interface AiConversationSummary {
-  id: string;
-  title: string | null;
-  scope: string;
-  createdAt: string;
-  lastAskedAt: string;
-}
-
-/**
- * A reopened conversation: each saved question re-run under the current permissions and a new as-of time, without
- * calling the model. A question that cannot run any more comes back with its reason and no data.
- */
-export interface ReopenedAiConversation {
-  id: string;
-  title: string | null;
-  scope: string;
-  turns: { question: string; askedAt: string; response: AiQueryResponseDto }[];
-}
-
 export const aiConversations = {
   list: (signal?: AbortSignal) =>
     api<AiConversationSummary[]>("/ai/conversations", { signal }),
   reopen: (id: string, scope: string, signal?: AbortSignal) =>
-    api<ReopenedAiConversation>(
+    api<AiSchema["AiReopenedConversation"]>(
       `/ai/conversations/${encodeURIComponent(id)}?scope=${encodeURIComponent(scope)}`,
       { signal },
     ),
   rename: (id: string, title: string) =>
-    api<{ id: string; title: string }>(
+    api<AiSchema["AiConversationTitle"]>(
       `/ai/conversations/${encodeURIComponent(id)}`,
       { method: "PATCH", body: { title } },
     ),
