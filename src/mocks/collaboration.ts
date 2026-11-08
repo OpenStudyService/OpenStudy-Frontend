@@ -821,3 +821,8 @@ export const collaborationHandlers = [
   ),
   ...handlers,
 ];
+export {
+  facility as facilityView,
+  inquiry as inquiryView,
+  notice as noticeView,
+};

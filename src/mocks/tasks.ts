@@ -663,3 +663,4 @@ export const taskHandlers = [
     }),
   ),
 ];
+export { view as taskView };

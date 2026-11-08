@@ -2593,7 +2593,7 @@ export interface paths {
     };
     /**
      * 운영 홈 요약
-     * @description 현재 이용 좌석·오늘의 업무와 완료율·미처리 문의·점검 필요·오늘의 근무 계획·최근 공지·읽지 않은 메시지를 원본 기능(M5·M7·M8)의 같은 조건 집계로 묶어 반환한다. 오늘은 Asia/Seoul 날짜다. 업무는 OWNER면 선택 범위, 그 외 직원이면 본인 담당이 기본이고 mine·assigneeId로 바꿀 수 있다. 근무 카드의 count·items는 M8-D02 조회 범위(OWNER 전체, 기록 지점 MANAGER, 그 외 본인)를 넘지 않는다. colleagues는 요청자가 유효 소속인 지점의 같은 지점 동료 근무를 이름·시작·종료 시각만으로 담는 홈 전용 예외이며 근무표·근태 API의 조회 범위는 바뀌지 않는다. 매출 정보는 담지 않는다.
+     * @description 현재 이용 좌석·오늘의 업무와 완료율·미처리 문의·점검 필요·오늘의 근무 계획·최근 공지를 원본 기능(M5·M7·M8)의 같은 조건 집계로 묶어 반환한다. 오늘은 Asia/Seoul 날짜다. 업무는 OWNER면 선택 범위, 그 외 직원이면 본인 담당이 기본이고 mine·assigneeId로 바꿀 수 있다. 근무 카드의 count·items는 M8-D02 조회 범위(OWNER 전체, 기록 지점 MANAGER, 그 외 본인)를 넘지 않는다. colleagues는 요청자가 유효 소속인 지점의 같은 지점 동료 근무를 이름·시작·종료 시각만으로 담는 홈 전용 예외이며 근무표·근태 API의 조회 범위는 바뀌지 않는다. 매출 정보는 담지 않는다.
      */
     get: operations["getHomeSummary"];
     put?: never;
@@ -5134,8 +5134,7 @@ export interface components {
         | "shift-list"
         | "shift-detail"
         | "notice-list"
-        | "notice-detail"
-        | "channel";
+        | "notice-detail";
       branchId: components["schemas"]["Id"] | null;
       targetId: components["schemas"]["Id"] | null;
       /** @description 목록 화면 주소에 복원할 조건(FR-DASH-06). */
@@ -5303,22 +5302,6 @@ export interface components {
       link: components["schemas"]["HomeLink"];
       source: components["schemas"]["HomeSource"];
     };
-    HomeChannelItem: {
-      id: components["schemas"]["Id"];
-      name: string;
-      branchId: components["schemas"]["Id"] | null;
-      unreadCount: number;
-      /** Format: date-time */
-      lastMessageAt: string | null;
-      link: components["schemas"]["HomeLink"];
-    };
-    /** @description 읽지 않은 메시지(M7 GET /channels의 unreadCount 합). */
-    HomeMessageCard: {
-      unreadCount: number;
-      channels: components["schemas"]["HomeChannelItem"][];
-      link: components["schemas"]["HomeLink"];
-      source: components["schemas"]["HomeSource"];
-    };
     /** @description 운영 홈 요약(FR-DASH-02·03·05·06). 각 카드는 원본 기능의 권한·범위를 넘지 않는다. */
     HomeSummary: {
       meta: components["schemas"]["HomeMeta"];
@@ -5328,7 +5311,6 @@ export interface components {
       facilities: components["schemas"]["HomeFacilityCard"];
       shifts: components["schemas"]["HomeShiftCard"];
       notices: components["schemas"]["HomeNoticeCard"];
-      messages: components["schemas"]["HomeMessageCard"];
     };
     /** @description 같은 지점 동료의 오늘 근무(2026-11-05 사용자 결정, FR-DASH-05). 이름과 근무 시작·종료 시각만 담는다. 근무 ID·직원 ID·예정 휴게·근태·메모·변경 이력·이동 대상은 없다. */
     HomeShiftColleague: {

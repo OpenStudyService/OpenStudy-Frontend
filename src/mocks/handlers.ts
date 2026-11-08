@@ -1,3 +1,4 @@
+import { homeSummary } from "./home";
 import { salesHandlers } from "./sales";
 import { roomHandlers } from "./rooms";
 import { workforceHandlers } from "./workforce";
@@ -22,7 +23,6 @@ import {
   command,
   create,
   customerHistory,
-  inScope,
   leaveBalance,
   rowsFor,
   sales,
@@ -570,20 +570,10 @@ export const handlers = [
     }),
   ),
   http.get(
-    "/api/home",
+    "/api/home/summary",
     response(async (a) => {
       await scenario();
-      const s = scope(a);
-      return {
-        tasks: rowsFor(store, "tasks", s),
-        seats: rowsFor(store, "seats", s),
-        facilities: rowsFor(store, "facilities", s),
-        inquiries: rowsFor(store, "inquiries", s),
-        notices: rowsFor(store, "notices", s),
-        shifts: store.db.shifts.filter((x) => inScope(store.user(), x, s)),
-        attendance: rowsFor(store, "attendance", s),
-        messages: rowsFor(store, "messages", s).slice(-5),
-      };
+      return homeSummary(a.request);
     }),
   ),
   http.get(

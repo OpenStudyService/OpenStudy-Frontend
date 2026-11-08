@@ -405,3 +405,4 @@ export const workforceHandlers = [
     }),
   ),
 ];
+export { visible as shiftVisible };
