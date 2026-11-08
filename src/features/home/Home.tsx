@@ -1,3 +1,4 @@
+import { formatPercent } from "../../shared/domain/format";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -52,7 +53,9 @@ function homeHref(scope: string, link: HomeLink) {
 
 function ratioLabel(ratio: Ratio | undefined) {
   if (!ratio) return "—";
-  return ratio.state === "notApplicable" ? "해당 없음" : `${ratio.percent}%`;
+  return formatPercent(
+    ratio.state === "notApplicable" ? null : (ratio.percent ?? undefined),
+  );
 }
 
 export function Home() {

@@ -1,3 +1,4 @@
+import { formatNumber } from "../../shared/domain/format";
 import type {
   components,
   operations,
@@ -85,7 +86,7 @@ export function adjustmentBody(
       amount > maximum
     )
       throw new Error(
-        `잔량은 0~${maximum.toLocaleString("ko-KR")} 사이의 정수로 입력해 주세요.`,
+        `잔량은 0~${formatNumber(maximum)} 사이의 정수로 입력해 주세요.`,
       );
     const field =
       pass.kind === "시간권" ? "remainingMinutes" : "remainingCreditKrw";

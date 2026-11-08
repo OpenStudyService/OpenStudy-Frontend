@@ -50,6 +50,9 @@ const amounts = amountsSchema.refine(amountsValid);
 const purposeAmounts = z
   .strictObject({ purpose, ...amountFields })
   .refine(amountsValid);
+const granularitySchema = z.enum(["day", "week", "month"]);
+export type TrendGranularity = z.infer<typeof granularitySchema>;
+type TrendMeasure = "revenue" | "passes";
 const conditionSchema = z
   .strictObject({
     branchIds: z.array(id).min(1),
@@ -60,7 +63,7 @@ const conditionSchema = z
     purpose: purpose.nullable(),
     productId: z.null(),
     categoryCode: z.null(),
-    granularity: z.null(),
+    granularity: granularitySchema.nullable(),
   })
   .refine(
     (v) =>
@@ -80,8 +83,8 @@ const aggregationSchema = z
     dataStatus,
     partial: z.strictObject({
       periodOpen: z.boolean(),
-      firstBucketPartial: z.null(),
-      lastBucketPartial: z.null(),
+      firstBucketPartial: z.boolean().nullable(),
+      lastBucketPartial: z.boolean().nullable(),
     }),
     metrics: z
       .array(
@@ -93,13 +96,6 @@ const aggregationSchema = z
       .min(1),
   })
   .refine((v) => {
-    const expected = new Map<string, string>([
-      ["sales.approved_amount", "원"],
-      ["sales.refund_amount", "원"],
-      ["sales.net_amount", "원"],
-      ["sales.approved_payment_count", "건"],
-      ["sales.refund_count", "건"],
-    ]);
     const day = new Date(Date.parse(v.asOf) + 9 * 3600000)
       .toISOString()
       .slice(0, 10);
@@ -107,9 +103,6 @@ const aggregationSchema = z
     const defaultTo = Date.parse(`${day}T00:00:00+09:00`) + 86400000;
     return (
       (v.dataStatus === "noData") === (v.sourceRowCount === 0) &&
-      v.metrics.length === expected.size &&
-      new Set(v.metrics.map((m) => m.id)).size === expected.size &&
-      v.metrics.every((m) => expected.get(m.id) === m.unit) &&
       v.partial.periodOpen ===
         Date.parse(v.condition.to) > Date.parse(v.asOf) &&
       (!v.defaultPeriod ||
@@ -117,6 +110,94 @@ const aggregationSchema = z
           Date.parse(v.condition.to) === defaultTo))
     );
   });
+const revenueMetrics = new Map<string, string>([
+  ["sales.approved_amount", "원"],
+  ["sales.refund_amount", "원"],
+  ["sales.net_amount", "원"],
+  ["sales.approved_payment_count", "건"],
+  ["sales.refund_count", "건"],
+]);
+const passMetrics = new Map<string, string>([
+  ["pass.payment_count", "건"],
+  ["pass.sold_quantity", "개"],
+  ["pass.refunded_quantity", "개"],
+  ["pass.net_sold_quantity", "개"],
+  ["pass.issued_count", "개"],
+]);
+const volumeFields = {
+  paymentCount: count,
+  soldQuantity: count,
+  refundedQuantity: count,
+  netSoldQuantity: integer,
+  issuedCount: count,
+  dataStatus,
+};
+const volume = z
+  .strictObject(volumeFields)
+  .refine((v) => v.soldQuantity - v.refundedQuantity === v.netSoldQuantity);
+const volumeSchema = z.strictObject({
+  aggregation: aggregationSchema,
+  totals: volume,
+});
+const pageMeta = z.strictObject({
+  page: count.min(1),
+  pageSize: count.min(1).max(100),
+  total: count,
+});
+const productsSchema = volumeSchema
+  .extend({
+    items: z.array(
+      z.strictObject({
+        ...volumeFields,
+        rank: count.min(1),
+        productId: id,
+        productName: z.string(),
+        categoryCode: z.string(),
+        categoryName: z.string(),
+        kind: z.enum(["시간권", "기간권", "정액권"]),
+      }),
+    ),
+    meta: pageMeta,
+  })
+  .refine(
+    (v) =>
+      v.meta.total === v.aggregation.rowCount &&
+      v.items.length ===
+        Math.min(
+          v.meta.pageSize,
+          Math.max(0, v.meta.total - (v.meta.page - 1) * v.meta.pageSize),
+        ),
+  );
+const trendValues = { revenue: amounts.nullable(), passes: volume.nullable() };
+const trendSchema = z
+  .strictObject({
+    aggregation: aggregationSchema,
+    measure: z.enum(["revenue", "passes"]),
+    granularity: granularitySchema,
+    totals: z.strictObject(trendValues),
+    items: z
+      .array(
+        z.strictObject({
+          ...trendValues,
+          label: z.string(),
+          bucketStart: instant,
+          bucketEnd: instant,
+          start: instant,
+          end: instant,
+          partial: z.boolean(),
+        }),
+      )
+      .min(1),
+  })
+  .refine(
+    (v) =>
+      [v.totals, ...v.items].every((row) =>
+        v.measure === "revenue"
+          ? !!row.revenue && row.passes === null
+          : !!row.passes && row.revenue === null,
+      ) && v.aggregation.rowCount === v.items.length,
+  );
+export type SalesTrend = z.infer<typeof trendSchema>;
 export type RevenueAmounts = components["schemas"]["RevenueAmounts"];
 // OpenAPI 3.0 nullable allOf IDs are generated as string by the current tool.
 // Infer the boundary DTOs from validators so explicit wire nulls are retained;
@@ -233,11 +314,7 @@ const ledgerSchema = z
     aggregation: aggregationSchema,
     totals: amounts,
     items: z.array(entrySchema),
-    meta: z.strictObject({
-      page: count.min(1),
-      pageSize: count.min(1).max(100),
-      total: count,
-    }),
+    meta: pageMeta,
   })
   .refine(
     (v) =>
@@ -352,10 +429,12 @@ function params(
     if (value !== undefined) result.set(key, String(value));
   return result.toString();
 }
-function parse<T>(
+function parse<T extends { aggregation: AggregationMeta }>(
   schema: z.ZodType<T>,
   value: unknown,
   condition: SalesCondition,
+  measure: TrendMeasure = "revenue",
+  granularity: TrendGranularity | null = null,
 ): T {
   const parsed = schema.safeParse(value);
   if (!parsed.success)
@@ -363,16 +442,25 @@ function parse<T>(
       code: "INVALID_RESPONSE",
       message: "매출 응답을 확인할 수 없어요. 다시 조회해 주세요.",
     });
-  const c = (parsed.data as { aggregation: AggregationMeta }).aggregation
-    .condition;
+  const { aggregation } = parsed.data;
+  const c = aggregation.condition;
+  const expected = measure === "passes" ? passMetrics : revenueMetrics;
   const matches =
-    (parsed.data as { aggregation: AggregationMeta }).aggregation
-      .defaultPeriod ===
-      (condition.from === undefined) &&
+    aggregation.metrics.length === expected.size &&
+    new Set(aggregation.metrics.map((m) => m.id)).size === expected.size &&
+    aggregation.metrics.every((m) => expected.get(m.id) === m.unit) &&
+    c.granularity === granularity &&
+    (granularity
+      ? aggregation.partial.firstBucketPartial !== null &&
+        aggregation.partial.lastBucketPartial !== null
+      : aggregation.partial.firstBucketPartial === null &&
+        aggregation.partial.lastBucketPartial === null) &&
+    aggregation.defaultPeriod === (condition.from === undefined) &&
     (!condition.from || Date.parse(c.from) === Date.parse(condition.from)) &&
     (!condition.to || Date.parse(c.to) === Date.parse(condition.to)) &&
     c.refundBasis === (condition.refundBasis ?? "processedDate") &&
-    c.purpose === (condition.purpose ?? null) &&
+    c.purpose ===
+      (measure === "passes" ? "이용권" : (condition.purpose ?? null)) &&
     c.allBranches === (condition.branchIds === undefined) &&
     (!condition.branchIds ||
       (condition.branchIds.length === c.branchIds.length &&
@@ -385,6 +473,62 @@ function parse<T>(
   return parsed.data;
 }
 export const salesApi = {
+  async volume(condition: SalesCondition, signal?: AbortSignal) {
+    return parse(
+      volumeSchema,
+      await api(
+        `/sales/passes/volume?${params({ ...condition, purpose: undefined })}`,
+        { signal },
+      ),
+      condition,
+      "passes",
+    );
+  },
+  async products(
+    condition: SalesCondition,
+    page: number,
+    signal?: AbortSignal,
+  ) {
+    const result = parse(
+      productsSchema,
+      await api(
+        `/sales/passes/products?${params({ ...condition, purpose: undefined }, { page, pageSize: 20 })}`,
+        { signal },
+      ),
+      condition,
+      "passes",
+    );
+    if (result.meta.page !== page || result.meta.pageSize !== 20)
+      throw new ApiError(0, {
+        code: "INVALID_RESPONSE",
+        message: "상품 순위 페이지 조건을 확인할 수 없어요.",
+      });
+    return result;
+  },
+  async trend(
+    condition: SalesCondition,
+    measure: TrendMeasure,
+    granularity: TrendGranularity,
+    signal?: AbortSignal,
+  ) {
+    const query =
+      measure === "passes" ? { ...condition, purpose: undefined } : condition;
+    const result = parse(
+      trendSchema,
+      await api(`/sales/trend?${params(query, { measure, granularity })}`, {
+        signal,
+      }),
+      query,
+      measure,
+      granularity,
+    );
+    if (result.measure !== measure || result.granularity !== granularity)
+      throw new ApiError(0, {
+        code: "INVALID_RESPONSE",
+        message: "추세 조회 조건을 확인할 수 없어요.",
+      });
+    return result;
+  },
   async revenue(
     condition: SalesCondition,
     signal?: AbortSignal,

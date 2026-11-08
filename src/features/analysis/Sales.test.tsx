@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => ({
   revenue: vi.fn(),
   branches: vi.fn(),
   ledger: vi.fn(),
+  volume: vi.fn(),
+  products: vi.fn(),
+  trend: vi.fn(),
   context: {} as { session: CurrentUser; scope: string },
 }));
 vi.mock("../../app/context", () => ({ useApp: () => mocks.context }));
@@ -32,6 +35,9 @@ vi.mock("./sales-api", async (load) => {
       revenue: mocks.revenue,
       branches: mocks.branches,
       ledger: mocks.ledger,
+      volume: mocks.volume,
+      products: mocks.products,
+      trend: mocks.trend,
     },
   };
 });
@@ -143,6 +149,9 @@ beforeEach(() => {
   mocks.revenue.mockResolvedValue(revenue);
   mocks.branches.mockResolvedValue(branches);
   mocks.ledger.mockResolvedValue(ledger);
+  mocks.volume.mockImplementation(() => new Promise(() => undefined));
+  mocks.products.mockImplementation(() => new Promise(() => undefined));
+  mocks.trend.mockImplementation(() => new Promise(() => undefined));
 });
 afterEach(() => {
   cleanup();

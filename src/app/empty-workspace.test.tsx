@@ -368,7 +368,9 @@ it("shows a missing sales response as an error instead of zero revenue", async (
     )[0],
   ).toBeVisible();
   expect(screen.queryByText("0원")).not.toBeInTheDocument();
-  expect(screen.getAllByText(/매출 응답을 확인할 수 없어요/)).toHaveLength(3);
+  await waitFor(() =>
+    expect(screen.getAllByText(/매출 응답을 확인할 수 없어요/)).toHaveLength(7),
+  );
 });
 
 it("clears every former user's scope cache on account changes", async () => {
@@ -590,7 +592,7 @@ it("uses the server's staff default and changes the request and query key with t
   ).not.toBeInTheDocument();
   expect(reads[0].searchParams.has("mine")).toBe(false);
   await userEvent.click(screen.getByRole("button", { name: "오늘 업무" }));
-  expect(await screen.findByText("완료율 0%")).toBeVisible();
+  expect(await screen.findByText("완료율 0.0%")).toBeVisible();
   expect(reads[1].searchParams.get("mine")).toBe("false");
   expect(
     clients[0].getQueryData(["data", "staff", "all", "home", false, undefined]),

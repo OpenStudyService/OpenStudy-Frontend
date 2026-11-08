@@ -103,6 +103,44 @@ export function SalesChart({
     </div>
   );
 }
+export function SalesTrendChart({
+  rows,
+  label,
+  format,
+}: {
+  rows: { label: string; value: number }[];
+  label: string;
+  format: (value: number) => string;
+}) {
+  return (
+    <div
+      className="h-[280px] min-w-0 w-full"
+      role="img"
+      aria-label={`${label} 추세 차트`}
+    >
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <LineChart
+          data={rows}
+          margin={{ left: 10, right: 20, top: 15, bottom: 10 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+          <XAxis dataKey="label" minTickGap={30} />
+          <YAxis tickFormatter={format} width={100} />
+          <Tooltip formatter={(value) => format(Number(value))} />
+          <Line
+            dataKey="value"
+            name={label}
+            stroke="var(--primary)"
+            strokeWidth={3}
+            dot={rows.length === 1}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function SalesTable({ rows }: { rows: SalesRow[] }) {
   return (
     <div className="data-scroll">

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { ApiError, MOCK } from "../../shared/api/client";
-import { displayDate, won } from "../../shared/domain/schema";
+import { formatShortDateTime, formatKrw } from "../../shared/domain/format";
 import {
   Badge,
   Button,
@@ -73,7 +73,8 @@ function Counts({ counts }: { counts: SeatCounts }) {
         </div>
       ))}
       <p className="help sm:col-span-5">
-        기준 시점: {displayDate(counts.asOf)} · 유형 필터 기준 전체 좌석 현황
+        기준 시점: {formatShortDateTime(counts.asOf)} · 유형 필터 기준 전체 좌석
+        현황
       </p>
     </div>
   );
@@ -386,7 +387,10 @@ function SeatPanel({
                         {seat.activeSession.customer.name} ·{" "}
                         {seat.activeSession.customer.memberNo}
                       </b>
-                      <p>입실 {displayDate(seat.activeSession.checkedInAt)}</p>
+                      <p>
+                        입실{" "}
+                        {formatShortDateTime(seat.activeSession.checkedInAt)}
+                      </p>
                       {currentSession.error && (
                         <ErrorState
                           error={currentSession.error}
@@ -937,7 +941,7 @@ function CheckInForm({
                     만료:{" "}
                     {candidate.usablePasses.find((p) => p.id === passId)
                       ?.expiresAt
-                      ? displayDate(
+                      ? formatShortDateTime(
                           candidate.usablePasses.find((p) => p.id === passId)!
                             .expiresAt!,
                         )
@@ -973,7 +977,7 @@ function passBalance(p: UsablePass) {
   return p.kind === "시간권"
     ? `${p.remainingMinutes}분`
     : p.kind === "정액권"
-      ? won(p.remainingCreditKrw || 0)
+      ? formatKrw(p.remainingCreditKrw || 0)
       : "기간권";
 }
 
@@ -1140,11 +1144,11 @@ function SessionResult({ session }: { session: SeatSession }) {
           <dd>{session.usedMinutes}분</dd>
           <dt>차감</dt>
           <dd>
-            {session.deductedMinutes}분 · {won(session.deductedKrw)}
+            {session.deductedMinutes}분 · {formatKrw(session.deductedKrw)}
           </dd>
           <dt>초과량</dt>
           <dd>
-            {session.overageMinutes}분 · {won(session.overageKrw)}
+            {session.overageMinutes}분 · {formatKrw(session.overageKrw)}
           </dd>
           <dt>처리 후 잔량</dt>
           <dd>
@@ -1153,7 +1157,7 @@ function SessionResult({ session }: { session: SeatSession }) {
               : `${session.passRemainingMinutes}분`}
             {session.passRemainingCreditKrw === null
               ? ""
-              : won(session.passRemainingCreditKrw)}
+              : formatKrw(session.passRemainingCreditKrw)}
             {session.pass.kind === "기간권" ? "기간권" : ""}
           </dd>
         </dl>
