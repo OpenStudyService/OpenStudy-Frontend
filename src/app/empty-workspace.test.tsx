@@ -1,3 +1,4 @@
+import type { components } from "../shared/api/foundation.generated";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -45,8 +46,8 @@ afterEach(() => {
 });
 
 function renderWorkspace(
-  respond: (path: string) => Response | Promise<Response>,
-  route = "home",
+  respond: (path: string, url: URL) => Response | Promise<Response>,
+  route = "/app/all/home",
   current = session,
 ) {
   vi.stubGlobal(
@@ -54,7 +55,9 @@ function renderWorkspace(
     vi.fn((url: string) => {
       const path = new URL(url, "http://localhost").pathname;
       return Promise.resolve(
-        path === "/api/me" ? Response.json(current) : respond(path),
+        path === "/api/me"
+          ? Response.json(current)
+          : respond(path, new URL(url, "http://localhost")),
       );
     }),
   );
@@ -63,7 +66,9 @@ function renderWorkspace(
   clients.push(client);
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/app/all/${route}`]}>
+      <MemoryRouter
+        initialEntries={[route.startsWith("/") ? route : `/app/all/${route}`]}
+      >
         <Routes>
           <Route path="/app/:scope" element={<Layout />}>
             <Route path="home" element={<Home />} />
@@ -78,66 +83,141 @@ function renderWorkspace(
   );
 }
 
+type HomeSummary = components["schemas"]["HomeSummary"];
+
+function emptySummary(mine = false): HomeSummary {
+  const emptyRatio = {
+    state: "notApplicable",
+    percent: null,
+    numerator: 0,
+    denominator: 0,
+  } as const;
+  const counts = {
+    total: 0,
+    open: 0,
+    overdue: 0,
+    completedToday: 0,
+    completionRate: emptyRatio,
+  };
+  const source = (operationId: string) => ({
+    operationId,
+    query: { scope: "all" },
+    clientFilter: null,
+  });
+  const link = (
+    screen: components["schemas"]["HomeLink"]["screen"],
+    query: Record<string, string> = {},
+  ) => ({ screen, branchId: null, targetId: null, query });
+  return {
+    meta: {
+      branchIds: [],
+      allBranches: true,
+      date: "2026-10-23",
+      asOf: session.asOf,
+      dayStart: "2026-10-22T15:00:00Z",
+      dayEnd: "2026-10-23T15:00:00Z",
+      timeZone: "Asia/Seoul",
+      taskFilter: { mine, assigneeId: null, defaulted: true },
+    },
+    seats: {
+      total: 0,
+      inUse: 0,
+      available: 0,
+      blocked: 0,
+      occupancy: emptyRatio,
+      branches: [],
+      link: link("seat-board"),
+      source: source("getSeatOccupancy"),
+    },
+    tasks: {
+      today: counts,
+      mine: counts,
+      items: [],
+      link: link("task-list", mine ? { mine: "true" } : {}),
+      sources: [],
+    },
+    inquiries: {
+      unresolved: 0,
+      received: 0,
+      inProgress: 0,
+      items: [],
+      link: link("inquiry-list"),
+      source: source("getInquirySummary"),
+    },
+    facilities: {
+      inspectionDue: 0,
+      items: [],
+      link: link("facility-list", { inspectionDue: "true" }),
+      source: source("getFacilitySummary"),
+    },
+    shifts: {
+      count: 0,
+      items: [],
+      colleagueCount: 0,
+      colleagues: [],
+      link: link("shift-list", { from: "2026-10-23", to: "2026-10-23" }),
+      source: source("listShifts"),
+    },
+    notices: {
+      items: [],
+      link: link("notice-list", { status: "게시 중" }),
+      source: source("listNotices"),
+    },
+  };
+}
+
+it("renders empty summary cards without loading any chat data", async () => {
+  renderWorkspace((path) =>
+    Response.json(path === "/api/home/summary" ? emptySummary() : {}),
+  );
+  expect(await screen.findByText("완료율 해당 없음")).toBeVisible();
+  expect(screen.getByText("해당 없음", { exact: true })).toBeVisible();
+  for (const title of [
+    "오늘 배정된 미완료 업무가 없어요",
+    "등록된 점검 항목이 없어요",
+    "미처리 문의가 없어요",
+    "오늘 예정된 근무가 없어요",
+    "등록된 공지사항이 없어요",
+  ]) {
+    expect(screen.getByRole("heading", { name: title })).toBeVisible();
+  }
+  expect(screen.getByRole("combobox", { name: "현재 지점" })).toBeDisabled();
+  expect(
+    screen.getByRole("option", { name: "등록된 지점 없음" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("link", { name: /현재 이용 좌석/ }),
+  ).toHaveTextContent("0/0석");
+  expect(screen.getByRole("link", { name: "AI 채팅 열기" })).toHaveAttribute(
+    "href",
+    "/app/all/ai",
+  );
+  expect(
+    vi
+      .mocked(fetch)
+      .mock.calls.map(
+        ([url]) => new URL(String(url), "http://localhost").pathname,
+      )
+      .sort(),
+  ).toEqual(["/api/home/summary", "/api/lookups", "/api/me"]);
+});
+
 it.each([
   ["empty object", () => Response.json({})],
-  [
-    "empty lists",
-    () =>
-      Response.json({
-        tasks: [],
-        seats: [],
-        facilities: [],
-        inquiries: [],
-        notices: [],
-        shifts: [],
-        messages: [],
-        branches: [],
-        employees: [],
-      }),
-  ],
   ["null body", () => Response.json(null)],
-  [
-    "null collections",
-    () =>
-      Response.json({
-        tasks: null,
-        seats: null,
-        branches: null,
-        employees: null,
-        notices: null,
-      }),
-  ],
   ["no content", () => new Response(null, { status: 204 })],
-  ["empty 200 body", () => new Response(null, { status: 200 })],
 ])(
-  "keeps the dashboard and empty sections visible with %s",
+  "preserves the home shell without reporting zero counts for %s",
   async (_, response) => {
     renderWorkspace(response);
     expect(
-      await screen.findByRole("heading", { name: "안녕하세요, 관리자님 ☀" }),
+      (
+        await screen.findAllByRole("heading", {
+          name: "데이터를 확인할 수 없어요",
+        })
+      )[0],
     ).toBeVisible();
-    expect(
-      await screen.findByRole("heading", { name: "오늘 예정된 근무가 없어요" }),
-    ).toBeVisible();
-    for (const title of [
-      "오늘 배정된 업무가 없어요",
-      "등록된 점검 항목이 없어요",
-      "아직 공유된 업무가 없어요",
-      "등록된 공지사항이 없어요",
-    ]) {
-      expect(screen.getByRole("heading", { name: title })).toBeVisible();
-    }
-    expect(screen.getByRole("combobox", { name: "현재 지점" })).toBeDisabled();
-    expect(
-      screen.getByRole("option", { name: "등록된 지점 없음" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /현재 이용 좌석/ }),
-    ).toHaveTextContent("0");
-    expect(screen.getByRole("link", { name: "업무 관리" })).toBeVisible();
-    expect(
-      screen.queryByText("요청을 완료하지 못했어요"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("완료율 —")).toBeVisible();
   },
 );
 
@@ -164,11 +244,11 @@ it("keeps the shell and home visible when unimplemented endpoints return 404", a
   expect(
     screen.getByRole("heading", { name: "우리 공간은 지금" }),
   ).toBeVisible();
+  expect(screen.getByText("현재 이용 좌석").closest(".card")).toHaveTextContent(
+    "—",
+  );
   expect(
-    screen.getByRole("link", { name: /현재 이용 좌석/ }),
-  ).toHaveTextContent("—");
-  expect(
-    screen.getByRole("link", { name: /현재 이용 좌석/ }),
+    screen.getByText("현재 이용 좌석").closest(".card"),
   ).not.toHaveTextContent("0석");
   expect(screen.queryByText(/No static resource/)).not.toBeInTheDocument();
 });
@@ -176,15 +256,27 @@ it("keeps the shell and home visible when unimplemented endpoints return 404", a
 it("keeps the layout during loading and displays real data after retrying a failed request", async () => {
   let attempts = 0;
   renderWorkspace((path) => {
-    if (path !== "/api/home") return Response.json({});
+    if (path !== "/api/home/summary") return Response.json({});
     attempts++;
     if (attempts === 1)
       return Response.json(
         { code: "ERROR", message: "failed" },
         { status: 500 },
       );
+    const summary = emptySummary();
     return Response.json({
-      seats: [{ id: "seat-1", branchId: "1", status: "이용 중" }],
+      ...summary,
+      seats: {
+        ...summary.seats,
+        total: 1,
+        inUse: 1,
+        occupancy: {
+          state: "value",
+          percent: 100,
+          numerator: 1,
+          denominator: 1,
+        },
+      },
     });
   });
   const retry = await screen.findByRole("button", {
@@ -258,7 +350,7 @@ function emptyTasks(path: string, page = 1) {
 }
 
 it("keeps list columns and filters with an empty canonical task page", async () => {
-  renderWorkspace(emptyTasks, "tasks");
+  renderWorkspace((path) => emptyTasks(path), "tasks");
   expect(
     await screen.findByRole("heading", { name: "등록된 항목이 없어요" }),
   ).toBeVisible();
@@ -379,9 +471,10 @@ it("keeps idle reads quiet and refreshes the active menu only on request", async
   let reads = 0;
   let fail = false;
   renderWorkspace((path) => {
-    if (path === "/api/home") {
+    if (path === "/api/home/summary") {
       reads++;
       if (fail) return new Response(null, { status: 503 });
+      return Response.json(emptySummary());
     }
     return Response.json({});
   });
@@ -440,4 +533,203 @@ it("keeps the URL filters and page when clicking the current menu", async () => 
   expect(new URL(taskUrls()[1], "http://localhost").searchParams.get("q")).toBe(
     "보고",
   );
+});
+
+const homeBranch = {
+  id: "2",
+  branchId: "2",
+  name: "테스트 지점",
+  address: "",
+  phone: "",
+  hours: "",
+  status: "운영 중" as const,
+  version: 1,
+  createdAt: session.asOf,
+  updatedAt: session.asOf,
+};
+const summaryTask = {
+  id: "task-2",
+  branchId: "2",
+  title: "지점 업무",
+  status: "할 일",
+  priority: "보통",
+  dueAt: session.asOf,
+  assignee: { id: "staff", name: "직원" },
+  overdue: false,
+  link: { screen: "task-detail", branchId: "2", targetId: "task-2", query: {} },
+} satisfies components["schemas"]["HomeTaskItem"];
+
+it("uses the server's staff default and changes the request and query key with the work filter", async () => {
+  const staff: CurrentUser = {
+    ...session,
+    branches: [homeBranch],
+    user: {
+      ...session.user,
+      id: "staff",
+      owner: false,
+      memberships: [{ branchId: "2", role: "staff", permissions: [] }],
+    },
+  };
+  const reads: URL[] = [];
+  renderWorkspace(
+    (path, url) => {
+      if (path !== "/api/home/summary") return Response.json({});
+      reads.push(url);
+      const mine = url.searchParams.get("mine") !== "false";
+      const summary = emptySummary(mine);
+      if (!mine) {
+        summary.tasks.items = [summaryTask];
+        summary.tasks.today = {
+          total: 1,
+          open: 1,
+          overdue: 0,
+          completedToday: 0,
+          completionRate: {
+            state: "value",
+            percent: 0,
+            numerator: 0,
+            denominator: 1,
+          },
+        };
+      }
+      return Response.json(summary);
+    },
+    "home",
+    staff,
+  );
+  expect(await screen.findByText("완료율 해당 없음")).toBeVisible();
+  expect(screen.getByRole("button", { name: "내 업무" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(reads[0].searchParams.has("mine")).toBe(false);
+  await userEvent.click(screen.getByRole("button", { name: "오늘 업무" }));
+  expect(await screen.findByText("완료율 0%")).toBeVisible();
+  expect(reads[1].searchParams.get("mine")).toBe("false");
+  expect(
+    clients[0].getQueryData(["data", "staff", "all", "home", false, undefined]),
+  ).toBeDefined();
+  await userEvent.selectOptions(screen.getByLabelText("현재 지점"), "2");
+  await waitFor(() => expect(reads[2]?.searchParams.get("scope")).toBe("2"));
+  expect(reads[2].searchParams.get("mine")).toBe("false");
+});
+
+it("puts the assignee in both the request and cache key", async () => {
+  const reads: URL[] = [];
+  renderWorkspace((path, url) => {
+    if (path !== "/api/home/summary") return Response.json({});
+    reads.push(url);
+    return Response.json(emptySummary());
+  }, "home?assigneeId=staff&mine=true");
+  expect(await screen.findByText("완료율 해당 없음")).toBeVisible();
+  expect(reads[0].searchParams.get("assigneeId")).toBe("staff");
+  expect(reads[0].searchParams.has("mine")).toBe(false);
+  expect(
+    clients[0].getQueryData([
+      "data",
+      "owner",
+      "all",
+      "home",
+      undefined,
+      "staff",
+    ]),
+  ).toBeDefined();
+});
+
+it("preserves branch and target on detail navigation and direct reopening", async () => {
+  const current = { ...session, branches: [homeBranch] };
+  const detailRequests: URL[] = [];
+  const respond = (path: string, url: URL) => {
+    if (path === "/api/home/summary") {
+      const summary = emptySummary();
+      summary.tasks.items = [summaryTask];
+      return Response.json(summary);
+    }
+    if (path === "/api/tasks/task-2") {
+      detailRequests.push(url);
+      return Response.json({
+        ...summaryTask,
+        body: "상세 내용",
+        category: "운영",
+        createdBy: summaryTask.assignee,
+        completedAt: null,
+        checklist: [],
+        checklistTotal: 0,
+        checklistDone: 0,
+        canEdit: false,
+        version: 1,
+        createdAt: session.asOf,
+        updatedAt: session.asOf,
+      });
+    }
+    if (path.endsWith("/events"))
+      return Response.json({
+        items: [],
+        meta: { page: 1, pageSize: 20, total: 0 },
+      });
+    if (path === "/api/assignee-candidates")
+      return Response.json({ items: [] });
+    return emptyTasks(path);
+  };
+  renderWorkspace(respond, "home", current);
+  const item = await screen.findByRole("link", { name: /지점 업무/ });
+  const href = item.getAttribute("href")!;
+  expect(href).toBe("/app/2/tasks?detail=task-2");
+  expect(screen.getByRole("link", { name: /근무표 보기/ })).toHaveAttribute(
+    "href",
+    "/app/all/attendance?tab=shifts&view=list&from=2026-10-23&to=2026-10-23",
+  );
+  await userEvent.click(item);
+  expect(
+    await screen.findByRole("dialog", { name: "지점 업무" }),
+  ).toBeVisible();
+  cleanup();
+  renderWorkspace(respond, href, current);
+  expect(
+    await screen.findByRole("dialog", { name: "지점 업무" }),
+  ).toBeVisible();
+  expect(detailRequests.map((url) => url.searchParams.get("scope"))).toEqual([
+    "2",
+    "2",
+  ]);
+});
+
+it("drops the previous account's home data while reading for the next account", async () => {
+  let account = "owner";
+  let finishRead: (response: Response) => void = () => {};
+  renderWorkspace((path) => {
+    if (path !== "/api/home/summary") return Response.json({});
+    if (account !== "owner")
+      return new Promise((resolve) => {
+        finishRead = resolve;
+      });
+    const summary = emptySummary();
+    summary.tasks.items = [summaryTask];
+    return Response.json(summary);
+  });
+  await screen.findByRole("link", { name: /지점 업무/ });
+  account = "next-owner";
+  act(() => {
+    clients[0].setQueryData(["session"], {
+      ...session,
+      user: { ...session.user, id: account },
+    });
+  });
+  await waitFor(() =>
+    expect(
+      clients[0].getQueryState([
+        "data",
+        account,
+        "all",
+        "home",
+        undefined,
+        undefined,
+      ])?.fetchStatus,
+    ).toBe("fetching"),
+  );
+  expect(
+    screen.queryByRole("link", { name: /지점 업무/ }),
+  ).not.toBeInTheDocument();
+  act(() => finishRead(Response.json(emptySummary())));
+  expect(await screen.findByText("완료율 해당 없음")).toBeVisible();
 });
