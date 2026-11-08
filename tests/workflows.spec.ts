@@ -26,7 +26,7 @@ async function switchUser(page: Page, id: string) {
   await page.goto(`/app/${id === "owner" ? "all" : "gangnam"}/home`);
   await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
 }
-test("task -> shared card -> staff report -> completion persists everywhere", async ({
+test("assigned staff completes a task and the list reflects the new status", async ({
   page,
 }) => {
   await login(page);
@@ -47,35 +47,14 @@ test("task -> shared card -> staff report -> completion persists everywhere", as
   await page
     .getByRole("button", { name: "스터디룸 냉방 점검 E2E", exact: true })
     .click();
-  await panel
-    .getByRole("button", { name: "운영 채널에 공유", exact: true })
-    .click();
-  await panel.getByLabel("공유할 채널").selectOption("gangnam");
-  await panel
-    .getByRole("button", { name: "운영 채널에 공유", exact: true })
-    .click();
-  await expect(panel.getByRole("button", { name: "수정하기" })).toBeVisible();
+  await expect(
+    panel.getByRole("button", { name: "운영 채널에 공유" }),
+  ).toHaveCount(0);
   await switchUser(page, "junho");
-  await page.goto("/app/gangnam/chat/gangnam");
-  const shared = page
-    .locator("article")
-    .filter({ hasText: "스터디룸 냉방 점검 E2E" });
-  await expect(shared).toBeVisible();
-  await shared.getByRole("button", { name: "답글 달기" }).click();
+  await page.goto("/app/gangnam/tasks");
   await page
-    .getByRole("textbox", { name: "스레드 답글" })
-    .fill("필터 청소 및 온도 확인 완료했습니다.");
-  await page.getByRole("textbox", { name: "스레드 답글" }).press("Enter");
-  await expect(
-    page
-      .locator("article p")
-      .filter({ hasText: "필터 청소 및 온도 확인 완료했습니다." }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "스레드 닫기" }).click();
-  await expect(
-    page.getByRole("complementary", { name: "스레드" }),
-  ).not.toBeVisible();
-  await shared.getByRole("button", { name: /연결된 업무/ }).click();
+    .getByRole("button", { name: "스터디룸 냉방 점검 E2E", exact: true })
+    .click();
   await panel.getByRole("checkbox", { name: "필터 상태 확인" }).click();
   await expect(
     panel.getByRole("checkbox", { name: "필터 상태 확인" }),
@@ -86,9 +65,6 @@ test("task -> shared card -> staff report -> completion persists everywhere", as
     panel.getByRole("button", { name: "할 일로 변경", exact: true }),
   ).toBeVisible();
   await panel.getByRole("button", { name: "닫기", exact: true }).click();
-  await expect(shared.getByText("완료", { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(shared.getByText("완료", { exact: true })).toBeVisible();
   await page.goto("/app/gangnam/tasks");
   await page
     .getByRole("searchbox", { name: "업무 검색" })
@@ -193,7 +169,7 @@ test("AI renders JSON results and cancels a pending question", async ({
   page,
 }) => {
   await login(page);
-  await page.goto("/app/all/ai");
+  await page.goto("/app/all/chat");
   const query = page.getByLabel("AI에게 질문", { exact: true });
   const submit = page.getByRole("button", { name: "질문하기", exact: true });
   const question = "지난달 지점별 매출을 보여줘";

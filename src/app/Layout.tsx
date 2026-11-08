@@ -81,13 +81,6 @@ export const navigation = [
     group: "업무 분석",
     permission: "sales:read" as const,
   },
-  {
-    path: "ai",
-    title: "업무 AI",
-    icon: "ai",
-    group: "업무 분석",
-    permission: "ai:read" as const,
-  },
   { path: "settings", title: "설정", icon: "settings", group: "환경설정" },
 ];
 export function Layout() {
@@ -215,10 +208,15 @@ export function Layout() {
       (!n.admin || admin(activeUser, scope)) &&
       (!n.permission || can(activeUser, scope, n.permission)),
   );
+  const quickLinks = [
+    ["home", "home", "홈"],
+    ["tasks", "tasks", "업무"],
+    ...(can(activeUser, scope, "ai:read") ? [["chat", "chat", "채팅"]] : []),
+  ];
   const section = location.pathname.split("/")[3] || "home",
     title =
       section === "chat"
-        ? "팀 채팅"
+        ? "AI 채팅"
         : navigation.find((n) => n.path === section)?.title || "OpenStudy";
   async function logout() {
     if (!confirmLeave()) return;
@@ -321,11 +319,7 @@ export function Layout() {
         >
           <Icon name="logo" size={30} />
         </Link>
-        {[
-          ["home", "home", "홈"],
-          ["tasks", "tasks", "업무"],
-          ["chat", "chat", "채팅"],
-        ].map(([p, icon, label]) => (
+        {quickLinks.map(([p, icon, label]) => (
           <NavLink
             key={p}
             to={`/app/${scope}/${p}`}
@@ -413,7 +407,7 @@ export function Layout() {
           </div>
         </header>
         <main id="main" className="content" tabIndex={-1}>
-          {section !== "settings" && section !== "ai" && section !== "chat" && (
+          {section !== "settings" && section !== "chat" && (
             <WorkspaceRefresh userId={activeUser.id} refresh={refresh} />
           )}
           {lookups.data?.preview && (
@@ -456,24 +450,21 @@ export function Layout() {
         </main>
       </div>
       <nav className="bottom-nav" aria-label="모바일 빠른 탐색">
-        {[
-          ["home", "home", "홈"],
-          ["tasks", "tasks", "업무"],
-          ["chat", "chat", "채팅"],
-          ["settings", "settings", "설정"],
-        ].map(([p, icon, label]) => (
-          <NavLink
-            key={p}
-            to={`/app/${scope}/${p}`}
-            onClick={(event) => menuClick(event, p)}
-            className={({ isActive }) =>
-              `rail-link ${isActive ? "active" : ""}`
-            }
-          >
-            <Icon name={icon} />
-            {label}
-          </NavLink>
-        ))}
+        {[...quickLinks, ["settings", "settings", "설정"]].map(
+          ([p, icon, label]) => (
+            <NavLink
+              key={p}
+              to={`/app/${scope}/${p}`}
+              onClick={(event) => menuClick(event, p)}
+              className={({ isActive }) =>
+                `rail-link ${isActive ? "active" : ""}`
+              }
+            >
+              <Icon name={icon} />
+              {label}
+            </NavLink>
+          ),
+        )}
       </nav>
       <Panel
         open={navOpen}

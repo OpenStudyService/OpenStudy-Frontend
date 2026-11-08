@@ -256,9 +256,9 @@ test("demo production build logs in through its bundled MSW worker", async ({
   await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
   await expect(page.getByText("데모 데이터", { exact: true })).toBeVisible();
   await page.goto(`${mockOrigin}/app/gangnam/chat/gangnam`);
-  await expect(page.locator("article").first()).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/gangnam\/chat$/);
   await expect(
-    page.getByRole("textbox", { name: "메시지", exact: true }),
+    page.getByRole("textbox", { name: "AI에게 질문", exact: true }),
   ).toBeVisible();
   await page.goto(`${mockOrigin}/app/all/settings`);
   await expect(

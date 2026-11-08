@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { useUi } from "../../app/store";
-import { ApiError, MOCK } from "../../shared/api/client";
+import { ApiError } from "../../shared/api/client";
 import { isAccessError } from "../../shared/api/read-model";
 import { displayDate } from "../../shared/domain/schema";
 import type { Task, TaskEvent } from "./api";
@@ -20,7 +20,6 @@ import type { TaskAction } from "./model";
 import { taskApi } from "./api";
 import { useTaskDetail, useTaskWrite, useTaskLeaveGuard } from "./hooks";
 import { LatestTask, TaskForm } from "./TaskForm";
-import { TaskShare } from "../chat/TaskShare";
 
 export function TaskPanel(props: { id: string; onClose: () => void }) {
   const { session, scope } = useApp();
@@ -109,18 +108,7 @@ function TaskPanelSession({
               ) : (
                 <State title="이 업무를 수정할 권한이 없어요" />
               )
-            ) : action === "share" && MOCK ? (
-              <TaskShare
-                task={task}
-                onSaved={() => {
-                  toast("업무를 공유했어요.");
-                  mode("action", "");
-                }}
-              />
-            ) : action &&
-              Object.hasOwn(actionLabels, action) &&
-              editable &&
-              (action !== "share" || MOCK) ? (
+            ) : action && Object.hasOwn(actionLabels, action) && editable ? (
               <TaskActionForm
                 key={action}
                 task={task}
@@ -177,13 +165,6 @@ function TaskPanelSession({
                         {actionLabels[key]}
                       </Button>
                     ))}
-                  </div>
-                )}
-                {MOCK && (
-                  <div className="mt-3">
-                    <Button onClick={() => mode("action", "share")}>
-                      운영 채널에 공유
-                    </Button>
                   </div>
                 )}
               </>
@@ -312,8 +293,7 @@ function TaskActionForm({
   const [conflict, setConflict] = useState(false);
   const denied = error instanceof ApiError && [401, 403].includes(error.status);
   const allowed =
-    canEditTask(session.user, base) &&
-    (action === "share" ? MOCK : taskActions(base).includes(action));
+    canEditTask(session.user, base) && taskActions(base).includes(action);
   async function refresh() {
     try {
       const value = await write.run(

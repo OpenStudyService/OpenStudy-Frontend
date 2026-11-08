@@ -16,7 +16,6 @@ import { Layout } from "./Layout";
 import { Home } from "../features/home/Home";
 import { ResourcePage } from "../features/records/ResourcePage";
 import { Sales } from "../features/analysis/Sales";
-import { Chat } from "../features/chat/Chat";
 import type { CurrentUser } from "../shared/domain/schema";
 const session: CurrentUser = {
   user: {
@@ -74,7 +73,6 @@ function renderWorkspace(
             <Route path="home" element={<Home />} />
             <Route path="tasks" element={<ResourcePage resource="tasks" />} />
             <Route path="sales" element={<Sales />} />
-            <Route path="chat" element={<Chat />} />
           </Route>
           <Route path="/login" element={<p>로그인 화면</p>} />
         </Routes>
@@ -190,7 +188,7 @@ it("renders empty summary cards without loading any chat data", async () => {
   ).toHaveTextContent("0/0석");
   expect(screen.getByRole("link", { name: "AI 채팅 열기" })).toHaveAttribute(
     "href",
-    "/app/all/ai",
+    "/app/all/chat",
   );
   expect(
     vi
@@ -371,22 +369,6 @@ it("shows a missing sales response as an error instead of zero revenue", async (
   ).toBeVisible();
   expect(screen.queryByText("0원")).not.toBeInTheDocument();
   expect(screen.getAllByText(/매출 응답을 확인할 수 없어요/)).toHaveLength(3);
-});
-
-it("shows a channel empty state for a canonical empty channel collection", async () => {
-  renderWorkspace(
-    (path) =>
-      path === "/api/channels"
-        ? Response.json({ items: [] })
-        : Response.json({}),
-    "chat",
-  );
-  expect(
-    await screen.findByRole("heading", {
-      name: "아직 참여 중인 대화가 없어요",
-    }),
-  ).toBeVisible();
-  expect(screen.getByRole("heading", { name: "팀 채팅" })).toBeVisible();
 });
 
 it("clears every former user's scope cache on account changes", async () => {
@@ -602,6 +584,10 @@ it("uses the server's staff default and changes the request and query key with t
     "aria-pressed",
     "true",
   );
+  expect(screen.queryByRole("link", { name: "채팅" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: "AI 채팅 열기" }),
+  ).not.toBeInTheDocument();
   expect(reads[0].searchParams.has("mine")).toBe(false);
   await userEvent.click(screen.getByRole("button", { name: "오늘 업무" }));
   expect(await screen.findByText("완료율 0%")).toBeVisible();

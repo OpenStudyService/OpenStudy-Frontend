@@ -92,31 +92,10 @@ for (const width of [1440, 1024, 390])
     await page.keyboard.press("Escape");
     if (width === 390) {
       await page.goto("/app/gangnam/chat");
-      await page.getByRole("link", { name: /강남점-운영/ }).click();
       await expect(
-        page.getByRole("textbox", { name: "메시지", exact: true }),
+        page.getByRole("textbox", { name: "AI에게 질문" }),
       ).toBeInViewport();
-      await expect(page.locator("article").first()).toBeVisible();
-      await expect(page.locator(".task-card").first()).toBeEnabled();
       await page.screenshot({ path: "test-results/chat-mobile.png" });
-      await page
-        .locator("article")
-        .first()
-        .getByRole("button", { name: "답글 달기" })
-        .click();
-      await expect(
-        page.getByRole("textbox", { name: "스레드 답글" }),
-      ).toBeInViewport();
-      await expect(
-        page
-          .getByRole("complementary", { name: "스레드" })
-          .getByText(/불러온 답글/),
-      ).toBeVisible();
-      await page.screenshot({ path: "test-results/thread-mobile.png" });
-      await page.getByRole("button", { name: "스레드 닫기" }).click();
-      await expect(
-        page.getByRole("textbox", { name: "메시지", exact: true }),
-      ).toBeInViewport();
     }
     expect(errors).toEqual([]);
   });
@@ -147,7 +126,7 @@ test("three themes persist and keep private inputs unchanged", async ({
     await expect(
       page.getByRole("heading", { name: /안녕하세요/ }),
     ).toBeVisible();
-    for (const route of ["home", "tasks", "chat/gangnam", "ai"]) {
+    for (const route of ["home", "tasks", "chat"]) {
       await page.goto(`/app/gangnam/${route}`);
       await expect(page.locator("#main")).toBeVisible();
       if (route === "home")
@@ -161,9 +140,7 @@ test("three themes persist and keep private inputs unchanged", async ({
             exact: true,
           }),
         ).toBeVisible();
-      if (route.startsWith("chat"))
-        await expect(page.locator("article").first()).toBeVisible();
-      if (route === "ai")
+      if (route === "chat")
         await expect(
           page.getByRole("heading", { name: "업무 AI", exact: true }),
         ).toBeVisible();

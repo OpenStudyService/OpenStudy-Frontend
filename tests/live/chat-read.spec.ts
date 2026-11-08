@@ -6,6 +6,11 @@ import {
   type BrowserContext,
 } from "@playwright/test";
 
+test.skip(
+  true,
+  "팀 채팅 화면과 백엔드 기본 라우트가 비활성화되었습니다 (#70).",
+);
+
 const sessions = new Map<
   string,
   Awaited<ReturnType<BrowserContext["storageState"]>>

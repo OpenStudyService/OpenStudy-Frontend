@@ -5,6 +5,11 @@ import {
   type Browser,
   type BrowserContext,
 } from "@playwright/test";
+test.skip(
+  true,
+  "팀 채팅 화면과 백엔드 기본 라우트가 비활성화되었습니다 (#70).",
+);
+
 const password = process.env.CHAT_LIVE_PASSWORD;
 const sessions = new Map<
   string,

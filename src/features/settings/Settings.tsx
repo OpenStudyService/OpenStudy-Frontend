@@ -74,8 +74,8 @@ export function Settings() {
         <section className="card mb-5 p-5">
           <h2>알림 범위</h2>
           <p className="help mt-3">
-            직원 초대 이메일과 팀 채팅의 읽지 않은 표시를 사용합니다. 이용권
-            만료 이메일·문자·별도 웹 푸시는 이번 버전에 포함하지 않습니다.
+            직원 초대 이메일을 사용합니다. 이용권 만료 이메일·문자·별도 웹
+            푸시는 이번 버전에 포함하지 않습니다.
           </p>
         </section>
         {MOCK && <DemoControls />}
@@ -87,7 +87,6 @@ export function Settings() {
           description="담당 지점의 공간과 변경 이력을 관리해요."
           tabs={[
             { resource: "rooms", label: "스터디룸" },
-            { resource: "channels", label: "채널 관리", admin: true },
             { resource: "audit", label: "변경 이력", admin: true },
           ]}
         />
@@ -180,7 +179,6 @@ function DemoControls() {
               ["error", "서버 오류"],
               ["forbidden", "권한 거부"],
               ["payment-failure", "Mock 결제 실패"],
-              ["message-failure", "메시지 전송 실패"],
               ["email-failure", "초대 발송 실패"],
               ["ai-failure", "AI 실행 실패"],
               ["ai-unavailable", "AI 준비 안 됨"],
