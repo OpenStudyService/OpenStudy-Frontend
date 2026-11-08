@@ -191,6 +191,7 @@ const aiConversationStore = new Map<
   }
 >();
 /** The mock DomainLens answer: every question returns the branch sales comparison of the mock ledger. */
+const aiReplay = new Map<string, ReturnType<typeof mockAiAnswer>>();
 function mockAiAnswer(q: string, s: string, conversationId: string) {
   const reqId = `req-${crypto.randomUUID().slice(0, 8)}`;
   const execId = `exec-${crypto.randomUUID().slice(0, 8)}`;
@@ -225,7 +226,7 @@ function mockAiAnswer(q: string, s: string, conversationId: string) {
           id: "comp_bar",
           componentRef: { id: "BAR_CHART", version: "1.0.0" },
           datasetId: "branchSales",
-          bindings: {},
+          bindings: { category: "branch_name", value: "net_krw" },
           options: {},
           events: [],
         },
@@ -291,7 +292,7 @@ function mockAiAnswer(q: string, s: string, conversationId: string) {
             id: "comp_bar",
             componentRef: { id: "BAR_CHART", version: "1.0.0" },
             datasetId: "branchSales",
-            bindings: {},
+            bindings: { category: "branch_name", value: "net_krw" },
             options: {},
             events: [],
           },
@@ -334,18 +335,6 @@ function mockAiAnswer(q: string, s: string, conversationId: string) {
       { id: "sales.net_sales_krw", kind: "METRIC", score: 0.918 },
     ],
     securityGate: { requestedScope: s, outcome: "EXECUTE" },
-    legacyExecution: {
-      id: execId,
-      status: "READY",
-      asOf: AS_OF,
-      start: "2026-11-01",
-      end: "2026-11-03",
-      currency: "KRW",
-      timeZone: "Asia/Seoul",
-      refundBasis: "processed",
-      viewSpec: { component: "bar", title: q },
-      rows,
-    },
   };
 }
 function ownAiConversation(id: string) {
@@ -628,29 +617,17 @@ export const handlers = [
     response((a) => customerHistory(store, String(a.params.id))),
   ),
   http.get(
-    "/api/catalog/readiness",
+    "/api/ai/catalog/readiness",
     response(() => ({
       ready: store.scenario !== "ai-unavailable",
       mode: "mock",
-      message:
-        "DomainLens 응답을 모킹하고 있습니다. 실제 엔진은 연결되지 않았습니다.",
-    })),
-  ),
-  http.get(
-    "/api/components",
-    response(() => ({ components: ["table", "bar", "line"] })),
-  ),
-  // DomainLens AI chat (synchronous /ai/queries), from the OpenStudy-DomainLenz port.
-  http.get(
-    "/api/ai/readiness",
-    response(() => ({
-      ready: store.scenario !== "ai-unavailable",
-      mode: "mock",
-      catalogVersion: "openstudy-semantic-1.0.0",
-      policyVersion: "openstudy-policy-v1",
-      embeddingModel: "koen-e5-tiny-q8",
-      embeddingDimensions: 384,
-      asOf: AS_OF,
+      version: "openstudy-semantic-1.0.0",
+      asOfKst: AS_OF,
+      reasons:
+        store.scenario === "ai-unavailable"
+          ? ["데모 카탈로그를 준비하고 있어요."]
+          : [],
+      warnings: [],
     })),
   ),
   http.post(
@@ -660,6 +637,24 @@ export const handlers = [
       const q = String(p.question || "").trim();
       const s = String(p.scope || "all");
       const employeeId = store.activeUser().id;
+      if (store.scenario === "ai-unavailable") {
+        return HttpResponse.json(
+          {
+            requestId: crypto.randomUUID(),
+            status: "NOT_READY",
+            httpStatus: 503,
+            errorCode: "AI_NOT_READY",
+          },
+          { status: 503 },
+        );
+      }
+      const key =
+        typeof p.clientRequestKey === "string"
+          ? `${employeeId}:${p.clientRequestKey}`
+          : undefined;
+      const replay = key ? aiReplay.get(key) : undefined;
+      if (replay && aiConversationStore.has(replay.conversationId))
+        return { ...replay, behavior: "REPLAY" };
       const asked = String(p.conversationId || "");
       const saved = asked ? aiConversationStore.get(asked) : undefined;
       assert(
@@ -681,7 +676,9 @@ export const handlers = [
       conversation.lastAskedAt = now;
       conversation.questions.push({ question: q, askedAt: now });
       aiConversationStore.set(conversation.id, conversation);
-      return mockAiAnswer(q, s, conversation.id);
+      const answer = mockAiAnswer(q, s, conversation.id);
+      if (key) aiReplay.set(key, answer);
+      return answer;
     }),
   ),
   http.get(

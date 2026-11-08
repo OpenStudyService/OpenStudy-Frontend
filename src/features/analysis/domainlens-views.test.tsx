@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { ViewSpecRenderer } from "./Charts";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import {
   COMPONENT_TYPES,
@@ -16,7 +18,7 @@ import { UrgentTaskList } from "./views/UrgentTaskList";
 afterEach(cleanup);
 
 describe("DomainLens ViewSpec contract (ported from OpenStudy-DomainLenz)", () => {
-  it("supports all 9 ViewSpec component types and normalizes legacy aliases", () => {
+  it("supports all 9 ViewSpec component types", () => {
     const nineTypes = [
       "KPI",
       "BAR_CHART",
@@ -76,9 +78,9 @@ describe("DomainLens ViewSpec contract (ported from OpenStudy-DomainLenz)", () =
       expect(parsed.snapshotVersion).toBe("openstudy-semantic-1.0.0");
     }
 
-    expect(normalizeComponentType("bar")).toBe("BAR_CHART");
-    expect(normalizeComponentType("line")).toBe("LINE_CHART");
-    expect(normalizeComponentType("table")).toBe("DATA_TABLE");
+    expect(normalizeComponentType("bar")).toBeUndefined();
+    expect(normalizeComponentType("line")).toBeUndefined();
+    expect(normalizeComponentType("table")).toBeUndefined();
     expect(POC_QUESTIONS).toHaveLength(10);
   });
 
@@ -193,3 +195,86 @@ describe("DomainLens ViewSpec contract (ported from OpenStudy-DomainLenz)", () =
     ).toBeInTheDocument();
   });
 });
+
+function sampleView(
+  over: Record<string, unknown> = {},
+  rows = [
+    { day: "2026-11-02", net: null },
+    { day: "2026-11-01", net: 0 },
+  ] as { day: string; net: number | string | null }[],
+) {
+  return parseAiResult({
+    envelope: {
+      requestId: "req",
+      status: "READY",
+      datasets: [
+        {
+          id: "daily",
+          columns: [
+            { alias: "day", type: "DATE" },
+            { alias: "net", type: "INTEGER" },
+          ],
+          rows,
+        },
+      ],
+      view: {
+        components: [
+          {
+            id: "trend",
+            componentRef: { id: "LINE_CHART", version: "1.0.0" },
+            datasetId: "daily",
+            bindings: { category: "day", value: "net" },
+            ...over,
+          },
+        ],
+      },
+    },
+  });
+}
+
+it.each([
+  { componentRef: { id: "constructor", version: "1.0.0" } },
+  { componentRef: { id: "HTML", version: "1.0.0" } },
+  { events: [{ event: "onClick", actionId: "javascript:alert(1)" }] },
+])("rejects an unregistered component or arbitrary events (%j)", (spec) => {
+  render(<ViewSpecRenderer parsed={sampleView(spec)} />);
+  expect(screen.getByRole("alert")).toBeVisible();
+  expect(screen.queryByRole("table")).toBeNull();
+});
+
+it("renders option text safely, orders time series and distinguishes zero from missing values", async () => {
+  const html = '<img src=x onerror="alert(1)">';
+  render(
+    <ViewSpecRenderer
+      parsed={sampleView({ options: { title: html, onClick: "alert(1)" } })}
+    />,
+  );
+  expect(screen.getByRole("heading", { name: html })).toBeVisible();
+  expect(document.querySelector("img")).toBeNull();
+  expect(screen.getAllByRole("row")[1]).toHaveTextContent("2026-11-010");
+  expect(screen.getByRole("cell", { name: "해당 없음" })).toBeVisible();
+  expect(
+    screen.getByText(/2026-11-01 0, 2026-11-02 해당 없음/),
+  ).toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.tab();
+  expect(screen.getByRole("button", { name: "day" })).toHaveFocus();
+  await user.keyboard("{Enter}{Enter}");
+  expect(screen.getAllByRole("row")[1]).toHaveTextContent(
+    "2026-11-02해당 없음",
+  );
+});
+
+it.each([
+  sampleView({ bindings: { category: "day", value: "missing" } }),
+  sampleView({}, [{ day: "2026-11-01", net: "12" }]),
+])(
+  "falls back to the original table for missing or mistyped bindings",
+  (parsed) => {
+    render(<ViewSpecRenderer parsed={parsed} />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "표시 명세와 데이터가 일치하지 않아",
+    );
+    expect(screen.getByRole("table")).toBeVisible();
+  },
+);

@@ -2628,7 +2628,7 @@ export interface paths {
     };
     /**
      * AI 준비 상태
-     * @description 의미 카탈로그·모델 모드·기준 시각을 돌려준다. 화면이 AI 채팅을 열 때 읽는다.
+     * @description 카탈로그 준비 상태(ready, reasons, warnings)·모델 모드·기준 시각을 돌려준다. 카탈로그 전체가 일관될 때만 ready이며, 준비 안 됨이면 질문을 실행하지 않는다(#93).
      */
     get: operations["getAiReadiness"];
     put?: never;
@@ -5502,6 +5502,10 @@ export interface components {
       /** Format: date-time */
       asOfKst: string;
       message?: string;
+      /** @description 준비 안 됨의 이유. 비어 있으면 ready=true */
+      reasons: string[];
+      /** @description 준비 상태를 바꾸지 않는 안내(예: 임베딩 모델 없음) */
+      warnings: string[];
     };
     AiConversationCreate: {
       /** @default all */
@@ -5552,16 +5556,20 @@ export interface components {
       question: string;
       /** @default all */
       scope: string;
-      /** @description 직전 응답 clarificationOptions[].id */
+      /** @description 직전 응답 clarificationOptions[].id. branch:{지점 ID}:{분석 ID}면 그 지점으로 좁혀 실행(ADR-M10-003 M10-D17) */
       clarificationChoice?: string;
       /** @description 없으면 새 대화 */
       conversationId?: string;
+      /** @description #96 중복 제출 방지. 같은 직원·같은 키는 새 실행 없이 저장된 질문을 돌려준다 */
+      clientRequestKey?: string;
     };
     AiConversationQuestion: {
       question: string;
       /** @default all */
       scope: string;
       clarificationChoice?: string;
+      /** @description #96 중복 제출 방지. 같은 직원·같은 키는 새 실행 없이 저장된 질문을 돌려준다 */
+      clientRequestKey?: string;
     };
     AiQueryAccepted: {
       requestId: string;
@@ -5744,11 +5752,12 @@ export interface components {
         | "INVALID"
         | "DENIED"
         | "RATE_LIMITED"
-        | "REFUSED";
+        | "REFUSED"
+        | "NOT_READY";
       httpStatus: number;
       errorCode?: string | null;
       resultCategory?: string | null;
-      /** @description REOPEN이면 다시 열기 결과 */
+      /** @description REOPEN이면 다시 열기 결과, REPLAY면 같은 clientRequestKey의 재제출 */
       behavior?: string | null;
       message?: string | null;
       pocCode?: string | null;
@@ -12356,6 +12365,16 @@ export interface operations {
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
+      /** @description 카탈로그 준비 안 됨(AI_NOT_READY) */
+      503: {
+        headers: {
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"];
+        };
+      };
     };
   };
   askAiQuestion: {
@@ -12427,6 +12446,16 @@ export interface operations {
         };
       };
       500: components["responses"]["Error500"];
+      /** @description 카탈로그 준비 안 됨(AI_NOT_READY) */
+      503: {
+        headers: {
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiQueryResponse"];
+        };
+      };
     };
   };
   cancelAiRequest: {
@@ -12491,6 +12520,16 @@ export interface operations {
       404: components["responses"]["Error404"];
       422: components["responses"]["Error422"];
       500: components["responses"]["Error500"];
+      /** @description 카탈로그 준비 안 됨(AI_NOT_READY) */
+      503: {
+        headers: {
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"];
+        };
+      };
     };
   };
 }

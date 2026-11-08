@@ -188,8 +188,10 @@ test("AI renders JSON results and cancels a pending question", async ({
   await mock(page, { scenario: "slow" });
   await query.fill(question);
   await submit.click();
-  await page.getByRole("button", { name: "질문 취소", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("질문을 취소했어요.");
+  await page
+    .getByRole("button", { name: "질문 대기 취소", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toHaveText("질문 대기를 취소했어요.");
 });
 test("staff cannot open owner menus or read another branch through HTTP", async ({
   page,
