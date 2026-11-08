@@ -252,7 +252,7 @@ export function Login() {
                   <Icon name="tasks" />
                   <span>
                     직원으로 체험
-                    <small className="block text-[10px]">내 업무·팀 채팅</small>
+                    <small className="block text-[10px]">내 업무</small>
                   </span>
                 </Button>
               </div>

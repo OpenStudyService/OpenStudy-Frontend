@@ -13,7 +13,7 @@ export type TaskDraft = {
   status: Task["status"];
   checks: string;
 };
-export type TaskAction = "progress" | "complete" | "reopen" | "share";
+export type TaskAction = "progress" | "complete" | "reopen";
 export const taskFields = [
   "branchId",
   "title",
@@ -42,7 +42,6 @@ export const actionLabels: Record<TaskAction, string> = {
   progress: "진행하기",
   complete: "완료하기",
   reopen: "할 일로 변경",
-  share: "운영 채널에 공유",
 };
 export function draftFromTask(task?: Task, branch = ""): TaskDraft {
   const date = task?.dueAt ? new Date(task.dueAt) : null;

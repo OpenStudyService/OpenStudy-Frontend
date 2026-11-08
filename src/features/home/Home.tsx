@@ -7,7 +7,7 @@ import type {
   operations,
 } from "../../shared/api/foundation.generated";
 import { isAccessError } from "../../shared/api/read-model";
-import { businessDate, displayDate } from "../../shared/domain/schema";
+import { businessDate, can, displayDate } from "../../shared/domain/schema";
 import { DataNotice } from "../../shared/ui/DataNotice";
 import { Icon } from "../../shared/ui/Icon";
 import {
@@ -460,15 +460,17 @@ export function Home() {
               )}
             </div>
           </section>
-          <section className="card p-5">
-            <h2>AI 채팅</h2>
-            <Link
-              className="btn mt-4 w-full"
-              to={`/app/${encodeURIComponent(scope)}/ai`}
-            >
-              AI 채팅 열기 <Icon name="arrow" size={16} />
-            </Link>
-          </section>
+          {can(session.user, scope, "ai:read") && (
+            <section className="card p-5">
+              <h2>AI 채팅</h2>
+              <Link
+                className="btn mt-4 w-full"
+                to={`/app/${encodeURIComponent(scope)}/chat`}
+              >
+                AI 채팅 열기 <Icon name="arrow" size={16} />
+              </Link>
+            </section>
+          )}
         </aside>
       </div>
       <footer className="mt-6 flex justify-between gap-4 text-[10px] text-muted">

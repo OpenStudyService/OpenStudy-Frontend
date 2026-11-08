@@ -1261,13 +1261,15 @@ export interface paths {
     };
     /**
      * 내 참여 채널
-     * @description 요청자가 참여 중인 전체 채널과 scope 지점 채널을 읽지 않은 수와 함께 반환한다. unreadCount는 원문과 모든 스레드 답글의 합계다. 페이지가 없다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 요청자가 참여 중인 전체 채널과 scope 지점 채널을 읽지 않은 수와 함께 반환한다. unreadCount는 원문과 모든 스레드 답글의 합계다. 페이지가 없다.
      */
     get: operations["listMyChannels"];
     put?: never;
     /**
      * 채널 생성
-     * @description 참여자는 활성 자격이 있는 직원만 지정할 수 있다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 참여자는 활성 자격이 있는 직원만 지정할 수 있다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
      */
     post: operations["createChannel"];
     delete?: never;
@@ -1285,7 +1287,8 @@ export interface paths {
     };
     /**
      * 관리 가능한 채널
-     * @description 요청자가 관리할 수 있는 채널을 참여 여부와 관계없이 반환한다. 메시지 접근 권한은 주지 않는다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 요청자가 관리할 수 있는 채널을 참여 여부와 관계없이 반환한다. 메시지 접근 권한은 주지 않는다.
      */
     get: operations["listManageableChannels"];
     put?: never;
@@ -1305,7 +1308,8 @@ export interface paths {
     };
     /**
      * 채널 참여자 후보
-     * @description branchId가 있으면 해당 지점의 유효 소속 직원과 활성 OWNER, 없으면 소속이 하나 이상 유효한 활성 직원과 활성 OWNER를 반환한다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. branchId가 있으면 해당 지점의 유효 소속 직원과 활성 OWNER, 없으면 소속이 하나 이상 유효한 활성 직원과 활성 OWNER를 반환한다.
      */
     get: operations["listChannelMemberCandidates"];
     put?: never;
@@ -1325,7 +1329,8 @@ export interface paths {
     };
     /**
      * 채널 상세
-     * @description 참여자가 아니고 관리할 수도 없으면 404다. DM도 404다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 참여자가 아니고 관리할 수도 없으면 404다. DM도 404다.
      */
     get: operations["getChannel"];
     put?: never;
@@ -1335,7 +1340,8 @@ export interface paths {
     head?: never;
     /**
      * 채널 수정
-     * @description 이름·설명만 수정한다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 이름·설명만 수정한다.
      */
     patch: operations["updateChannel"];
     trace?: never;
@@ -1349,12 +1355,14 @@ export interface paths {
     };
     /**
      * 채널 참여자
-     * @description 참여 중인 직원을 이름순으로 반환한다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 참여 중인 직원을 이름순으로 반환한다.
      */
     get: operations["listChannelMembers"];
     /**
      * 채널 참여자 변경
-     * @description 최종 참여자 전체로 바꾼다. 빠진 직원은 즉시 접근이 끝난다. 참여 종료 후 다시 넣은 직원은 그 시점의 채널 최신 메시지까지 본문·모든 스레드를 읽은 상태가 되고 이전 메시지를 다시 볼 수 있다. 채널에 메시지가 없으면 위치는 그대로다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 최종 참여자 전체로 바꾼다. 빠진 직원은 즉시 접근이 끝난다. 참여 종료 후 다시 넣은 직원은 그 시점의 채널 최신 메시지까지 본문·모든 스레드를 읽은 상태가 되고 이전 메시지를 다시 볼 수 있다. 채널에 메시지가 없으면 위치는 그대로다.
      */
     put: operations["replaceChannelMembers"];
     post?: never;
@@ -1375,7 +1383,8 @@ export interface paths {
     put?: never;
     /**
      * 본문 읽음 위치 갱신
-     * @description 요청자의 본문 위치를 앞으로 옮긴다. messageId는 같은 채널의 원문이어야 하고 답글이면 422 INVALID_READ_TARGET이다. 현재 위치 이하면 위치를 바꾸지 않고 현재 값을 돌려준다. 스레드 위치는 바뀌지 않으므로 열지 않은 답글은 미확인으로 남는다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 요청자의 본문 위치를 앞으로 옮긴다. messageId는 같은 채널의 원문이어야 하고 답글이면 422 INVALID_READ_TARGET이다. 현재 위치 이하면 위치를 바꾸지 않고 현재 값을 돌려준다. 스레드 위치는 바뀌지 않으므로 열지 않은 답글은 미확인으로 남는다.
      */
     post: operations["markChannelRead"];
     delete?: never;
@@ -1393,13 +1402,15 @@ export interface paths {
     };
     /**
      * 채널 메시지
-     * @description 원문 메시지를 메시지 ID 기준으로 잘라 반환한다. 답글은 GET .../replies. 비참여자는 404다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 원문 메시지를 메시지 ID 기준으로 잘라 반환한다. 답글은 GET .../replies. 비참여자는 404다.
      */
     get: operations["listChannelMessages"];
     put?: never;
     /**
      * 메시지 전송
-     * @description clientMessageKey가 필수다. 처음이면 201, 같은 키·같은 입력의 재전송은 새 메시지 없이 원래 메시지를 200으로 돌려준다. 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. clientMessageKey가 필수다. 처음이면 201, 같은 키·같은 입력의 재전송은 새 메시지 없이 원래 메시지를 200으로 돌려준다. 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
      */
     post: operations["sendChannelMessage"];
     delete?: never;
@@ -1419,7 +1430,8 @@ export interface paths {
     put?: never;
     /**
      * 업무 카드 공유
-     * @description 요청자가 참여한 채널에 요청자가 접근할 수 있는 업무만 공유한다. 재전송 규칙은 메시지 전송과 같다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 요청자가 참여한 채널에 요청자가 접근할 수 있는 업무만 공유한다. 재전송 규칙은 메시지 전송과 같다.
      */
     post: operations["shareTaskCard"];
     delete?: never;
@@ -1437,7 +1449,8 @@ export interface paths {
     };
     /**
      * 메시지 단건
-     * @description 다른 채널의 메시지이거나 비참여자면 404다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 다른 채널의 메시지이거나 비참여자면 404다.
      */
     get: operations["getChannelMessage"];
     put?: never;
@@ -1457,7 +1470,8 @@ export interface paths {
     };
     /**
      * 스레드 답글
-     * @description 원문과 같은 참여자 권한을 적용하고 메시지 목록과 같은 커서 규칙을 쓴다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 원문과 같은 참여자 권한을 적용하고 메시지 목록과 같은 커서 규칙을 쓴다.
      */
     get: operations["listMessageReplies"];
     put?: never;
@@ -1479,7 +1493,8 @@ export interface paths {
     put?: never;
     /**
      * 스레드 읽음 위치 갱신
-     * @description 요청자의 원문별 스레드 위치를 앞으로 옮긴다. 본문 위치와 다른 스레드는 바뀌지 않는다. 현재 위치 이하면 위치를 바꾸지 않고 현재 값을 돌려준다. 비참여자·참여 종료·다른 채널의 원문이나 답글·없는 ID는 404다. 같은 채널이지만 경로가 답글이거나 replyId가 그 원문의 답글이 아니면 422 INVALID_READ_TARGET이다.
+     * @deprecated
+     * @description **비활성(#167, ADR-M10-002 M10-D10)**: 팀 채팅이 서비스 범위에서 빠졌다. 기본 설정(`openstudy.team-chat.enabled=false`)에서는 이 operation이 서버에 없어 인증된 요청도 404를 받는다. 새 클라이언트는 쓰지 않는다. 아래는 플래그를 켰을 때의 동작 기록이다. 요청자의 원문별 스레드 위치를 앞으로 옮긴다. 본문 위치와 다른 스레드는 바뀌지 않는다. 현재 위치 이하면 위치를 바꾸지 않고 현재 값을 돌려준다. 비참여자·참여 종료·다른 채널의 원문이나 답글·없는 ID는 404다. 같은 채널이지만 경로가 답글이거나 replyId가 그 원문의 답글이 아니면 422 INVALID_READ_TARGET이다.
      */
     post: operations["markThreadRead"];
     delete?: never;

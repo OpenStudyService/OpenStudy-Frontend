@@ -55,7 +55,6 @@ import { Shifts } from "../attendance/Shifts";
 import { AttendanceRecords } from "../attendance/AttendanceRecords";
 import { Tasks } from "../tasks/Tasks";
 import { TaskPanel } from "../tasks/TaskPanel";
-import { ChannelManagement } from "../chat/ChannelManagement";
 import { Customers } from "../customers/Customers";
 import { CustomerPanel } from "../customers/CustomerPanel";
 import { Payments } from "../payments/Payments";
@@ -243,8 +242,6 @@ export function ResourcePage(props: {
     <Passes embedded={props.embedded} />
   ) : props.resource === "members" ? (
     <Customers embedded={props.embedded} />
-  ) : props.resource === "channels" ? (
-    <ChannelManagement embedded={props.embedded} />
   ) : props.resource === "tasks" ? (
     <Tasks />
   ) : props.resource === "seats" ? (

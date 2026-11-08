@@ -12,7 +12,6 @@ import {
   InvitationAccept,
   PendingApproval,
 } from "../features/auth/Login";
-import { Chat } from "../features/chat/Chat";
 import { ResourceGroup, ResourcePage } from "../features/records/ResourcePage";
 import { ErrorState, State } from "../shared/ui/primitives";
 import { EmployeeManagement } from "../features/organization/Organization";
@@ -63,8 +62,8 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="home" replace /> },
       { path: "home", element: <Home /> },
       { path: "tasks", element: <ResourcePage resource="tasks" /> },
-      { path: "chat", element: <Chat /> },
-      { path: "chat/:channelId", element: <Chat /> },
+      { path: "ai", element: <Navigate to="../chat" replace /> },
+      { path: "chat/:channelId", element: <Navigate to="../chat" replace /> },
       {
         path: "members",
         element: (
@@ -120,7 +119,7 @@ export const router = createBrowserRouter([
         }),
       },
       {
-        path: "ai",
+        path: "chat",
         lazy: async () => ({
           Component: (await import("../features/analysis/Ai")).Ai,
         }),

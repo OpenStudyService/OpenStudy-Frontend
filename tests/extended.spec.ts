@@ -67,62 +67,8 @@ test("leave approval/cancel and weekly schedule use one balance", async ({
   ).toBe(15);
 });
 
-test("message IME, failed retry and duplicate removal after explicit refresh", async ({
-  page,
-}) => {
-  await login(page, "직원");
-  await page.goto("/app/gangnam/chat/gangnam");
-  const input = page.getByRole("textbox", { name: "메시지", exact: true });
-  await input.fill("한글 조합 중");
-  await input.dispatchEvent("keydown", {
-    key: "Enter",
-    code: "Enter",
-    keyCode: 229,
-    isComposing: true,
-  });
-  await expect(input).toHaveValue("한글 조합 중");
-  await expect(
-    page.locator("article p").filter({ hasText: "한글 조합 중" }),
-  ).toHaveCount(0);
-  await demo(page, { scenario: "message-failure" });
-  await input.fill("재전송 시험 메시지");
-  await input.press("Enter");
-  await expect(
-    page.getByRole("button", { name: "재전송", exact: true }),
-  ).toBeVisible();
-  await demo(page, { scenario: "normal" });
-  await page.getByRole("button", { name: "재전송", exact: true }).click();
-  await expect(input).toHaveValue("");
-  await expect(
-    page.locator("article p").filter({ hasText: "재전송 시험 메시지" }),
-  ).toHaveCount(1);
-  const refresh = page.getByRole("button", { name: "채팅 새로고침" });
-  await refresh.click();
-  await expect(refresh).toBeEnabled();
-  await expect(
-    page.locator("article p").filter({ hasText: "재전송 시험 메시지" }),
-  ).toHaveCount(1);
-});
-
-test("channel participants and session expiration", async ({ page }) => {
+test("an expired session returns to login", async ({ page }) => {
   await login(page);
-  await page.goto("/app/gangnam/settings?tab=channels");
-  await page.getByRole("button", { name: "채널 등록", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("채널 이름").fill("교대 인수인계");
-  await dialog.getByLabel("채널 설명").fill("교대 내용을 남겨 주세요");
-  await dialog
-    .getByLabel("참여 직원")
-    .selectOption([{ label: "박준호" }, { label: "이민지" }]);
-  await dialog.getByRole("button", { name: "채널 등록", exact: true }).click();
-  await expect(dialog).not.toBeVisible();
-  await page.goto("/app/gangnam/chat");
-  await expect(page.getByRole("link", { name: /교대 인수인계/ })).toHaveCount(
-    0,
-  );
-  await demo(page, { persona: "junho" });
-  await page.goto("/app/gangnam/chat");
-  await expect(page.getByRole("link", { name: /교대 인수인계/ })).toBeVisible();
   await demo(page, { expire: true });
   await page.goto("/app/gangnam/home");
   await expect(page.getByLabel("이메일", { exact: true })).toBeVisible();
