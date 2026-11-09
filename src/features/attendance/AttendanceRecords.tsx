@@ -12,6 +12,7 @@ import {
   type AttendanceRecord,
 } from "./attendance-api";
 import { shiftTime } from "./api";
+import { CorrectionForm } from "./RequestForms";
 
 export function AttendanceRecords() {
   const { session, scope, lookups } = useApp();
@@ -255,7 +256,7 @@ function RecordDetail({ id }: { id: string }) {
       ) : (
         <p>휴게 기록이 없습니다.</p>
       )}
-      <p className="help">다른 직원의 출퇴근을 대신 변경할 수 없습니다.</p>
+      <CorrectionForm row={row} />
     </div>
   );
 }

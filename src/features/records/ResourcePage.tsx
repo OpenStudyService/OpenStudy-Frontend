@@ -53,6 +53,7 @@ import { ResourceForm } from "./ResourceForm";
 import { WeekSchedule } from "../attendance/WeekSchedule";
 import { Shifts } from "../attendance/Shifts";
 import { AttendanceRecords } from "../attendance/AttendanceRecords";
+import { CorrectionList, SwapList } from "../attendance/RequestLists";
 import { Tasks } from "../tasks/Tasks";
 import { TaskPanel } from "../tasks/TaskPanel";
 import { Customers } from "../customers/Customers";
@@ -226,6 +227,10 @@ export function ResourcePage(props: {
     <Shifts />
   ) : props.resource === "attendance" ? (
     <AttendanceRecords />
+  ) : props.resource === "corrections" ? (
+    <CorrectionList />
+  ) : props.resource === "substitutions" ? (
+    <SwapList />
   ) : props.resource === "lockers" ? (
     <Lockers embedded={props.embedded} />
   ) : props.resource === "rooms" ? (

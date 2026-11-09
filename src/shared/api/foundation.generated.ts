@@ -2775,6 +2775,156 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    RequestStatus: "신청" | "승인" | "반려" | "취소";
+    RequestDecision: {
+      by: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      at: string;
+    };
+    RequestCancellation: {
+      /** @enum {string} */
+      kind: "신청 취소" | "승인 취소";
+      by: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      at: string;
+    };
+    AttendanceCorrectionKind: "출퇴근" | "휴게";
+    AttendanceCorrectionValues: {
+      /** Format: date-time */
+      clockInAt: string | null;
+      /** Format: date-time */
+      clockOutAt: string | null;
+      /** Format: date-time */
+      breakStartedAt: string | null;
+      /** Format: date-time */
+      breakEndedAt: string | null;
+    };
+    AttendanceCorrection: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["RequestStatus"];
+      kind: components["schemas"]["AttendanceCorrectionKind"];
+      attendanceRecordId: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      employee: components["schemas"]["ActorSummary"];
+      breakId: components["schemas"]["Id"] | null;
+      before: components["schemas"]["AttendanceCorrectionValues"];
+      after: components["schemas"]["AttendanceCorrectionValues"];
+      reason: string;
+      decision: components["schemas"]["AttendanceCorrectionDecision"] | null;
+      cancellation: components["schemas"]["RequestCancellation"] | null;
+      /** Format: date-time */
+      createdAt: string;
+      canApprove: boolean;
+      canReject: boolean;
+      canCancel: boolean;
+    };
+    AttendanceCorrectionPage: {
+      items: components["schemas"]["AttendanceCorrection"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    AttendanceCorrectionCreate: {
+      kind: components["schemas"]["AttendanceCorrectionKind"];
+      /** Format: date-time */
+      clockInAt?: string;
+      /** Format: date-time */
+      clockOutAt?: string;
+      breakId?: components["schemas"]["Id"];
+      /** Format: date-time */
+      breakStartedAt?: string;
+      /** Format: date-time */
+      breakEndedAt?: string;
+      reason: string;
+    };
+    AttendanceCorrectionReject: {
+      version: components["schemas"]["Version"];
+      reason: string;
+    };
+    AttendanceCorrectionDecision: {
+      by: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      at: string;
+      reason: string | null;
+    };
+    AttendanceConflict: {
+      visible: boolean;
+      /** @enum {string} */
+      label: "근태" | "다른 지점 근태";
+      /** Format: date-time */
+      overlapStartsAt: string;
+      /** Format: date-time */
+      overlapEndsAt: string;
+      attendanceRecordId: components["schemas"]["Id"] | null;
+    };
+    ShiftSwap: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["RequestStatus"];
+      shiftId: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      requester: components["schemas"]["ActorSummary"];
+      replacement: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      originalStartsAt: string;
+      /** Format: date-time */
+      originalEndsAt: string;
+      /** Format: date-time */
+      proposedStartsAt: string;
+      /** Format: date-time */
+      proposedEndsAt: string;
+      shiftVersion: components["schemas"]["Version"];
+      reason: string;
+      decision: components["schemas"]["RequestDecision"] | null;
+      cancellation: components["schemas"]["RequestCancellation"] | null;
+      /** Format: date-time */
+      createdAt: string;
+      canApprove: boolean;
+      canReject: boolean;
+      canCancel: boolean;
+      canCancelApproval: boolean;
+    };
+    ShiftSwapPage: {
+      items: components["schemas"]["ShiftSwap"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    ShiftSwapCreate: {
+      replacementEmployeeId: components["schemas"]["Id"];
+      /** Format: date-time */
+      proposedStartsAt: string;
+      /** Format: date-time */
+      proposedEndsAt: string;
+      reason: string;
+    };
+    ShiftSwapApprove: {
+      version: components["schemas"]["Version"];
+      shiftVersion: components["schemas"]["Version"];
+    };
+    WorkforceRequestConflictError: {
+      code: string;
+      message: string;
+      requestId: string;
+      fieldErrors?: {
+        [key: string]: string;
+      };
+      latestVersion?: components["schemas"]["Version"];
+      reloadUrl?: string;
+      /** @description LEAVE_SHIFT_CONFLICT, SHIFT_CONFLICT */
+      conflicts?: components["schemas"]["ShiftConflict"][];
+      /** @description CORRECTION_OVERLAP */
+      attendanceConflicts?: components["schemas"]["AttendanceConflict"][];
+      /** @description CORRECTION_BREAK_OUTSIDE */
+      breakIds?: components["schemas"]["Id"][];
+      /** @description LEAVE_BALANCE_INSUFFICIENT */
+      requiredDays?: number;
+      /** @description LEAVE_BALANCE_INSUFFICIENT */
+      availableDays?: number;
+      /** @description LEAVE_OVERLAP */
+      overlappingRequestIds?: components["schemas"]["Id"][];
+      pendingCorrectionId?: components["schemas"]["Id"];
+      pendingSwapId?: components["schemas"]["Id"];
+      shiftId?: components["schemas"]["Id"];
+      approvedVersion?: components["schemas"]["Version"];
+    };
     /**
      * @description BIGINT UNSIGNED를 표현하는 10진 문자열. 서버는 DB 상한도 검증한다.
      * @example 1
