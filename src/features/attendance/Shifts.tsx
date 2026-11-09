@@ -20,6 +20,8 @@ import {
   shiftTime as displayDate,
 } from "./api";
 
+import { SwapForm } from "./RequestForms";
+
 export function Shifts() {
   const { session, scope } = useApp();
   const [params, setParams] = useSearchParams();
@@ -211,12 +213,15 @@ function ShiftPanel({
   if (id && data.error)
     return <ErrorState error={data.error} retry={() => void data.refetch()} />;
   return (
-    <ShiftEditor
-      key={id || "create"}
-      row={data.data}
-      onCreated={onCreated}
-      reload={() => void data.refetch()}
-    />
+    <>
+      <ShiftEditor
+        key={id || "create"}
+        row={data.data}
+        onCreated={onCreated}
+        reload={() => void data.refetch()}
+      />
+      {data.data && <SwapForm row={data.data} />}
+    </>
   );
 }
 function ShiftEditor({

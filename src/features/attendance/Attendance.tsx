@@ -20,16 +20,16 @@ export function Attendance() {
       tabs={[
         { resource: "shifts", label: "근무표" },
         { resource: "attendance", label: "출퇴근·휴게" },
+        { resource: "corrections", label: "기록 정정" },
+        { resource: "substitutions", label: "대체근무" },
         ...(MOCK
           ? [
-              { resource: "corrections" as const, label: "기록 정정" },
               { resource: "leaveRequests" as const, label: "휴가 신청·승인" },
               {
                 resource: "leaveGrants" as const,
                 label: "휴가 부여",
                 admin: true,
               },
-              { resource: "substitutions" as const, label: "대체근무" },
             ]
           : []),
       ]}

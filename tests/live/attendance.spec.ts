@@ -428,3 +428,153 @@ test("stopped branch and revoked membership preserve ongoing break-end and clock
     await staff.context.close();
   }
 });
+test("M12 real attendance correction refreshes minutes and records rejection and cancellation", async ({
+  browser,
+}) => {
+  const staff = await login(browser);
+  const manager = await login(browser, "manager@workforce.test");
+  try {
+    await staff.page.goto("/app/1/attendance?tab=attendance&detail=9001");
+    const dialog = staff.page.getByRole("dialog");
+    await dialog.getByLabel("변경 종료 시각 (서울)").fill("2026-11-01T17:30");
+    await dialog.getByLabel("신청 사유").fill("실제 퇴근 시각 정정");
+    const response = staff.page.waitForResponse((r) =>
+      r.url().endsWith("/9001/corrections"),
+    );
+    await dialog.getByRole("button", { name: "신청하기" }).click();
+    const created = await response;
+    expect(created.status(), await created.text()).toBe(201);
+    const correction = await created.json();
+    await manager.page.goto("/app/1/attendance?tab=corrections");
+    const card = manager.page
+      .getByRole("article")
+      .filter({ hasText: correction.id });
+    await card.getByRole("button", { name: "승인", exact: true }).click();
+    await expect(card).toContainText("승인 ·");
+    await manager.page.getByRole("tab", { name: "출퇴근·휴게" }).click();
+    await expect(
+      manager.page.getByRole("row").filter({ hasText: "468분" }),
+    ).toBeVisible();
+
+    const path = "/attendance-records/9001/corrections";
+    const body = {
+      kind: "출퇴근",
+      clockInAt: "2026-11-01T00:00:00Z",
+      clockOutAt: "2026-11-01T08:00:00Z",
+      reason: "추가 정정",
+    };
+    const key = randomUUID();
+    const rejected = await api(staff.context, path, body, "POST", key);
+    expect(rejected.status(), await rejected.text()).toBe(201);
+    const row = await rejected.json();
+    expect(
+      (await (await api(staff.context, path, body, "POST", key)).json()).id,
+    ).toBe(row.id);
+    await manager.page.getByRole("tab", { name: "기록 정정" }).click();
+    const rejectedCard = manager.page
+      .getByRole("article")
+      .filter({ hasText: `#${row.id} ·` });
+    await rejectedCard
+      .getByRole("button", { name: "반려", exact: true })
+      .click();
+    await rejectedCard.getByLabel("반려 사유").fill("확인 자료가 필요합니다.");
+    await rejectedCard.getByRole("button", { name: "반려 확정" }).click();
+    await expect(rejectedCard).toContainText(
+      "반려 사유: 확인 자료가 필요합니다.",
+    );
+    const cancelled = await (
+      await api(staff.context, path, body, "POST", randomUUID())
+    ).json();
+    const result = await api(
+      staff.context,
+      `/attendance-corrections/${cancelled.id}/cancel`,
+      { version: cancelled.version },
+    );
+    expect(result.status(), await result.text()).toBe(200);
+    expect((await result.json()).status).toBe("취소");
+  } finally {
+    await staff.context.close();
+    await manager.context.close();
+  }
+});
+
+test("M12 real swaps approve, restore, reject and cancel", async ({
+  browser,
+}) => {
+  const staff = await login(browser);
+  const manager = await login(browser, "manager@workforce.test");
+  try {
+    const startsAt = new Date(
+      Math.ceil((Date.now() + 10 * 86400000) / 60000) * 60000,
+    ).toISOString();
+    const endsAt = new Date(Date.parse(startsAt) + 3600000).toISOString();
+    const created = await api(
+      manager.context,
+      "/shifts",
+      {
+        branchId: "1",
+        employeeId: "3",
+        startsAt,
+        endsAt,
+        plannedBreakMinutes: 0,
+      },
+      "POST",
+      randomUUID(),
+    );
+    expect(created.status(), await created.text()).toBe(201);
+    const shift = await created.json();
+    await staff.page.goto(`/app/1/attendance?tab=shifts&detail=${shift.id}`);
+    const dialog = staff.page.getByRole("dialog");
+    await dialog.getByLabel("대체 직원").selectOption("2");
+    await dialog.getByLabel("신청 사유").fill("대체근무 요청");
+    const response = staff.page.waitForResponse((r) =>
+      r.url().endsWith(`/${shift.id}/swaps`),
+    );
+    await dialog.getByRole("button", { name: "신청하기" }).click();
+    const swapResponse = await response;
+    expect(swapResponse.status(), await swapResponse.text()).toBe(201);
+    const swap = await swapResponse.json();
+    await manager.page.goto("/app/1/attendance?tab=substitutions");
+    const card = manager.page
+      .getByRole("article")
+      .filter({ hasText: `#${swap.id} ·` });
+    await card.getByRole("button", { name: "승인", exact: true }).click();
+    await expect(card).toContainText("승인 ·");
+    expect(
+      (await (await api(manager.context, `/shifts/${shift.id}`)).json())
+        .employee.id,
+    ).toBe("2");
+    await card.getByRole("button", { name: "승인 취소", exact: true }).click();
+    await expect(card).toContainText("취소 ·");
+    expect(
+      (await (await api(manager.context, `/shifts/${shift.id}`)).json())
+        .employee.id,
+    ).toBe("3");
+    const body = {
+      replacementEmployeeId: "2",
+      proposedStartsAt: startsAt,
+      proposedEndsAt: endsAt,
+      reason: "대체근무 요청",
+    };
+    for (const action of ["reject", "cancel"]) {
+      const request = await api(
+        staff.context,
+        `/shifts/${shift.id}/swaps`,
+        body,
+        "POST",
+        randomUUID(),
+      );
+      expect(request.status(), await request.text()).toBe(201);
+      const row = await request.json();
+      const result = await api(
+        action === "cancel" ? staff.context : manager.context,
+        `/shift-swaps/${row.id}/${action}`,
+        { version: row.version },
+      );
+      expect(result.status(), await result.text()).toBe(200);
+    }
+  } finally {
+    await staff.context.close();
+    await manager.context.close();
+  }
+});

@@ -320,6 +320,9 @@ export const schemas = {
     status: z.enum(["근무 중", "휴게 중", "퇴근"]),
   }),
   corrections: base.extend({
+    canonical: z
+      .custom<components["schemas"]["AttendanceCorrection"]>()
+      .optional(),
     employeeId: str,
     attendanceId: str,
     startedAt: str,
@@ -347,6 +350,7 @@ export const schemas = {
     decidedBy: z.string(),
   }),
   substitutions: base.extend({
+    canonical: z.custom<components["schemas"]["ShiftSwap"]>().optional(),
     employeeId: str,
     shiftId: str,
     substituteId: str,
