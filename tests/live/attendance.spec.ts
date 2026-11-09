@@ -578,3 +578,134 @@ test("M12 real swaps approve, restore, reject and cancel", async ({
     await manager.context.close();
   }
 });
+test("M12 real leave grant, request, approval, restoration and refusal", async ({
+  browser,
+}) => {
+  const staff = await login(browser);
+  const manager = await login(browser, "manager@workforce.test");
+  try {
+    const future = new Date(Date.now() + 4 * 86400000);
+    const day = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Seoul",
+    }).format(future);
+    const year = day.slice(0, 4);
+    await manager.page.goto("/app/1/attendance?tab=leaveGrants");
+    await manager.page.getByLabel("부여 직원").selectOption("3");
+    await manager.page.getByLabel("부여 연도").fill(year);
+    await manager.page.getByLabel("유효 시작일").fill(`${year}-01-01`);
+    await manager.page.getByLabel("유효 종료일").fill(`${year}-12-31`);
+    await manager.page.getByLabel("부여 일수").fill("2");
+    await manager.page.getByLabel("부여 사유").fill("M12 실제 연동 검증");
+    const grantResponse = manager.page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/leave-grants") &&
+        r.request().method() === "POST",
+    );
+    await manager.page.getByRole("button", { name: "휴가 부여하기" }).click();
+    const grant = await grantResponse;
+    expect(grant.status(), await grant.text()).toBe(201);
+
+    await staff.page.goto("/app/1/attendance?tab=leaveRequests");
+    await expect(
+      staff.page.getByRole("tab", { name: "휴가 부여", exact: true }),
+    ).toHaveCount(0);
+    await staff.page.getByLabel("시작일", { exact: true }).fill(day);
+    await staff.page.getByLabel("종료일", { exact: true }).fill(day);
+    await staff.page.getByLabel("신청 일수").fill("0.3");
+    await expect(staff.page.getByRole("alert")).toContainText("0.5일 단위");
+    await staff.page.getByLabel("신청 일수").fill("1.5");
+    await expect(staff.page.getByRole("alert")).toContainText("달력 일수(1일)");
+    await staff.page.getByLabel("신청 일수").fill("0.5");
+    await staff.page.getByLabel("사유", { exact: true }).fill("실제 반차 신청");
+    const submitted = staff.page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/leave-requests") &&
+        r.request().method() === "POST",
+    );
+    await staff.page.getByRole("button", { name: "휴가 신청 등록" }).click();
+    const response = await submitted;
+    expect(response.status(), await response.text()).toBe(201);
+    const request = await response.json();
+    const staffCard = staff.page
+      .getByRole("article")
+      .filter({ hasText: `#${request.id} ·` });
+    await expect(
+      staffCard.getByRole("button", { name: "승인", exact: true }),
+    ).toHaveCount(0);
+    await manager.page.getByRole("tab", { name: "휴가 신청·승인" }).click();
+    const balance = manager.page.getByRole("region", { name: "휴가 잔여량" });
+    await balance.getByLabel("잔여량 조회 대상").selectOption("3");
+    await balance.getByRole("button", { name: "부여·사용·복원 내역" }).click();
+    const card = manager.page
+      .getByRole("article")
+      .filter({ hasText: `#${request.id} ·` });
+    await card.getByRole("button", { name: "승인", exact: true }).click();
+    await expect(balance).toContainText("QA Staff · 잔여 1.5일");
+    await expect(balance).toContainText("사용 · -0.5일");
+    await expect(balance).toContainText("내역 합계 1.5일");
+    await card.getByRole("button", { name: "승인 취소", exact: true }).click();
+    await expect(balance).toContainText("QA Staff · 잔여 2일");
+    await expect(balance).toContainText("복원 · +0.5일");
+    await expect(balance).toContainText("내역 합계 2일");
+
+    const startsAt = new Date(`${day}T09:00:00+09:00`).toISOString();
+    const endsAt = new Date(`${day}T10:00:00+09:00`).toISOString();
+    const shift = await api(
+      manager.context,
+      "/shifts",
+      {
+        branchId: "1",
+        employeeId: "3",
+        startsAt,
+        endsAt,
+        plannedBreakMinutes: 0,
+      },
+      "POST",
+      randomUUID(),
+    );
+    expect(shift.status(), await shift.text()).toBe(201);
+    const shiftId = (await shift.json()).id;
+    const body = {
+      branchId: "1",
+      startsOn: day,
+      endsOn: day,
+      requestedDays: 0.5,
+      reason: "겹치는 근무 확인",
+    };
+    const make = async () => {
+      const result = await api(
+        staff.context,
+        "/leave-requests",
+        body,
+        "POST",
+        randomUUID(),
+      );
+      expect(result.status(), await result.text()).toBe(201);
+      return result.json();
+    };
+    const conflicting = await make();
+    await manager.page.getByRole("button", { name: "목록 새로고침" }).click();
+    const conflictCard = manager.page
+      .getByRole("article")
+      .filter({ hasText: `#${conflicting.id} ·` });
+    await conflictCard
+      .getByRole("button", { name: "승인", exact: true })
+      .click();
+    await expect(conflictCard).toContainText(`근무 #${shiftId}`);
+    await conflictCard
+      .getByRole("button", { name: "반려", exact: true })
+      .click();
+    await expect(conflictCard).toContainText("반려 ·");
+    const cancelled = await make();
+    const result = await api(
+      staff.context,
+      `/leave-requests/${cancelled.id}/cancel`,
+      { version: cancelled.version },
+    );
+    expect(result.status(), await result.text()).toBe(200);
+    expect((await result.json()).status).toBe("취소");
+  } finally {
+    await staff.context.close();
+    await manager.context.close();
+  }
+});

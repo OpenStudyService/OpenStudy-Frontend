@@ -322,13 +322,14 @@ function swapView(row: Swap, u: Employee) {
 function list<T extends { createdAt: string; branchId: string }>(
   rows: T[],
   a: Args,
+  order = (left: T, right: T) => right.createdAt.localeCompare(left.createdAt),
 ) {
   const p = new URL(a.request.url).searchParams;
   const page = Number(p.get("page") || 1);
   const pageSize = Number(p.get("pageSize") || 20);
   const selected = rows
     .filter((r) => scope(a) === "all" || scope(a) === r.branchId)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    .sort(order);
   return {
     items: selected.slice((page - 1) * pageSize, page * pageSize),
     meta: { page, pageSize, total: selected.length },
@@ -873,7 +874,515 @@ const swapHandlers = [
   ),
 ];
 
+type LeaveRecord = ResourceMap["leaveRequests"];
+type GrantRecord = ResourceMap["leaveGrants"];
+type Leave = NonNullable<LeaveRecord["canonical"]>;
+type GrantEvent = NonNullable<GrantRecord["events"]>[number];
+const today = () => businessDate(store.now());
+const date = z.iso.date();
+const validDays = (days: number) => days >= 0.5 && Number.isInteger(days * 2);
+const grantBody = z.strictObject({
+  employeeId: z.string().min(1),
+  originBranchId: z.string().min(1),
+  grantYear: z.number().int(),
+  validFrom: date,
+  validThrough: date,
+  grantedDays: z.number(),
+  reason,
+});
+const leaveBody = z.strictObject({
+  branchId: z.string().min(1),
+  startsOn: date,
+  endsOn: date,
+  requestedDays: z.number(),
+  reason,
+});
+const branchActive = (id: string) =>
+  store.db.branches.some(
+    (branch) => branch.id === id && branch.status === "운영 중",
+  );
+const seesLeave = (u: Employee, branchId: string, employeeId: string) =>
+  u.id === employeeId || admin(u, branchId);
+const grantEvents = (row: GrantRecord): GrantEvent[] =>
+  row.events ?? [
+    {
+      type: "부여",
+      deltaDays: row.amount,
+      leaveRequestId: null,
+      reason: row.reason,
+      actor: actor(row.grantedBy ?? "owner"),
+      createdAt: row.createdAt,
+    },
+  ];
+const remaining = (row: GrantRecord) =>
+  grantEvents(row).reduce((sum, event) => sum + event.deltaDays, 0);
+const grantOrder = (a: GrantRecord, b: GrantRecord) =>
+  a.endsOn.localeCompare(b.endsOn) || a.id.localeCompare(b.id);
+function grantView(row: GrantRecord, u: Employee) {
+  return {
+    id: row.id,
+    version: row.version,
+    originBranchId: row.branchId,
+    employee: actor(row.employeeId),
+    grantYear: row.grantYear ?? Number(row.startsOn.slice(0, 4)),
+    validFrom: row.startsOn,
+    validThrough: row.endsOn,
+    grantedDays: row.amount,
+    remainingDays: remaining(row),
+    expired: row.endsOn < today(),
+    reason: row.reason,
+    grantedBy: actor(row.grantedBy ?? "owner"),
+    createdAt: row.createdAt,
+    canAdjust: admin(u, row.branchId),
+  };
+}
+function balanceView(id: string, u: Employee) {
+  const grants = store.db.leaveGrants
+    .filter((row) => row.employeeId === id)
+    .sort(grantOrder)
+    .map((row) => {
+      const view = grantView(row, u);
+      return {
+        grantId: view.id,
+        originBranchId: view.originBranchId,
+        grantYear: view.grantYear,
+        validFrom: view.validFrom,
+        validThrough: view.validThrough,
+        grantedDays: view.grantedDays,
+        remainingDays: view.remainingDays,
+        expired: view.expired,
+      };
+    });
+  return {
+    employee: actor(id),
+    asOf: store.now(),
+    grants,
+    totalRemainingDays: grants
+      .filter((grant) => !grant.expired)
+      .reduce((sum, grant) => sum + grant.remainingDays, 0),
+  };
+}
+function leaveView(row: Leave, u: Employee) {
+  return {
+    ...row,
+    ...flags(row, u, row.employee.id),
+    canCancelApproval:
+      row.status === "승인" &&
+      today() < row.startsOn &&
+      u.id !== row.employee.id &&
+      admin(u, row.branchId),
+  };
+}
+function leaveRows(u: Employee) {
+  return store.db.leaveRequests.flatMap(({ canonical }) =>
+    canonical && seesLeave(u, canonical.branchId, canonical.employee.id)
+      ? [canonical]
+      : [],
+  );
+}
+function leaveOverlap(
+  employeeId: string,
+  start: string,
+  end: string,
+  u: Employee,
+  approving?: string,
+) {
+  const matches = store.db.leaveRequests.filter(
+    (row) =>
+      row.id !== approving &&
+      row.employeeId === employeeId &&
+      (row.status === "승인" || (!approving && row.status === pending)) &&
+      start <= row.endsOn &&
+      row.startsOn <= end,
+  );
+  if (!matches.length) return;
+  const overlappingRequestIds = matches
+    .filter((row) => seesLeave(u, row.branchId, row.employeeId))
+    .map((row) => row.id);
+  throw new RequestClash(
+    "LEAVE_OVERLAP",
+    "겹치는 휴가가 있습니다.",
+    overlappingRequestIds.length ? { overlappingRequestIds } : {},
+  );
+}
+function usableGrants(
+  employeeId: string,
+  start: string,
+  end: string,
+  requiredDays: number,
+) {
+  const grants = store.db.leaveGrants
+    .filter(
+      (row) =>
+        row.employeeId === employeeId &&
+        row.startsOn <= start &&
+        end <= row.endsOn &&
+        remaining(row) > 0,
+    )
+    .sort(grantOrder);
+  const availableDays = grants.reduce(
+    (sum, grant) => sum + remaining(grant),
+    0,
+  );
+  if (availableDays < requiredDays)
+    throw new RequestClash(
+      "LEAVE_BALANCE_INSUFFICIENT",
+      "사용 가능한 휴가가 부족합니다.",
+      { requiredDays, availableDays },
+    );
+  return grants;
+}
+function leaveShiftConflicts(row: Leave, u: Employee) {
+  const start = Date.parse(`${row.startsOn}T00:00:00+09:00`);
+  const end = Date.parse(`${row.endsOn}T00:00:00+09:00`) + 86400000;
+  const conflicts: Conflict[] = [];
+  const shifts = store.db.shifts
+    .filter(
+      (item) =>
+        item.employeeId === row.employee.id &&
+        item.status !== "취소" &&
+        Date.parse(item.startsAt) < end &&
+        start < Date.parse(item.endsAt),
+    )
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  for (const item of shifts) {
+    const allowed = visible(item, u);
+    const overlapStartsAt = new Date(
+      Math.max(start, Date.parse(item.startsAt)),
+    ).toISOString();
+    const overlapEndsAt = new Date(
+      Math.min(end, Date.parse(item.endsAt)),
+    ).toISOString();
+    const lastHidden = conflicts.findLast((conflict) => !conflict.visible);
+    if (!allowed && lastHidden && lastHidden.overlapEndsAt >= overlapStartsAt) {
+      if (lastHidden.overlapEndsAt < overlapEndsAt)
+        lastHidden.overlapEndsAt = overlapEndsAt;
+    } else
+      conflicts.push({
+        kind: "근무",
+        visible: allowed,
+        label: allowed ? "근무" : "다른 지점 근무",
+        overlapStartsAt,
+        overlapEndsAt,
+        shift: allowed
+          ? {
+              id: item.id,
+              branchId: item.branchId,
+              startsAt: item.startsAt,
+              endsAt: item.endsAt,
+            }
+          : null,
+      });
+  }
+  if (conflicts.length)
+    throw new RequestClash(
+      "LEAVE_SHIFT_CONFLICT",
+      "휴가 기간에 예정 근무가 있습니다.",
+      { conflicts },
+    );
+}
+function addGrantEvent(
+  grant: GrantRecord,
+  row: Leave,
+  type: "사용" | "복원",
+  deltaDays: number,
+  u: Employee,
+) {
+  grant.events = [
+    ...grantEvents(grant),
+    {
+      type,
+      deltaDays,
+      leaveRequestId: row.id,
+      reason: null,
+      actor: actor(u.id),
+      createdAt: store.now(),
+    },
+  ];
+  grant.version++;
+}
+const leaveHandlers = [
+  http.get(
+    "/api/me/leave-balance",
+    route((_a, u) => balanceView(u.id, u)),
+  ),
+  http.get(
+    "/api/employees/:id/leave-balance",
+    route((a, u) => {
+      const employee = store.db.employees.find(
+        (person) => person.id === a.params.id,
+      );
+      assert(
+        employee &&
+          (u.owner ||
+            employee.memberships.some(
+              (membership) =>
+                activeMember(employee, membership.branchId) &&
+                admin(u, membership.branchId),
+            )),
+        "직원을 찾을 수 없습니다.",
+        404,
+        "NOT_FOUND",
+      );
+      return balanceView(employee.id, u);
+    }),
+  ),
+  http.get(
+    "/api/leave-grants",
+    route((a, u) => {
+      const p = new URL(a.request.url).searchParams;
+      const page = Number(p.get("page") || 1);
+      const pageSize = Number(p.get("pageSize") || 20);
+      const rows = store.db.leaveGrants
+        .filter(
+          (row) =>
+            seesLeave(u, row.branchId, row.employeeId) &&
+            (scope(a) === "all" || scope(a) === row.branchId) &&
+            (p.get("includeExpired") === "true" || row.endsOn >= today()),
+        )
+        .sort(grantOrder);
+      return {
+        items: rows
+          .slice((page - 1) * pageSize, page * pageSize)
+          .map((row) => grantView(row, u)),
+        meta: { page, pageSize, total: rows.length },
+      };
+    }),
+  ),
+  http.get(
+    "/api/leave-grants/:id",
+    route((a, u) => {
+      const row = store.get("leaveGrants", String(a.params.id));
+      assert(
+        seesLeave(u, row.branchId, row.employeeId),
+        "부여를 찾을 수 없습니다.",
+        404,
+        "NOT_FOUND",
+      );
+      return { ...grantView(row, u), events: grantEvents(row) };
+    }),
+  ),
+  http.post(
+    "/api/leave-grants",
+    route(async (a, u) => {
+      const p = grantBody.parse(await a.request.json());
+      return store.transaction(
+        requestKey(a),
+        { operation: "leave-grant", p },
+        () => {
+          assert(
+            admin(u, p.originBranchId),
+            "부여 지점 관리자만 처리할 수 있습니다.",
+            403,
+            "FORBIDDEN",
+          );
+          assert(
+            p.validFrom <= p.validThrough &&
+              validDays(p.grantedDays) &&
+              p.grantedDays <= 366 &&
+              p.grantYear >= 2000 &&
+              p.grantYear <= 2100,
+            "부여 기간을 확인해 주세요.",
+            422,
+            "LEAVE_GRANT_INVALID",
+          );
+          assert(
+            branchActive(p.originBranchId),
+            "운영 중지 지점입니다.",
+            409,
+            "BRANCH_NOT_ACTIVE",
+          );
+          assert(
+            store.db.employees.some(
+              (person) =>
+                person.id === p.employeeId &&
+                person.status === "활성" &&
+                activeMember(person, p.originBranchId),
+            ),
+            "활성 소속 직원을 선택해 주세요.",
+            422,
+            "INVALID_LEAVE_EMPLOYEE",
+          );
+          const row = store.add("leaveGrants", p.originBranchId, {
+            employeeId: p.employeeId,
+            amount: p.grantedDays,
+            startsOn: p.validFrom,
+            endsOn: p.validThrough,
+            reason: p.reason,
+            grantYear: p.grantYear,
+            grantedBy: u.id,
+          });
+          return grantView(row, u);
+        },
+      );
+    }, 201),
+  ),
+  http.get(
+    "/api/leave-requests",
+    route((a, u) =>
+      list(
+        leaveRows(u).map((row) => leaveView(row, u)),
+        a,
+        (left, right) =>
+          right.startsOn.localeCompare(left.startsOn) ||
+          right.id.localeCompare(left.id),
+      ),
+    ),
+  ),
+  http.get(
+    "/api/leave-requests/:id",
+    route((a, u) => {
+      const row = leaveRows(u).find((item) => item.id === a.params.id);
+      assert(row, "휴가 신청을 찾을 수 없습니다.", 404, "NOT_FOUND");
+      return leaveView(row, u);
+    }),
+  ),
+  http.post(
+    "/api/leave-requests",
+    route(async (a, u) => {
+      const p = leaveBody.parse(await a.request.json());
+      return store.transaction(
+        requestKey(a),
+        { operation: "leave-request", p },
+        () => {
+          assert(
+            activeMember(u, p.branchId),
+            "신청 지점의 활성 소속이 필요합니다.",
+            403,
+            "FORBIDDEN",
+          );
+          assert(
+            p.startsOn.slice(0, 4) === p.endsOn.slice(0, 4) &&
+              validDays(p.requestedDays) &&
+              p.requestedDays <=
+                (Date.parse(p.endsOn) - Date.parse(p.startsOn)) / 86400000 + 1,
+            "휴가 기간과 일수를 확인해 주세요.",
+            422,
+            "LEAVE_PERIOD_INVALID",
+          );
+          assert(
+            branchActive(p.branchId),
+            "운영 중지 지점입니다.",
+            409,
+            "BRANCH_NOT_ACTIVE",
+          );
+          leaveOverlap(u.id, p.startsOn, p.endsOn, u);
+          usableGrants(u.id, p.startsOn, p.endsOn, p.requestedDays);
+          const record = store.add("leaveRequests", p.branchId, {
+            employeeId: u.id,
+            startsOn: p.startsOn,
+            endsOn: p.endsOn,
+            amount: p.requestedDays,
+            reason: p.reason,
+            status: pending,
+            decidedBy: "",
+          });
+          record.canonical = {
+            id: record.id,
+            version: record.version,
+            status: pending,
+            branchId: p.branchId,
+            employee: actor(u.id),
+            startsOn: p.startsOn,
+            endsOn: p.endsOn,
+            requestedDays: p.requestedDays,
+            reason: p.reason,
+            createdAt: record.createdAt,
+            decision: null,
+            cancellation: null,
+            allocations: [],
+            ...flags(record, u, u.id),
+            canCancelApproval: false,
+          };
+          return leaveView(record.canonical, u);
+        },
+      );
+    }, 201),
+  ),
+  ...(["approve", "reject", "cancel", "cancel-approval"] as const).map(
+    (action) =>
+      http.post(
+        `/api/leave-requests/:id/${action}`,
+        route(async (a, u) => {
+          const body = z
+            .strictObject({ version })
+            .parse(await a.request.json());
+          const row = leaveRows(u).find((item) => item.id === a.params.id);
+          assert(row, "휴가 신청을 찾을 수 없습니다.", 404, "NOT_FOUND");
+          decisionCheck(
+            u,
+            row,
+            row.employee.id,
+            action,
+            body.version,
+            "leave-requests",
+          );
+          if (action === "approve") {
+            leaveOverlap(row.employee.id, row.startsOn, row.endsOn, u, row.id);
+            leaveShiftConflicts(row, u);
+            const grants = usableGrants(
+              row.employee.id,
+              row.startsOn,
+              row.endsOn,
+              row.requestedDays,
+            );
+            let left = row.requestedDays;
+            for (const grant of grants) {
+              if (!left) break;
+              const days = Math.min(left, remaining(grant));
+              addGrantEvent(grant, row, "사용", -days, u);
+              row.allocations.push({
+                grantId: grant.id,
+                days,
+                restored: false,
+              });
+              left -= days;
+            }
+          }
+          if (action === "cancel-approval") {
+            assert(
+              today() < row.startsOn,
+              "시작일이 지난 휴가입니다.",
+              409,
+              "LEAVE_ALREADY_STARTED",
+            );
+            for (const allocation of row.allocations) {
+              addGrantEvent(
+                store.get("leaveGrants", allocation.grantId),
+                row,
+                "복원",
+                allocation.days,
+                u,
+              );
+              allocation.restored = true;
+            }
+          }
+          row.status =
+            action === "approve"
+              ? "승인"
+              : action === "reject"
+                ? "반려"
+                : "취소";
+          row.version++;
+          const audit = { by: actor(u.id), at: store.now() };
+          if (row.status === "취소")
+            row.cancellation = {
+              ...audit,
+              kind: action === "cancel" ? "신청 취소" : "승인 취소",
+            };
+          else row.decision = audit;
+          const record = store.get("leaveRequests", row.id);
+          record.status = row.status;
+          record.version = row.version;
+          store.persist();
+          return leaveView(row, u);
+        }),
+      ),
+  ),
+];
+
 export const workforceHandlers = [
+  ...leaveHandlers,
   ...correctionHandlers,
   ...swapHandlers,
   http.get(
