@@ -22,49 +22,48 @@ test("leave approval/cancel and weekly schedule use one balance", async ({
 }) => {
   await login(page, "직원");
   await page.goto("/app/gangnam/attendance?tab=leaveRequests");
+  await expect(
+    page.getByRole("tab", { name: "휴가 부여", exact: true }),
+  ).toHaveCount(0);
+  await page.getByLabel("시작일", { exact: true }).fill("2026-10-20");
+  await page.getByLabel("종료일", { exact: true }).fill("2026-10-20");
+  await page.getByLabel("신청 일수").fill("1.5");
+  await expect(page.getByRole("alert")).toContainText(
+    "기간의 달력 일수(1일)를 넘을 수 없습니다",
+  );
+  await page.getByLabel("신청 일수").fill("1");
+  await page.getByLabel("사유", { exact: true }).fill("개인 일정");
   await page
     .getByRole("button", { name: "휴가 신청 등록", exact: true })
     .click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("시작일", { exact: true }).fill("2026-10-20");
-  await dialog.getByLabel("종료일", { exact: true }).fill("2026-10-20");
-  await dialog.getByLabel("신청 일수").fill("1");
-  await dialog.getByLabel("사유", { exact: true }).fill("개인 일정");
-  await dialog
-    .getByRole("button", { name: "휴가 신청 등록", exact: true })
-    .click();
-  await expect(dialog).not.toBeVisible();
+  await expect(page.getByText("휴가 신청을 접수했습니다.")).toBeVisible();
+  const staffCard = page.getByRole("article").filter({ hasText: "개인 일정" });
+  await expect(
+    staffCard.getByRole("button", { name: "승인", exact: true }),
+  ).toHaveCount(0);
   await demo(page, { persona: "owner" });
   await page.goto("/app/gangnam/attendance?tab=leaveRequests");
-  await page.getByRole("button", { name: "박준호", exact: true }).click();
-  await dialog.getByRole("button", { name: "승인", exact: true }).click();
-  await dialog.getByRole("button", { name: "승인", exact: true }).click();
-  await expect(dialog.locator(".badge")).toHaveText("승인");
-  await dialog.getByRole("button", { name: "닫기", exact: true }).click();
-  const balance = await page.evaluate(() =>
-    fetch("/api/leave-balances?scope=gangnam").then((r) => r.json()),
-  );
-  expect(
-    balance.find((b: { employeeId: string }) => b.employeeId === "junho")
-      .balance,
-  ).toBe(14);
+  const card = page.getByRole("article").filter({ hasText: "개인 일정" });
+  const balance = page.getByRole("region", { name: "휴가 잔여량" });
+  await balance.getByLabel("잔여량 조회 대상").selectOption("junho");
+  await card.getByRole("button", { name: "승인", exact: true }).click();
+  await expect(card).toContainText("승인 ·");
+  await expect(balance.getByText("박준호 · 잔여 14일")).toBeVisible();
+  await balance.getByRole("button", { name: "부여·사용·복원 내역" }).click();
+  await expect(balance).toContainText("사용 · -1일");
+  await expect(balance).toContainText("내역 합계 14일");
   await page.goto("/app/gangnam/attendance?tab=shifts&week=2026-10-20");
   await expect(
     page.getByText("휴가 · 1일 승인", { exact: true }),
   ).toBeVisible();
-  await page.goto("/app/gangnam/attendance?tab=leaveRequests");
-  await page.getByRole("button", { name: "박준호", exact: true }).click();
-  await dialog.getByRole("button", { name: "취소·복원", exact: true }).click();
-  await dialog.getByLabel("처리 사유").fill("일정 변경");
-  await dialog.getByRole("button", { name: "취소·복원", exact: true }).click();
-  await expect(dialog.locator(".badge")).toHaveText("취소");
-  const restored = await page.evaluate(() =>
-    fetch("/api/leave-balances?scope=gangnam").then((r) => r.json()),
-  );
-  expect(
-    restored.find((b: { employeeId: string }) => b.employeeId === "junho")
-      .balance,
-  ).toBe(15);
+  await page.getByRole("tab", { name: "휴가 신청·승인" }).click();
+  await balance.getByLabel("잔여량 조회 대상").selectOption("junho");
+  await card.getByRole("button", { name: "승인 취소", exact: true }).click();
+  await expect(card).toContainText("취소 ·");
+  await expect(balance.getByText("박준호 · 잔여 15일")).toBeVisible();
+  await balance.getByRole("button", { name: "부여·사용·복원 내역" }).click();
+  await expect(balance).toContainText("복원 · +1일");
+  await expect(balance).toContainText("내역 합계 15일");
 });
 
 test("an expired session returns to login", async ({ page }) => {

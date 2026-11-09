@@ -334,6 +334,11 @@ export const schemas = {
     original: z.string(),
   }),
   leaveGrants: base.extend({
+    grantYear: z.number().int().optional(),
+    grantedBy: z.string().optional(),
+    events: z
+      .array(z.custom<components["schemas"]["LeaveBalanceEvent"]>())
+      .optional(),
     employeeId: str,
     amount: z.number().positive(),
     startsOn: str,
@@ -341,6 +346,7 @@ export const schemas = {
     reason: str,
   }),
   leaveRequests: base.extend({
+    canonical: z.custom<components["schemas"]["LeaveRequest"]>().optional(),
     employeeId: str,
     startsOn: str,
     endsOn: str,

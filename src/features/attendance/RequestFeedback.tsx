@@ -53,6 +53,20 @@ export function RequestFeedback({
           {conflict.pendingSwapId && (
             <li>처리 대기 중인 대체근무: {conflict.pendingSwapId}</li>
           )}
+          {conflict.code === "LEAVE_OVERLAP" && (
+            <li>
+              {conflict.overlappingRequestIds?.length
+                ? `겹치는 휴가 신청: ${conflict.overlappingRequestIds.join(", ")}`
+                : "다른 휴가와 기간이 겹칩니다."}
+            </li>
+          )}
+          {conflict.requiredDays !== undefined &&
+            conflict.availableDays !== undefined && (
+              <li>
+                필요 {conflict.requiredDays}일 · 사용 가능{" "}
+                {conflict.availableDays}일
+              </li>
+            )}
           {conflict.shiftId && <li>대상 근무: {conflict.shiftId}</li>}
           {conflict.latestVersion !== undefined && (
             <li>최신 버전: {conflict.latestVersion}</li>
