@@ -62,6 +62,7 @@ export async function getSpaceHistory(
   customerId: string,
   scope: string,
   signal: AbortSignal,
+  includeAbsorbed = false,
 ): Promise<SpaceHistory> {
   const parsed = spaceSchema.safeParse(
     await api<unknown>(
@@ -75,7 +76,7 @@ export async function getSpaceHistory(
   if (
     [...reservations, ...assignments].some(
       (r) =>
-        r.customer.id !== customerId ||
+        (!includeAbsorbed && r.customer.id !== customerId) ||
         (scope !== "all" && r.branchId !== scope),
     ) ||
     new Set(reservations.map((r) => r.id)).size !== reservations.length ||

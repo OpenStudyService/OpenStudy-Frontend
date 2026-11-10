@@ -1,3 +1,4 @@
+import { CustomerMergeErrorLink } from "./CustomerMergeErrorLink";
 import { useId, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -209,6 +210,7 @@ export function CustomerForm({
         );
       })}
       {failure && <FieldError>{failure.message}</FieldError>}
+      <CustomerMergeErrorLink error={failure} />
       {errors.body && <FieldError>{errors.body}</FieldError>}
       {conflict && (
         <section className="tip" aria-label="버전 충돌 확인">

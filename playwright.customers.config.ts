@@ -22,7 +22,10 @@ export default defineConfig({
     command: "npm run dev:live -- --port 15179 --strictPort",
     url: "http://127.0.0.1:15179",
     reuseExistingServer: false,
-    env: { API_PROXY_TARGET: "http://127.0.0.1:18089" },
+    env: {
+      API_PROXY_TARGET:
+        process.env.API_PROXY_TARGET || "http://127.0.0.1:18089",
+    },
     timeout: 30000,
   },
 });

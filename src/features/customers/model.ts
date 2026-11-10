@@ -9,7 +9,12 @@ export type CustomerCreate = components["schemas"]["CustomerCreate"];
 export type CustomerUpdate = components["schemas"]["CustomerUpdate"];
 export type CustomerStatusChange =
   components["schemas"]["CustomerStatusChange"];
+export type CustomerDuplicatePage =
+  components["schemas"]["CustomerDuplicatePage"];
+export type CustomerMerge = components["schemas"]["CustomerMerge"];
+export type CustomerMergeList = components["schemas"]["CustomerMergeList"];
 export const customerStatuses = ["정상", "이용 제한", "비활성"] as const;
+export const customerListStatuses = [...customerStatuses, "병합됨"] as const;
 export interface CustomerDraft {
   registeredBranchId: string;
   name: string;
@@ -51,7 +56,7 @@ export function parseCustomerFilters(params: URLSearchParams): CustomerFilters {
   };
   return {
     q: params.get("q") ?? "",
-    status: customerStatuses.includes(
+    status: customerListStatuses.includes(
       params.get("status") as Customer["status"],
     )
       ? params.get("status")!

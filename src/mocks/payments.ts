@@ -7,6 +7,7 @@ import type { components } from "../shared/api/foundation.generated";
 import { can } from "../shared/domain/schema";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
+import { matchesCustomer, rejectMergedCustomer } from "./customer-identity";
 
 type Payment = components["schemas"]["Payment"];
 type Pass = components["schemas"]["Pass"];
@@ -373,7 +374,7 @@ export const paymentHandlers = [
                   selected.includes(p.branchId) &&
                   (!status || p.status === status) &&
                   (!q.get("customerId") ||
-                    p.memberId === q.get("customerId")) &&
+                    matchesCustomer(p.memberId, q.get("customerId")!)) &&
                   (!from || Date.parse(p.createdAt) >= Date.parse(from)) &&
                   (!to || Date.parse(p.createdAt) < Date.parse(to)),
               )
@@ -434,6 +435,7 @@ export const paymentHandlers = [
           404,
           "NOT_FOUND",
         );
+        rejectMergedCustomer(customer, "CUSTOMER_NOT_ACTIVE");
         assert(
           customer.status === "정상",
           "정상 고객만 결제할 수 있습니다.",
@@ -623,7 +625,7 @@ export const paymentHandlers = [
                 (p) =>
                   selected.includes(p.branchId) &&
                   (!q.get("customerId") ||
-                    p.memberId === q.get("customerId")) &&
+                    matchesCustomer(p.memberId, q.get("customerId")!)) &&
                   (!status || effective(p) === status) &&
                   (!kind || p.kind === kind),
               )

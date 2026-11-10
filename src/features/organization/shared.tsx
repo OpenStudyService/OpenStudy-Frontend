@@ -143,13 +143,21 @@ export function Pager({
 }) {
   return (
     <div className="my-3 flex items-center gap-3">
-      <Button disabled={page === 1} onClick={() => onChange(page - 1)}>
+      <Button
+        type="button"
+        disabled={page === 1}
+        onClick={() => onChange(page - 1)}
+      >
         이전
       </Button>
       <span>
         {page}페이지 · 총 {total}개
       </span>
-      <Button disabled={page * 20 >= total} onClick={() => onChange(page + 1)}>
+      <Button
+        type="button"
+        disabled={page * 20 >= total}
+        onClick={() => onChange(page + 1)}
+      >
         다음
       </Button>
     </div>

@@ -5,6 +5,7 @@ import type {
   Resource,
   ResourceMap,
 } from "../shared/domain/schema";
+import type { components } from "../shared/api/foundation.generated";
 import type { StoredClosure } from "../shared/domain/closures";
 import { seed } from "./seed";
 import { reconcileChannels } from "../features/chat/model";
@@ -73,7 +74,10 @@ function publicLedger(db: Database) {
     passes: db.passes.filter((row) => fixtureIds.has(row.memberId)),
   };
 }
-type MockDatabase = Database & { branchClosures?: StoredClosure[] };
+type MockDatabase = Database & {
+  branchClosures?: StoredClosure[];
+  customerMerges?: components["schemas"]["CustomerMergeRecord"][];
+};
 interface Saved {
   db: MockDatabase;
   persona: string | null;

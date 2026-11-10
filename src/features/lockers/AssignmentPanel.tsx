@@ -1,3 +1,4 @@
+import { CustomerMergeErrorLink } from "../customers/CustomerMergeErrorLink";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -495,6 +496,7 @@ function AssignmentForm({
             </Field>
           </>
         )}
+        <CustomerMergeErrorLink error={error} />
         <LockerWriteError
           error={error}
           compare={compare}

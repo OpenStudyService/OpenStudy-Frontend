@@ -665,7 +665,7 @@ export interface paths {
     };
     /**
      * 고객 목록·검색
-     * @description scope 지점에 등록되었거나 scope 지점에서 결제(상태 무관)한 고객만 반환한다. q는 이름 부분 일치, 회원번호 정확 일치, 숫자 4자리 이상이면 연락처 부분 일치다. 범위 밖 고객은 total에도 포함하지 않는다. 다른 지점 고객 최소 요약은 M6(FR-MEM-03).
+     * @description scope 지점에 등록되었거나 scope 지점에서 결제(상태 무관)한 고객만 반환한다. q는 이름 부분 일치, 회원번호 정확 일치, 숫자 4자리 이상이면 연락처 부분 일치다. 범위 밖 고객은 total에도 포함하지 않는다. 다른 지점 고객 최소 요약은 M6(FR-MEM-03). 병합된 고객은 status=병합됨일 때만 나온다(M13-D07, #114).
      */
     get: operations["listCustomers"];
     put?: never;
@@ -718,6 +718,66 @@ export interface paths {
      * @description 정상·이용 제한·비활성 전환과 사유를 기록한다. 고객 행·결제·이용권·이용 기록을 삭제하지 않는다. 같은 상태 요청은 현재 값을 돌려주며 이력을 만들지 않는다.
      */
     post: operations["changeCustomerStatus"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customer-duplicates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 중복 의심 고객 묶음
+     * @description 같은 숫자 연락처의 병합되지 않은 고객이 둘 이상인 묶음(M13-D13). 고객 수 내림차순, 같으면 연락처 오름차순.
+     */
+    get: operations["listCustomerDuplicates"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}/merge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 고객 병합
+     * @description 흡수 고객을 병합됨으로 바꾸고 대상 고객 참조를 남긴다. 결제·이용권·이용 기록의 고객 참조는 바꾸지 않는다(M13-D07). 되돌리지 않는다.
+     */
+    post: operations["mergeCustomer"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}/merges": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 고객 병합 이력
+     * @description 이 고객이 대상이거나 흡수된 병합 이력, 최신순.
+     */
+    get: operations["listCustomerMerges"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -3776,7 +3836,7 @@ export interface components {
       /** @description 숫자만 9~11자리. 입력 시 하이픈·공백은 서버가 제거한 뒤 검증하고 숫자만 저장한다. */
       phone: string;
       /** @enum {string} */
-      status: "정상" | "이용 제한" | "비활성";
+      status: "정상" | "이용 제한" | "비활성" | "병합됨";
       registeredBranchId: components["schemas"]["Id"] | null;
       /** Format: date-time */
       registeredAt: string;
@@ -3794,7 +3854,7 @@ export interface components {
       /** @description 고객 응대 메모(M4-D06). 빈 문자열은 null로 저장한다. */
       memo: string | null;
       /** @enum {string} */
-      status: "정상" | "이용 제한" | "비활성";
+      status: "정상" | "이용 제한" | "비활성" | "병합됨";
       statusReason: string | null;
       registeredBranchId: components["schemas"]["Id"] | null;
       /** Format: date-time */
@@ -3802,10 +3862,58 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
       canEdit: boolean;
+      /** @description 병합됨 고객이 병합된 대상 고객. 그 외에는 null(M13-D03). */
+      mergedInto: components["schemas"]["CustomerSummary"] | null;
+      /** @description 이 고객으로 병합된 고객 수(M13-D07). */
+      absorbedCustomerCount: number;
     };
     CustomerPage: {
       items: components["schemas"]["CustomerListItem"][];
       meta: components["schemas"]["PageMeta"];
+    };
+    DuplicateCustomer: {
+      id: components["schemas"]["Id"];
+      memberNo: string;
+      name: string;
+      /** @enum {string} */
+      status: "정상" | "이용 제한" | "비활성";
+      registeredBranchId: components["schemas"]["Id"] | null;
+      /** Format: date-time */
+      registeredAt: string;
+      paymentCount: number;
+      /** Format: date-time */
+      lastActivityAt: string | null;
+    };
+    /** @description 같은 숫자 연락처의 병합되지 않은 고객 묶음(M13-D13). 고객은 등록 시각 순. */
+    CustomerDuplicateGroup: {
+      phone: string;
+      customers: components["schemas"]["DuplicateCustomer"][];
+    };
+    CustomerDuplicatePage: {
+      items: components["schemas"]["CustomerDuplicateGroup"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 경로의 고객이 남고 absorbedCustomerId가 흡수된다. 되돌리지 않는다(M13-D03). */
+    CustomerMerge: {
+      version: components["schemas"]["Version"];
+      absorbedCustomerId: components["schemas"]["Id"];
+      absorbedVersion: components["schemas"]["Version"];
+      reason: string;
+    };
+    CustomerMergeRecord: {
+      id: components["schemas"]["Id"];
+      target: components["schemas"]["CustomerSummary"];
+      absorbed: components["schemas"]["CustomerSummary"];
+      /** @description 연쇄 병합으로 옮겨진 경우 원래 대상이던 중간 고객. */
+      via: components["schemas"]["CustomerSummary"] | null;
+      mergedBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      mergedAt: string;
+      reason: string;
+    };
+    /** @description 최신순. 페이지 없음. */
+    CustomerMergeList: {
+      items: components["schemas"]["CustomerMergeRecord"][];
     };
     /**
      * @description 회원번호·상태·등록 시각은 서버가 정한다. 신규 고객은 정상 상태로 등록한다.
@@ -7917,7 +8025,8 @@ export interface operations {
         direction?: components["parameters"]["Direction"];
         /** @description 기본 registeredAt. 동률은 id로 안정 정렬. */
         sort?: "registeredAt" | "name";
-        status?: "정상" | "이용 제한" | "비활성";
+        /** @description 병합됨은 이 값으로만 나온다. */
+        status?: "정상" | "이용 제한" | "비활성" | "병합됨";
       };
       header?: never;
       path?: never;
@@ -7935,6 +8044,126 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["CustomerPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listCustomerDuplicates: {
+    parameters: {
+      query?: {
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CustomerDuplicatePage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  mergeCustomer: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CustomerMerge"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Customer"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 M13 규칙 충돌. code별 대상 정보는 OperationsConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"] & {
+            mergedIntoCustomerId?: string | null;
+          };
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listCustomerMerges: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CustomerMergeList"];
         };
       };
       401: components["responses"]["Error401"];
@@ -8059,7 +8288,20 @@ export interface operations {
       401: components["responses"]["Error401"];
       403: components["responses"]["Error403"];
       404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
+      /** @description 버전 충돌, 병합된 고객의 변경(CUSTOMER_ALREADY_MERGED, mergedIntoCustomerId). */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"] & {
+            mergedIntoCustomerId?: string | null;
+          };
+        };
+      };
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
@@ -8101,7 +8343,20 @@ export interface operations {
       401: components["responses"]["Error401"];
       403: components["responses"]["Error403"];
       404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
+      /** @description 버전 충돌, 병합된 고객의 변경(CUSTOMER_ALREADY_MERGED, mergedIntoCustomerId). */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"] & {
+            mergedIntoCustomerId?: string | null;
+          };
+        };
+      };
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];

@@ -1,3 +1,4 @@
+import { CustomerMergeErrorLink } from "../customers/CustomerMergeErrorLink";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -368,6 +369,7 @@ export function ReservationCreate({
         </Field>
       </fieldset>
       <WriteError error={error} />
+      <CustomerMergeErrorLink error={error} />
       {error instanceof ApiError &&
         error.detail.code === "ROOM_TIME_CONFLICT" && (
           <section className="my-4">

@@ -1,3 +1,4 @@
+import { CustomerMergeErrorLink } from "../customers/CustomerMergeErrorLink";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -254,6 +255,7 @@ export function PaymentCreate({
       </fieldset>
       {saleCode && <FieldError>{saleMessages[saleCode]}</FieldError>}
       {validation && <FieldError>{validation}</FieldError>}
+      <CustomerMergeErrorLink error={write.error} />
       {write.error && (
         <FieldError>
           {saleMessages[errorCode] ?? write.error.message} 입력을 유지했어요.
