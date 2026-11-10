@@ -73,7 +73,9 @@ export async function api<T>(
   signal.throwIfAborted();
   const method = (options.method || "GET").toUpperCase(),
     headers: Record<string, string> = { Accept: "application/json" };
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  const multipart = options.body instanceof FormData;
+  if (options.body !== undefined && !multipart)
+    headers["Content-Type"] = "application/json";
   if (!["GET", "HEAD"].includes(method)) headers["X-CSRF-Token"] = await csrf();
   signal.throwIfAborted();
   if (options.key) headers["Idempotency-Key"] = options.key;
@@ -83,8 +85,9 @@ export async function api<T>(
       method,
       credentials: "include",
       headers,
-      body:
-        options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: multipart
+        ? (options.body as FormData)
+        : JSON.stringify(options.body),
       signal,
     });
   } catch (e) {
@@ -134,7 +137,9 @@ export async function api<T>(
     if (response.status === 401 || detail.code === "CSRF_INVALID") clearCsrf();
     if (response.status === 401 && !path.startsWith("/auth/login")) {
       abortPrivateRequests();
-      window.dispatchEvent(new Event("openstudy:session-expired"));
+      window.dispatchEvent(
+        new CustomEvent("openstudy:session-expired", { detail: detail.code }),
+      );
     }
     throw new ApiError(
       response.status,

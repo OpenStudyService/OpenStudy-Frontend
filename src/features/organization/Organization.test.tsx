@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import type { components } from "../../shared/api/foundation.generated";
 import type {
@@ -279,12 +280,14 @@ it.each([
 ] as const)("shows only allowed controls for %s", (role, forms, global) => {
   setActor(role);
   render(
-    <EmployeeDetail
-      employee={employee}
-      presets={presets}
-      definitions={definitions}
-      onSaved={vi.fn()}
-    />,
+    <QueryClientProvider client={new QueryClient()}>
+      <EmployeeDetail
+        employee={employee}
+        presets={presets}
+        definitions={definitions}
+        onSaved={vi.fn()}
+      />
+    </QueryClientProvider>,
   );
   expect(
     screen.queryAllByRole("button", { name: "이 지점 소속 저장" }),
@@ -449,12 +452,14 @@ describe("employee detail version baselines", () => {
       },
     );
     render(
-      <EmployeeDetail
-        employee={employee}
-        presets={presets}
-        definitions={definitions}
-        onSaved={vi.fn().mockResolvedValue(undefined)}
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <EmployeeDetail
+          employee={employee}
+          presets={presets}
+          definitions={definitions}
+          onSaved={vi.fn().mockResolvedValue(undefined)}
+        />
+      </QueryClientProvider>,
     );
     const profile = within(
       screen.getByRole("button", { name: "계정 정보 저장" }).closest("form")!,

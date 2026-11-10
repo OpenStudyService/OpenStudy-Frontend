@@ -1,6 +1,13 @@
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError } from "../../shared/api/client";
@@ -111,7 +118,7 @@ it.each(["owner", "manager", "staff"])(
     );
     expect(useUi.getState().notice).toBe("프로필을 저장했어요.");
     expect(screen.getByText("staff@example.test")).toBeVisible();
-    expect(document.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.getByLabelText("프로필 사진")).toBeEnabled();
     expect(screen.getByRole("img")).toHaveAttribute(
       "src",
       state.session.user.avatar,
@@ -243,4 +250,73 @@ it("rechecks the session on 403 and never restores a cleared session with a late
   await act(async () => finish(updated()));
   expect(query.getQueryData(["session"])).toBeNull();
   expect(useUi.getState().notice).toBe("");
+});
+
+it("rejects unsupported MIME and oversize photos before making a request", () => {
+  setup();
+  const input = screen.getByLabelText("프로필 사진");
+  fireEvent.change(input, {
+    target: {
+      files: [new File(["bad"], "bad.svg", { type: "image/svg+xml" })],
+    },
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent("JPG, PNG, WebP");
+  fireEvent.change(input, {
+    target: {
+      files: [
+        new File([new Uint8Array(5_242_881)], "large.png", {
+          type: "image/png",
+        }),
+      ],
+    },
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent("5MB 이하");
+  expect(api).not.toHaveBeenCalled();
+});
+
+it("shows the server file error and falls back to initials on an image load error", async () => {
+  setup();
+  const photo = new File(["not a PNG"], "photo.png", { type: "image/png" });
+  vi.mocked(api).mockRejectedValueOnce(
+    new ApiError(422, {
+      code: "AVATAR_TYPE_UNSUPPORTED",
+      message: "파일 오류",
+      fieldErrors: { file: "서버가 지원하지 않는 사진 형식입니다." },
+    }),
+  );
+  fireEvent.change(screen.getByLabelText("프로필 사진"), {
+    target: { files: [photo] },
+  });
+  const body = vi.mocked(api).mock.calls[0][1]?.body as FormData;
+  expect([...body.keys()]).toEqual(["file"]);
+  expect(body.get("file")).toEqual(photo);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "서버가 지원하지 않는 사진 형식입니다.",
+  );
+  fireEvent.error(screen.getByRole("img"));
+  expect(screen.queryByRole("img")).toBeNull();
+  expect(screen.getByText("이", { selector: ".avatar" })).toBeVisible();
+});
+
+it("updates the session cache from upload and delete responses", async () => {
+  const { query, user } = setup();
+  const uploaded = updated(state.session.user.nickname);
+  uploaded.user.avatar = "/api/employees/10/avatar?v=fixture";
+  const deleted = updated(state.session.user.nickname, 3);
+  deleted.user.avatar = "";
+  vi.mocked(api).mockResolvedValueOnce(uploaded).mockResolvedValueOnce(deleted);
+  fireEvent.change(screen.getByLabelText("프로필 사진"), {
+    target: {
+      files: [new File(["fixture"], "photo.png", { type: "image/png" })],
+    },
+  });
+  await waitFor(() =>
+    expect(query.getQueryData(["session"])).toEqual(uploaded),
+  );
+  await user.click(screen.getByRole("button", { name: "사진 삭제" }));
+  expect(api).toHaveBeenLastCalledWith(
+    "/me/avatar",
+    expect.objectContaining({ method: "DELETE" }),
+  );
+  await waitFor(() => expect(query.getQueryData(["session"])).toEqual(deleted));
 });

@@ -6,7 +6,7 @@ import { api, ApiError } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
 import type { CurrentUser } from "../../shared/domain/schema";
 import { schemas } from "../../shared/domain/schema";
-import { Avatar, Button } from "../../shared/ui/primitives";
+import { Avatar, Button, FieldError } from "../../shared/ui/primitives";
 import { SaveError } from "../organization/shared";
 
 type ProfileResponse = components["schemas"]["CurrentUser"];
@@ -22,6 +22,7 @@ export function ProfileForm() {
   const [error, setError] = useState<Error | null>(null);
   const [latest, setLatest] = useState("");
   const [busy, setBusy] = useState(false);
+  const [photoError, setPhotoError] = useState("");
   const controller = useRef<AbortController | null>(null);
   useEffect(() => {
     const active = new AbortController();
@@ -57,6 +58,53 @@ export function ProfileForm() {
     );
   }
 
+  async function updatePhoto(file?: File) {
+    if (!allowed || busy) return;
+    setPhotoError("");
+    if (
+      file &&
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+    ) {
+      setPhotoError("JPG, PNG, WebP 사진을 선택해 주세요.");
+      return;
+    }
+    if (file && file.size > 5_242_880) {
+      setPhotoError("사진은 5MB 이하로 선택해 주세요.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const body = file ? new FormData() : undefined;
+      if (file) body?.append("file", file);
+      const updated = await api<ProfileResponse>("/me/avatar", {
+        method: file ? "PUT" : "DELETE",
+        body,
+        signal: controller.current?.signal,
+      });
+      if (await accept(updated)) {
+        setVersion((previous) =>
+          previous === updated.user.version - 1
+            ? updated.user.version
+            : previous,
+        );
+        void query.invalidateQueries({
+          queryKey: ["data", session.user.id],
+          refetchType: "none",
+        });
+        toast(file ? "프로필 사진을 변경했어요." : "프로필 사진을 삭제했어요.");
+      }
+    } catch (failure) {
+      if (failure instanceof DOMException && failure.name === "AbortError")
+        return;
+      setPhotoError(
+        (failure instanceof ApiError && failure.detail.fieldErrors?.file) ||
+          (failure as Error).message,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="card mb-5" aria-labelledby={`${id}-heading`}>
       <header className="card-header">
@@ -64,19 +112,34 @@ export function ProfileForm() {
       </header>
       <div className="grid gap-6 p-5 sm:grid-cols-[120px_minmax(0,500px)]">
         <div>
-          {session.user.avatar ? (
-            <img
-              className="mb-3 h-20 w-20 rounded-2xl object-cover"
-              src={session.user.avatar}
-              alt={`${session.user.nickname || session.user.name} 프로필`}
+          <Avatar
+            name={session.user.nickname || session.user.name}
+            size="large"
+            src={session.user.avatar}
+          />
+          <label className="field mt-3">
+            프로필 사진
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={busy || !allowed}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                if (file) void updatePhoto(file);
+              }}
             />
-          ) : (
-            <Avatar
-              name={session.user.nickname || session.user.name}
-              size="large"
-            />
+          </label>
+          {session.user.avatar && (
+            <Button
+              type="button"
+              disabled={busy || !allowed}
+              onClick={() => void updatePhoto()}
+            >
+              사진 삭제
+            </Button>
           )}
-          <p className="help mt-3">프로필 사진 변경은 추후 제공됩니다.</p>
+          {photoError && <FieldError>{photoError}</FieldError>}
         </div>
         <form
           className="grid gap-4"

@@ -341,7 +341,10 @@ export function Layout() {
           <Icon name="settings" />
           설정
         </NavLink>
-        <Avatar name={activeUser.nickname || activeUser.name} />
+        <Avatar
+          name={activeUser.nickname || activeUser.name}
+          src={activeUser.avatar}
+        />
       </nav>
       {sidebar}
       <div className="main-shell">
@@ -369,7 +372,10 @@ export function Layout() {
                   className="flex items-center gap-2 rounded-lg p-1 text-left"
                   aria-label="사용자 메뉴"
                 >
-                  <Avatar name={activeUser.nickname || activeUser.name} />
+                  <Avatar
+                    name={activeUser.nickname || activeUser.name}
+                    src={activeUser.avatar}
+                  />
                   <span className="hidden text-xs sm:block">
                     <b>{activeUser.nickname || activeUser.name}</b>
                     <small className="block">

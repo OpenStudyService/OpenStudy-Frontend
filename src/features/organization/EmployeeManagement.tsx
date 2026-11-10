@@ -8,6 +8,7 @@ import { api, queryString } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
 import { permissions } from "../../shared/domain/schema";
 import {
+  Avatar,
   Badge,
   Button,
   ErrorState,
@@ -24,6 +25,7 @@ import {
   rolePermissions,
 } from "./model";
 import type { Employee, Membership, MembershipInput, Preset } from "./model";
+import { EmployeeAccountActions } from "./EmployeeAccountActions";
 import { PresetManagement } from "./PermissionPresets";
 import {
   ContractNotice,
@@ -140,9 +142,12 @@ function EmployeeManagementContent() {
                 <article className="card my-3 p-4" key={employee.id}>
                   <div className="flex flex-wrap justify-between gap-3">
                     <div>
-                      <h2>
-                        {employee.name} {employee.owner && "(사장님)"}
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={employee.name} src={employee.avatar} />
+                        <h2>
+                          {employee.name} {employee.owner && "(사장님)"}
+                        </h2>
+                      </div>
                       <p className="help">{employee.email}</p>
                       <Badge>{employee.status}</Badge>
                       <p className="help">
@@ -273,6 +278,7 @@ export function EmployeeDetail({
         {!session.user.owner &&
           "이름·계정 전체 상태는 사장님만 변경할 수 있습니다."}
       </p>
+      <EmployeeAccountActions employee={employee} />
       {session.user.owner && (
         <EmployeeProfile
           employee={employee}
