@@ -2775,6 +2775,131 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    LeaveGrant: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      employee: components["schemas"]["ActorSummary"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
+      /** Format: date */
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      remainingDays: number;
+      /** @description validThrough < 오늘(Asia/Seoul) */
+      expired: boolean;
+      reason: string;
+      grantedBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      createdAt: string;
+      /** @description 원부여 지점의 MANAGER 이상. 화면 안내용 */
+      canAdjust: boolean;
+    };
+    LeaveBalanceEvent: {
+      /**
+       * @description DB GRANT, ADJUST, USE, RESTORE
+       * @enum {string}
+       */
+      type: "부여" | "보정" | "사용" | "복원";
+      deltaDays: number;
+      leaveRequestId: components["schemas"]["Id"] | null;
+      reason: string | null;
+      actor: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    LeaveGrantDetail: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      employee: components["schemas"]["ActorSummary"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
+      /** Format: date */
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      remainingDays: number;
+      /** @description validThrough < 오늘(Asia/Seoul) */
+      expired: boolean;
+      reason: string;
+      grantedBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      createdAt: string;
+      /** @description 원부여 지점의 MANAGER 이상. 화면 안내용 */
+      canAdjust: boolean;
+      /** @description 시간순 */
+      events: components["schemas"]["LeaveBalanceEvent"][];
+    };
+    LeaveGrantCreate: {
+      employeeId: components["schemas"]["Id"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
+      /** Format: date */
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      reason: string;
+    };
+    LeaveBalanceGrant: {
+      grantId: components["schemas"]["Id"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
+      /** Format: date */
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      remainingDays: number;
+      expired: boolean;
+    };
+    LeaveBalance: {
+      employee: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      asOf: string;
+      /** @description 만료되지 않은 부여의 잔여 합 */
+      totalRemainingDays: number;
+      /** @description validThrough 오름차순, 같으면 grantId */
+      grants: components["schemas"]["LeaveBalanceGrant"][];
+    };
+    LeaveAllocation: {
+      grantId: components["schemas"]["Id"];
+      days: number;
+      restored: boolean;
+    };
+    LeaveRequest: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["RequestStatus"];
+      employee: components["schemas"]["ActorSummary"];
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      startsOn: string;
+      /** Format: date */
+      endsOn: string;
+      requestedDays: number;
+      reason: string;
+      decision: components["schemas"]["RequestDecision"] | null;
+      cancellation: components["schemas"]["RequestCancellation"] | null;
+      allocations: components["schemas"]["LeaveAllocation"][];
+      /** Format: date-time */
+      createdAt: string;
+      canApprove: boolean;
+      canReject: boolean;
+      canCancel: boolean;
+      canCancelApproval: boolean;
+    };
+    LeaveRequestCreate: {
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      startsOn: string;
+      /** Format: date */
+      endsOn: string;
+      requestedDays: number;
+      reason: string;
+    };
     RequestStatus: "신청" | "승인" | "반려" | "취소";
     RequestDecision: {
       by: components["schemas"]["ActorSummary"];

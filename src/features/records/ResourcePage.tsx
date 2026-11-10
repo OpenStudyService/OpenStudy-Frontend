@@ -54,6 +54,7 @@ import { WeekSchedule } from "../attendance/WeekSchedule";
 import { Shifts } from "../attendance/Shifts";
 import { AttendanceRecords } from "../attendance/AttendanceRecords";
 import { CorrectionList, SwapList } from "../attendance/RequestLists";
+import { LeaveGrants, LeaveRequests } from "../attendance/Leave";
 import { Tasks } from "../tasks/Tasks";
 import { TaskPanel } from "../tasks/TaskPanel";
 import { Customers } from "../customers/Customers";
@@ -231,6 +232,10 @@ export function ResourcePage(props: {
     <CorrectionList />
   ) : props.resource === "substitutions" ? (
     <SwapList />
+  ) : props.resource === "leaveGrants" ? (
+    <LeaveGrants />
+  ) : props.resource === "leaveRequests" ? (
+    <LeaveRequests />
   ) : props.resource === "lockers" ? (
     <Lockers embedded={props.embedded} />
   ) : props.resource === "rooms" ? (

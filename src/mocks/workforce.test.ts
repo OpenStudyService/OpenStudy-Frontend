@@ -8,6 +8,12 @@ import { getShift, weekly, type Shift } from "../features/attendance/api";
 import { attendanceHandlers } from "./attendance";
 import { attendanceApi } from "../features/attendance/attendance-api";
 import type { Correction, Swap } from "../features/attendance/request-api";
+import {
+  leaveBalance,
+  leaveGrantDetail,
+  type LeaveGrant,
+  type LeaveRequest,
+} from "../features/attendance/leave-api";
 const server = setupServer(
   http.get("/api/auth/csrf", () =>
     HttpResponse.json({ token: "openstudy-mock-csrf" }),
@@ -311,5 +317,135 @@ it("returns break IDs and merges private attendance conflicts without record IDs
         },
       ],
     },
+  });
+});
+const leaveInput = {
+  branchId: "gangnam",
+  startsOn: "2026-11-02",
+  endsOn: "2026-11-02",
+  requestedDays: 0.5,
+  reason: "반차 신청",
+};
+const grantInput = {
+  employeeId: "junho",
+  originBranchId: "gangnam",
+  grantYear: 2026,
+  validFrom: "2026-01-01",
+  validThrough: "2026-11-30",
+  grantedDays: 2,
+  reason: "추가 부여",
+};
+it("deducts from the earliest expiring grant, restores the same allocation, and reconciles the ledger", async () => {
+  const options = { method: "POST", body: grantInput, key: "grant" };
+  const grant = await api<LeaveGrant>("/leave-grants", options);
+  expect(await api("/leave-grants", options)).toEqual(grant);
+  store.persona = "junho";
+  await expect(
+    api("/leave-grants", { ...options, key: "staff" }),
+  ).rejects.toMatchObject({ status: 403 });
+  await expect(
+    api("/leave-requests", {
+      method: "POST",
+      key: "invalid",
+      body: { ...leaveInput, requestedDays: 1.5 },
+    }),
+  ).rejects.toMatchObject({
+    status: 422,
+    detail: { code: "LEAVE_PERIOD_INVALID" },
+  });
+  const create = { method: "POST", body: leaveInput, key: "leave" };
+  const leave = await api<LeaveRequest>("/leave-requests", create);
+  expect(await api("/leave-requests", create)).toEqual(leave);
+  expect(leave).toMatchObject({
+    canApprove: false,
+    canReject: false,
+    canCancel: true,
+  });
+  await expect(
+    api("/leave-requests", { ...create, key: "overlap" }),
+  ).rejects.toMatchObject({
+    status: 409,
+    detail: { code: "LEAVE_OVERLAP", overlappingRequestIds: [leave.id] },
+  });
+  store.persona = "minji";
+  const path = `/leave-requests/${leave.id}`;
+  await expect(
+    api(`${path}/reject`, {
+      method: "POST",
+      body: { version: leave.version, reason: "invalid" },
+    }),
+  ).rejects.toMatchObject({ status: 422 });
+  const approved = await api<LeaveRequest>(`${path}/approve`, {
+    method: "POST",
+    body: { version: leave.version },
+  });
+  expect(approved.allocations).toEqual([
+    { grantId: grant.id, days: 0.5, restored: false },
+  ]);
+  expect((await leaveBalance("junho")).totalRemainingDays).toBe(16.5);
+  const restored = await api<LeaveRequest>(`${path}/cancel-approval`, {
+    method: "POST",
+    body: { version: approved.version },
+  });
+  expect(restored.allocations).toEqual([
+    { grantId: grant.id, days: 0.5, restored: true },
+  ]);
+  expect((await leaveBalance("junho")).totalRemainingDays).toBe(17);
+  const detail = await leaveGrantDetail(grant.id);
+  expect(detail.events.map((event) => [event.type, event.deltaDays])).toEqual([
+    ["부여", 2],
+    ["사용", -0.5],
+    ["복원", 0.5],
+  ]);
+  expect(detail.events.reduce((sum, event) => sum + event.deltaDays, 0)).toBe(
+    detail.remainingDays,
+  );
+});
+
+it("returns visible shift targets and protects cross-branch leave conflicts", async () => {
+  const shift = await api<Shift>("/shifts", {
+    method: "POST",
+    key: "planned-shift",
+    body: {
+      ...input,
+      startsAt: "2026-11-02T09:00:00+09:00",
+      endsAt: "2026-11-02T10:00:00+09:00",
+      plannedBreakMinutes: 0,
+    },
+  });
+  store.persona = "junho";
+  const leave = await api<LeaveRequest>("/leave-requests", {
+    method: "POST",
+    key: "leave",
+    body: leaveInput,
+  });
+  store.persona = "minji";
+  const approve = () =>
+    api(`/leave-requests/${leave.id}/approve`, {
+      method: "POST",
+      body: { version: leave.version },
+    });
+  await expect(approve()).rejects.toMatchObject({
+    status: 409,
+    detail: {
+      code: "LEAVE_SHIFT_CONFLICT",
+      conflicts: [{ visible: true, shift: { id: shift.id } }],
+    },
+  });
+  store.add("leaveRequests", "seongsu", {
+    employeeId: "junho",
+    startsOn: leaveInput.startsOn,
+    endsOn: leaveInput.endsOn,
+    status: "승인",
+    amount: 0.5,
+    reason: "hidden",
+    decidedBy: "owner",
+  });
+  await expect(approve()).rejects.toMatchObject({
+    status: 409,
+    detail: { code: "LEAVE_OVERLAP" },
+  });
+  await approve().catch((error: ApiError) => {
+    expect(error.detail).not.toHaveProperty("overlappingRequestIds");
   });
 });
