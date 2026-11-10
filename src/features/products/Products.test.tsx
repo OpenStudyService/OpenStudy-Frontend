@@ -48,6 +48,12 @@ const time = (over: Partial<Product> = {}): Product => ({
   category: categories[0],
   branchIds: ["gangnam"],
   canEdit: true,
+  salesStartsAt: null,
+  salesEndsAt: null,
+  salesLimit: null,
+  soldQuantity: 0,
+  remainingQuantity: null,
+  saleAvailability: "판매 가능",
   ...over,
 });
 const snapshot = (over: object = {}) => ({

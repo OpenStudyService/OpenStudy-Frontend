@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
-import { api, MOCK, queryString } from "../../shared/api/client";
+import { api, queryString } from "../../shared/api/client";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useIdempotency } from "../../shared/api/useIdempotency";
 import {
@@ -49,12 +49,11 @@ export function BranchClosures({ branch }: { branch: Branch }) {
     ],
     queryFn: ({ signal }) =>
       api<ClosureList>(`${path}?${queryString(range)}`, { signal }),
-    enabled: MOCK,
     retry: false,
   });
 
   async function save(action: () => Promise<unknown>) {
-    if (busy || !writable || !MOCK) return;
+    if (busy || !writable) return;
     setBusy(true);
     setError(null);
     try {
@@ -96,10 +95,9 @@ export function BranchClosures({ branch }: { branch: Branch }) {
 
   return (
     <div className="grid gap-4">
-      {!MOCK && <p className="help">서버 업데이트 후 사용할 수 있어요.</p>}
       {writable && (
         <form onSubmit={register}>
-          <fieldset className="grid gap-2" disabled={!MOCK || busy}>
+          <fieldset className="grid gap-2" disabled={busy}>
             <legend>휴무일 등록</legend>
             <Field label="휴무 날짜 (한국 시간)">
               <input
@@ -135,7 +133,7 @@ export function BranchClosures({ branch }: { branch: Branch }) {
                 {created.affectedReservations.map((row) => (
                   <li key={row.id}>
                     {row.roomName} · {formatDateTime(row.startAt)} ~{" "}
-                    {formatDateTime(row.endAt)}
+                    {formatDateTime(row.endAt)} · {row.status}
                   </li>
                 ))}
               </ul>
@@ -151,129 +149,124 @@ export function BranchClosures({ branch }: { branch: Branch }) {
         </section>
       )}
       {error && <p role="alert">{error.message}</p>}
-      {MOCK && (
-        <>
-          <form
-            className="grid gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (
-                draftRange.to < draftRange.from ||
-                draftRange.to > shiftClosureDate(draftRange.from, 366)
-              ) {
-                setError(
-                  new Error("조회 종료일은 시작일부터 366일 이내여야 해요."),
-                );
-                return;
-              }
-              setError(null);
-              setRange(draftRange);
-            }}
-          >
-            <Field label="조회 시작일">
-              <input
-                type="date"
-                required
-                value={draftRange.from}
-                onChange={(e) =>
-                  setDraftRange({ ...draftRange, from: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="조회 종료일">
-              <input
-                type="date"
-                required
-                value={draftRange.to}
-                onChange={(e) =>
-                  setDraftRange({ ...draftRange, to: e.target.value })
-                }
-              />
-            </Field>
-            <Button type="submit">휴무일 조회</Button>
-          </form>
-          {list.isPending && <State loading />}
-          {list.error && (
-            <ErrorState error={list.error} retry={() => void list.refetch()} />
-          )}
-          {list.data?.items.length === 0 && (
-            <State title="조회 기간에 휴무일이 없어요" />
-          )}
-          {list.data?.items.map((row) => (
-            <article className="rounded-xl border border-line p-3" key={row.id}>
-              <h3>{row.date}</h3>
-              {row.note && <p>{row.note}</p>}
-              {writable &&
-                row.canEdit &&
-                (editing?.id === row.id ? (
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void save(async () => {
-                        await api(`/branch-closures/${row.id}`, {
-                          method: "PATCH",
-                          body: {
-                            version: editing.version,
-                            note: editNote.trim() || null,
-                          },
-                        });
-                        setEditing(null);
-                      });
-                    }}
-                  >
-                    <Field label="휴무 안내 문구 수정">
-                      <textarea
-                        maxLength={200}
-                        value={editNote}
-                        onChange={(e) => setEditNote(e.target.value)}
-                        disabled={busy}
-                      />
-                    </Field>
-                    <Button type="submit" disabled={busy}>
-                      안내 저장
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setEditing(null)}
-                    >
-                      취소
-                    </Button>
-                  </form>
-                ) : (
-                  <Button
-                    disabled={busy}
-                    onClick={() => {
-                      setEditing(row);
-                      setEditNote(row.note ?? "");
-                    }}
-                  >
-                    안내 수정
-                  </Button>
-                ))}
-              {writable && row.canDelete && row.date > today && (
-                <Button
-                  disabled={busy}
-                  onClick={() => {
-                    if (!window.confirm(`${row.date} 휴무일을 삭제할까요?`))
-                      return;
-                    void save(async () => {
-                      await api<void>(
-                        `/branch-closures/${row.id}?version=${row.version}`,
-                        { method: "DELETE" },
-                      );
-                      if (editing?.id === row.id) setEditing(null);
-                      if (created?.closure.id === row.id) setCreated(null);
-                    });
-                  }}
-                >
-                  휴무일 삭제
-                </Button>
-              )}
-            </article>
-          ))}
-        </>
+      <form
+        className="grid gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (
+            draftRange.to < draftRange.from ||
+            draftRange.to > shiftClosureDate(draftRange.from, 366)
+          ) {
+            setError(
+              new Error("조회 종료일은 시작일부터 366일 이내여야 해요."),
+            );
+            return;
+          }
+          setError(null);
+          setRange(draftRange);
+        }}
+      >
+        <Field label="조회 시작일">
+          <input
+            type="date"
+            required
+            value={draftRange.from}
+            onChange={(e) =>
+              setDraftRange({ ...draftRange, from: e.target.value })
+            }
+          />
+        </Field>
+        <Field label="조회 종료일">
+          <input
+            type="date"
+            required
+            value={draftRange.to}
+            onChange={(e) =>
+              setDraftRange({ ...draftRange, to: e.target.value })
+            }
+          />
+        </Field>
+        <Button type="submit">휴무일 조회</Button>
+      </form>
+      {list.isPending && <State loading />}
+      {list.error && (
+        <ErrorState error={list.error} retry={() => void list.refetch()} />
       )}
+      {list.data?.items.length === 0 && (
+        <State title="조회 기간에 휴무일이 없어요" />
+      )}
+      {list.data?.items.map((row) => (
+        <article className="rounded-xl border border-line p-3" key={row.id}>
+          <h3>{row.date}</h3>
+          {row.note && <p>{row.note}</p>}
+          {writable &&
+            row.canEdit &&
+            (editing?.id === row.id ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void save(async () => {
+                    await api(`/branch-closures/${row.id}`, {
+                      method: "PATCH",
+                      body: {
+                        version: editing.version,
+                        note: editNote.trim() || null,
+                      },
+                    });
+                    setEditing(null);
+                  });
+                }}
+              >
+                <Field label="휴무 안내 문구 수정">
+                  <textarea
+                    maxLength={200}
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                    disabled={busy}
+                  />
+                </Field>
+                <Button type="submit" disabled={busy}>
+                  안내 저장
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setEditing(null)}
+                >
+                  취소
+                </Button>
+              </form>
+            ) : (
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  setEditing(row);
+                  setEditNote(row.note ?? "");
+                }}
+              >
+                안내 수정
+              </Button>
+            ))}
+          {writable && row.canDelete && row.date > today && (
+            <Button
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`${row.date} 휴무일을 삭제할까요?`)) return;
+                void save(async () => {
+                  await api<void>(
+                    `/branch-closures/${row.id}?version=${row.version}`,
+                    { method: "DELETE" },
+                  );
+                  if (editing?.id === row.id) setEditing(null);
+                  if (created?.closure.id === row.id) setCreated(null);
+                });
+              }}
+            >
+              휴무일 삭제
+            </Button>
+          )}
+        </article>
+      ))}
     </div>
   );
 }

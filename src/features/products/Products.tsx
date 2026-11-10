@@ -37,7 +37,7 @@ export function ProductManagement() {
   const tab = params.get("tab") === "categories" ? "categories" : "products";
   const { page, search, setPage, setSearch } = useListSearch("product");
   const status = params.get("productStatus") || "";
-  const availability = MOCK ? (params.get("productAvailability") ?? "") : "";
+  const availability = params.get("productAvailability") ?? "";
   const kind = params.get("productKind") || "";
   const categoryId = params.get("productCategory") || "";
   const [selected, setSelected] = useState<Product | "new" | null>(null);
@@ -94,7 +94,7 @@ export function ProductManagement() {
           </Button>
         )}
       </Heading>
-      {tab === "products" && MOCK && (
+      {tab === "products" && (
         <Field label="판매 가능 여부">
           <select
             value={availability}

@@ -1,4 +1,3 @@
-import { MOCK } from "../../shared/api/client";
 import type { ReactNode } from "react";
 import { FieldError } from "../../shared/ui/primitives";
 import { Field } from "../organization/shared";
@@ -219,13 +218,9 @@ export function ProductForm({
         {errors.categoryId && <FieldError>{errors.categoryId}</FieldError>}
       </div>
       {!disabled && (
-        <fieldset className="grid gap-2" disabled={!MOCK}>
+        <fieldset className="grid gap-2">
           <legend>판매 기간·한도</legend>
-          <p className="help">
-            {MOCK
-              ? "한국 시간 기준이에요. 비워 두면 제한이 없어요."
-              : "서버 업데이트 후 사용할 수 있어요."}
-          </p>
+          <p className="help">한국 시간 기준이에요. 비워 두면 제한이 없어요.</p>
           {(
             [
               ["salesStartsAt", "판매 시작"],

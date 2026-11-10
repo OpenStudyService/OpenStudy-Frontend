@@ -739,7 +739,7 @@ export interface paths {
     put?: never;
     /**
      * Mock 결제 생성·이용권 발급
-     * @description 고객·지점·상품을 서버에서 검증하고 상품의 현재 가격으로 금액을 산정한다. 승인이면 결제와 이용권 1장을 한 트랜잭션으로 확정하고, 실패면 실패 결제만 남기고 이용권을 만들지 않는다. 두 결과 모두 201이며 멱등 결과로 저장한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @description 고객·지점·상품을 서버에서 검증하고 상품의 현재 가격으로 금액을 산정한다. 승인이면 결제와 이용권 1장을 한 트랜잭션으로 확정하고, 실패면 실패 결제만 남기고 이용권을 만들지 않는다. 두 결과 모두 201이며 멱등 결과로 저장한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 판정 순서: 판매 중지 → 판매 지점 → 판매 기간 → 남은 한도(M13-D06). 판매 기간 밖은 409 PRODUCT_NOT_IN_SALE_PERIOD, 한도 소진은 409 PRODUCT_SALE_LIMIT_REACHED(#113).
      */
     post: operations["createPayment"];
     delete?: never;
@@ -1910,7 +1910,7 @@ export interface paths {
     put?: never;
     /**
      * 예약 생성과 선결제
-     * @description 입력 오류(422)와 시간 중복(409 ROOM_TIME_CONFLICT)을 구분한다. 승인이면 결제·예약·슬롯을 한 트랜잭션으로 확정하고, 실패면 실패 결제와 결제 실패 예약만 남기며 슬롯을 점유하지 않는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @description 입력 오류(422)와 시간 중복(409 ROOM_TIME_CONFLICT)을 구분한다. 승인이면 결제·예약·슬롯을 한 트랜잭션으로 확정하고, 실패면 실패 결제와 결제 실패 예약만 남기며 슬롯을 점유하지 않는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 시작 시각의 Asia/Seoul 날짜가 휴무일이면 409 BRANCH_CLOSED_DAY(M13-D01, #112).
      */
     post: operations["createRoomReservation"];
     delete?: never;
@@ -2771,6 +2771,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/branch-closures/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * 지점 휴무일 삭제
+     * @description date > 오늘(Asia/Seoul)인 휴무일만 삭제한다. 오늘 또는 지난 휴무일은 409 CLOSURE_ALREADY_STARTED.
+     */
+    delete: operations["deleteBranchClosure"];
+    options?: never;
+    head?: never;
+    /**
+     * 지점 휴무일 안내 수정
+     * @description 안내 문구만 바꾼다. 날짜는 바꿀 수 없다.
+     */
+    patch: operations["updateBranchClosure"];
+    trace?: never;
+  };
+  "/branches/{id}/closures": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 지점 휴무일 목록
+     * @description 기간과 겹치는 휴무일(날짜 오름차순). 생략하면 오늘부터 90일. 최대 366일.
+     */
+    get: operations["listBranchClosures"];
+    put?: never;
+    /**
+     * 지점 휴무일 등록
+     * @description 그날 시작하는 스터디룸 신규 예약만 막는다. 기존 예약은 취소하지 않고 affectedReservations로 경고한다(M13-D01).
+     */
+    post: operations["createBranchClosure"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3471,6 +3519,24 @@ export interface components {
       category: components["schemas"]["ProductCategory"];
       branchIds: components["schemas"]["Id"][];
       canEdit: boolean;
+      /**
+       * Format: date-time
+       * @description 판매 시작(포함). null이면 제한 없음.
+       */
+      salesStartsAt: string | null;
+      /**
+       * Format: date-time
+       * @description 판매 종료(제외). null이면 제한 없음.
+       */
+      salesEndsAt: string | null;
+      /** @description 모든 판매 지점 합계 한도(M13-D02). null이면 제한 없음. */
+      salesLimit: number | null;
+      /** @description 승인 상태 결제 수. 환불된 결제는 빠진다. */
+      soldQuantity: number;
+      remainingQuantity: number | null;
+      /** @enum {string} */
+      saleAvailability:
+        "판매 가능" | "판매 중지" | "판매 전" | "판매 종료" | "한도 소진";
     };
     /**
      * @example {
@@ -3496,6 +3562,18 @@ export interface components {
       status: "판매 중" | "판매 중지";
       categoryId: components["schemas"]["Id"];
       branchIds: components["schemas"]["Id"][];
+      /**
+       * Format: date-time
+       * @description 판매 시작(포함). null이면 제한 없음.
+       */
+      salesStartsAt?: string | null;
+      /**
+       * Format: date-time
+       * @description 판매 종료(제외). null이면 제한 없음.
+       */
+      salesEndsAt?: string | null;
+      /** @description 모든 판매 지점 합계 한도(M13-D02). null이면 제한 없음. */
+      salesLimit?: number | null;
     };
     /** @description terms.kind 변경 금지. 제공되지 않은 필드는 유지. terms는 유형 전체 조건 교체. */
     ProductUpdate: {
@@ -3504,6 +3582,18 @@ export interface components {
       priceKrw?: number;
       terms?: components["schemas"]["ProductTerms"];
       categoryId?: components["schemas"]["Id"];
+      /**
+       * Format: date-time
+       * @description 판매 시작(포함). null이면 제한 없음.
+       */
+      salesStartsAt?: string | null;
+      /**
+       * Format: date-time
+       * @description 판매 종료(제외). null이면 제한 없음.
+       */
+      salesEndsAt?: string | null;
+      /** @description 모든 판매 지점 합계 한도(M13-D02). null이면 제한 없음. */
+      salesLimit?: number | null;
     };
     ProductStatus: {
       version: components["schemas"]["Version"];
@@ -3514,6 +3604,7 @@ export interface components {
       version: components["schemas"]["Version"];
       branchIds: components["schemas"]["Id"][];
     };
+    /** @description 상품 변경 이력·구매 시점 조건 스냅샷. schemaVersion 2부터 판매 기간·한도(salesStartsAt, salesEndsAt, salesLimit)를 담는다. #113 이전에 저장된 버전 1 스냅샷에는 이 세 필드가 없다. */
     ProductSnapshot: {
       schemaVersion: number;
       code: string;
@@ -3525,6 +3616,18 @@ export interface components {
       categoryCode: string;
       categoryName: string;
       branchIds: components["schemas"]["Id"][];
+      /**
+       * Format: date-time
+       * @description 판매 시작(포함). null이면 제한 없음.
+       */
+      salesStartsAt?: string | null;
+      /**
+       * Format: date-time
+       * @description 판매 종료(제외). null이면 제한 없음.
+       */
+      salesEndsAt?: string | null;
+      /** @description 모든 판매 지점 합계 한도(M13-D02). null이면 제한 없음. */
+      salesLimit?: number | null;
     };
     /** @description productId는 불변 상품 ID다. 최초 이력 before=null. SRS v1.1에서는 신규 상품 물리 삭제를 제공하지 않는다. 이전 스키마에서 남은 DELETED 이력이 있는 경우에만 과거 이벤트로 해석하고 새로 생성하지 않는다. 관련 지점 관리 권한을 확인한다. */
     ProductRevision: {
@@ -4877,6 +4980,8 @@ export interface components {
       /** Format: date-time */
       to: string;
       items: components["schemas"]["RoomReservation"][];
+      /** @description 조회 기간과 겹치는 그 지점의 휴무일(오름차순, M13-D01). */
+      closedDates: string[];
     };
     /** @description 금액 필드는 없다. 서버가 룸의 현재 시간당 요금으로 계산한다. partySize는 정원 검증에만 쓰고 저장하지 않는다. */
     RoomReservationCreate: {
@@ -5753,6 +5858,8 @@ export interface components {
       facilities: components["schemas"]["HomeFacilityCard"];
       shifts: components["schemas"]["HomeShiftCard"];
       notices: components["schemas"]["HomeNoticeCard"];
+      /** @description scope 지점의 오늘부터 7일 뒤까지의 휴무일. 날짜 → 지점 ID 순(M13-D01). */
+      closures: components["schemas"]["HomeClosureItem"][];
     };
     /** @description 같은 지점 동료의 오늘 근무(2026-11-05 사용자 결정, FR-DASH-05). 이름과 근무 시작·종료 시각만 담는다. 근무 ID·직원 ID·예정 휴게·근태·메모·변경 이력·이동 대상은 없다. */
     HomeShiftColleague: {
@@ -6075,6 +6182,106 @@ export interface components {
       envelope: components["schemas"]["AiResultEnvelope"];
       querySpec?: components["schemas"]["AiQuerySpec"] | null;
     };
+    /** @description 지점 휴무일(Asia/Seoul 하루 전체, M13-D05). */
+    BranchClosure: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      date: string;
+      note: string | null;
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      canEdit: boolean;
+      /** @description 편집 권한이 있고 date > 오늘(Asia/Seoul)이면 true. */
+      canDelete: boolean;
+    };
+    /** @description date 오름차순. 페이지 없음(최대 367행). */
+    BranchClosureList: {
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      items: components["schemas"]["BranchClosure"][];
+    };
+    /** @description 오늘(Asia/Seoul) ~ 366일 뒤. 아니면 422 CLOSURE_DATE_INVALID. */
+    BranchClosureCreate: {
+      /** Format: date */
+      date: string;
+      note?: string;
+    };
+    /** @description 안내 문구만 바꾼다. 날짜는 바꿀 수 없다. */
+    BranchClosureUpdate: {
+      version: components["schemas"]["Version"];
+      note: string | null;
+    };
+    /** @description 등록 결과와 경고. affectedReservations는 시작 시각 순 최대 100건. */
+    BranchClosureCreated: {
+      closure: components["schemas"]["BranchClosure"];
+      affectedReservations: components["schemas"]["AffectedReservation"][];
+      affectedReservationCount: number;
+    };
+    /** @description 홈 휴무 안내(오늘부터 7일 뒤까지). */
+    HomeClosureItem: {
+      branchId: components["schemas"]["Id"];
+      branchName: string;
+      /** Format: date */
+      date: string;
+      note: string | null;
+      today: boolean;
+    };
+    /** @description 휴무일에 시작하는 기존 예약. 자동 취소하지 않는다(M13-D01). 고객 정보는 담지 않는다. */
+    AffectedReservation: {
+      id: components["schemas"]["Id"];
+      roomId: components["schemas"]["Id"];
+      roomName: string;
+      /** Format: date-time */
+      startAt: string;
+      /** Format: date-time */
+      endAt: string;
+      /** @enum {string} */
+      status: "확정" | "이용 중";
+    };
+    /** @description M13 409 본문. ApiError 필드에 code별 대상 정보를 더한다. 해당 없는 필드는 담지 않는다. */
+    OperationsConflictError: {
+      code: string;
+      message: string;
+      requestId: string;
+      fieldErrors?: {
+        [key: string]: string;
+      };
+      latestVersion?: components["schemas"]["Version"];
+      reloadUrl?: string;
+      /** @description BRANCH_CLOSURE_EXISTS */
+      closureId?: components["schemas"]["Id"] | null;
+      /**
+       * Format: date
+       * @description BRANCH_CLOSED_DAY
+       */
+      closedDate?: string | null;
+      /**
+       * Format: date-time
+       * @description PRODUCT_NOT_IN_SALE_PERIOD
+       */
+      salesStartsAt?: string | null;
+      /**
+       * Format: date-time
+       * @description PRODUCT_NOT_IN_SALE_PERIOD
+       */
+      salesEndsAt?: string | null;
+      /** @description PRODUCT_SALE_LIMIT_REACHED */
+      salesLimit?: number | null;
+      /** @description PRODUCT_SALE_LIMIT_REACHED */
+      soldQuantity?: number | null;
+      /** @description CUSTOMER_ALREADY_MERGED */
+      mergedIntoCustomerId?: components["schemas"]["Id"] | null;
+      /** @description CLOSING_EXISTS */
+      closingId?: components["schemas"]["Id"] | null;
+    };
   };
   responses: {
     /** @description 유효한 세션/자격증명 없음 */
@@ -6179,6 +6386,10 @@ export interface components {
     PassProductId: components["schemas"]["Id"];
     /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
     PassCategoryCode: string;
+    /** @description 시작 날짜(포함, Asia/Seoul). to와 함께 보내거나 함께 생략한다. */
+    ClosureFrom: string;
+    /** @description 종료 날짜(포함, Asia/Seoul). 기간은 최대 366일이고 넘으면 422 PERIOD_TOO_LONG. */
+    ClosureTo: string;
   };
   requestBodies: never;
   headers: never;
@@ -7348,6 +7559,9 @@ export interface operations {
         status?: "판매 중" | "판매 중지";
         kind?: "시간권" | "기간권" | "정액권";
         categoryId?: components["schemas"]["Id"];
+        /** @description 지금의 판매 가능 여부로 거른다. */
+        availability?:
+          "판매 가능" | "판매 중지" | "판매 전" | "판매 종료" | "한도 소진";
       };
       header?: never;
       path?: never;
@@ -7972,7 +8186,18 @@ export interface operations {
       401: components["responses"]["Error401"];
       403: components["responses"]["Error403"];
       404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
+      /** @description 판매 불가·고객 상태·중복 요청 충돌. PRODUCT_NOT_IN_SALE_PERIOD·PRODUCT_SALE_LIMIT_REACHED는 대상 정보를 담는다(OperationsConflictError). */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
@@ -10844,7 +11069,18 @@ export interface operations {
       401: components["responses"]["Error401"];
       403: components["responses"]["Error403"];
       404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
+      /** @description 시간 충돌·지점 상태·휴무일·중복 요청 충돌. BRANCH_CLOSED_DAY는 closedDate를 담는다(OperationsConflictError). */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
@@ -12805,6 +13041,192 @@ export interface operations {
           "application/json": components["schemas"]["ApiError"];
         };
       };
+    };
+  };
+  listBranchClosures: {
+    parameters: {
+      query?: {
+        /** @description 시작 날짜(포함, Asia/Seoul). to와 함께 보내거나 함께 생략한다. */
+        from?: components["parameters"]["ClosureFrom"];
+        /** @description 종료 날짜(포함, Asia/Seoul). 기간은 최대 366일이고 넘으면 422 PERIOD_TOO_LONG. */
+        to?: components["parameters"]["ClosureTo"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BranchClosureList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createBranchClosure: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BranchClosureCreate"];
+      };
+    };
+    responses: {
+      /** @description 생성됨. 같은 Idempotency-Key·같은 입력은 처음 결과를 재생한다. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BranchClosureCreated"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 M13 규칙 충돌. code별 대상 정보는 OperationsConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  deleteBranchClosure: {
+    parameters: {
+      query: {
+        /** @description 조회한 version. */
+        version: components["schemas"]["Version"];
+      };
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 본문 없음. */
+      204: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 M13 규칙 충돌. code별 대상 정보는 OperationsConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  updateBranchClosure: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BranchClosureUpdate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BranchClosure"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 M13 규칙 충돌. code별 대상 정보는 OperationsConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
     };
   };
 }
