@@ -107,6 +107,7 @@ function emptySummary(mine = false): HomeSummary {
     query: Record<string, string> = {},
   ) => ({ screen, branchId: null, targetId: null, query });
   return {
+    closures: [],
     meta: {
       branchIds: [],
       allBranches: true,

@@ -2,9 +2,9 @@ import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState, type FormEvent } from "react";
 import { useApp } from "../../app/context";
-import { admin } from "../../shared/domain/schema";
+import { admin, can } from "../../shared/domain/schema";
 import { BranchClosures } from "./BranchClosures";
-import { api, MOCK, queryString } from "../../shared/api/client";
+import { api, queryString } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
 import {
   Badge,
@@ -85,7 +85,7 @@ function BranchManagementContent() {
                   <p className="help">{branch.hours}</p>
                   <Badge>{branch.status}</Badge>
                 </div>
-                {(MOCK || admin(session.user, branch.id)) && (
+                {can(session.user, branch.id) && (
                   <Button onClick={() => setClosureBranch(branch)}>
                     {admin(session.user, branch.id)
                       ? "휴무일 관리"

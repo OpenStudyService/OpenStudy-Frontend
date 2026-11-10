@@ -27,9 +27,9 @@ const view = (row: StoredClosure, actor: Employee) => ({
 });
 
 function checkBranch(branchId: string, actor: Employee, write = false) {
+  assert(can(actor, branchId), "지점에 접근할 수 없어요.", 403, "FORBIDDEN");
   assert(
-    store.db.branches.some((branch) => branch.id === branchId) &&
-      can(actor, branchId),
+    store.db.branches.some((branch) => branch.id === branchId),
     "지점을 찾을 수 없습니다.",
     404,
     "NOT_FOUND",
@@ -71,6 +71,12 @@ export const closureHandlers = [
       const branchId = String(params.id);
       checkBranch(branchId, actor);
       const query = new URL(request.url).searchParams;
+      assert(
+        query.has("from") === query.has("to"),
+        "시작일과 종료일을 함께 입력해 주세요.",
+        422,
+        "VALIDATION_FAILED",
+      );
       const from = dateSchema.parse(query.get("from") ?? today());
       const to = dateSchema.parse(
         query.get("to") ?? shiftClosureDate(today(), 90),
@@ -163,6 +169,7 @@ export const closureHandlers = [
                 r.roomId,
               startAt: r.startsAt,
               endAt: r.endsAt,
+              status: r.status === "이용 중" ? "이용 중" : "확정",
             })),
           };
         },

@@ -327,7 +327,9 @@ it("warns about existing reservations and blocks only bookings starting on the c
   expect(result).toMatchObject({
     closure: { ...body, canEdit: true, canDelete: true },
     affectedReservationCount: 1,
-    affectedReservations: [{ id: old.id, roomId: "gangnam-room-a" }],
+    affectedReservations: [
+      { id: old.id, roomId: "gangnam-room-a", status: "확정" },
+    ],
   });
   expect(await (await request(path, "POST", body, key)).json()).toEqual(result);
   const duplicate = await request(path, "POST", body);
@@ -364,6 +366,9 @@ it("warns about existing reservations and blocks only bookings starting on the c
 
   const item = `/branch-closures/${result.closure.id}`;
   store.persona = "junho";
+  const inaccessible = await request("/branches/unknown/closures");
+  expect(inaccessible.status).toBe(403);
+  expect(await inaccessible.json()).toMatchObject({ code: "FORBIDDEN" });
   expect(await (await request(path)).json()).toMatchObject({
     items: [{ canEdit: false, canDelete: false }],
   });

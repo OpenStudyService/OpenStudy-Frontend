@@ -533,3 +533,201 @@ test("real overlap preserves booking input and reloads the latest schedule", asy
     await owner.context.close();
   }
 });
+
+test("real closure warns about existing bookings and blocks new bookings", async ({
+  browser,
+}) => {
+  const owner = await login(browser);
+  const staff = await login(browser, "staff@rooms.test");
+  try {
+    const fixtureData = await fixture(owner.context);
+    const bookingBody = { ...fixtureData.body, ...period(48) };
+    const booking = await created(
+      owner.context,
+      "/room-reservations?scope=1",
+      bookingBody,
+    );
+    const date = kstDate(bookingBody.startAt);
+    const path = "/branches/1/closures";
+    await owner.page.goto("/app/1/settings");
+    await owner.page.getByRole("button", { name: /휴무일 관리:/ }).click();
+    const panel = owner.page.getByRole("dialog");
+    await panel.getByLabel("휴무 날짜 (한국 시간)").fill(date);
+    await panel.getByLabel("휴무 안내 문구").fill("실제 휴무 검증");
+    await panel.getByRole("button", { name: "휴무일 등록" }).click();
+    await expect(panel.getByText(/기존 예약 \d+건이 있어요/)).toBeVisible();
+    await expect(
+      panel.getByText(new RegExp(fixtureData.room.name + ".*확정")),
+    ).toBeVisible();
+
+    const { items } = await (
+      await api(owner.context, path + "?from=" + date + "&to=" + date)
+    ).json();
+    const closure = items.find((row: { date: string }) => row.date === date);
+    expect(closure).toMatchObject({ canEdit: true, canDelete: true });
+    const duplicate = await api(owner.context, path, { date });
+    expect(duplicate.status()).toBe(409);
+    expect(await duplicate.json()).toMatchObject({
+      code: "BRANCH_CLOSURE_EXISTS",
+      closureId: closure.id,
+    });
+    const blocked = await api(
+      owner.context,
+      "/room-reservations?scope=1",
+      bookingBody,
+    );
+    expect(blocked.status()).toBe(409);
+    expect(await blocked.json()).toMatchObject({
+      code: "BRANCH_CLOSED_DAY",
+      closedDate: date,
+    });
+    expect(
+      (await api(owner.context, "/room-reservations/" + booking.id)).status(),
+    ).toBe(200);
+
+    expect((await api(staff.context, "/branches/2/closures")).status()).toBe(
+      403,
+    );
+    expect((await api(staff.context, path, { date })).status()).toBe(403);
+    const staffList = await (await api(staff.context, path)).json();
+    expect(staffList.items).toContainEqual(
+      expect.objectContaining({
+        id: closure.id,
+        canEdit: false,
+        canDelete: false,
+      }),
+    );
+    await staff.page.goto("/app/1/settings");
+    await expect(
+      staff.page.getByRole("button", { name: /휴무일 관리:/ }),
+    ).toHaveCount(0);
+
+    await owner.page.goto("/app/1/reservations?detail=new");
+    const reservation = owner.page.getByRole("dialog");
+    await reservation.locator('input[type="date"]').fill(date);
+    await expect(
+      reservation.getByText("지점 휴무일에는 새 예약을 시작할 수 없어요."),
+    ).toBeVisible();
+    await expect(
+      reservation.getByRole("combobox", { name: "시작 시각 (한국 시간)" }),
+    ).toBeDisabled();
+
+    await owner.page.goto("/app/1/settings");
+    await owner.page.getByRole("button", { name: /휴무일 관리:/ }).click();
+    owner.page.once("dialog", (dialog) => dialog.accept());
+    const row = panel
+      .getByRole("article")
+      .filter({
+        has: owner.page.getByRole("heading", { name: date, exact: true }),
+      });
+    await row.getByRole("button", { name: "휴무일 삭제" }).click();
+    await expect(row).toHaveCount(0);
+  } finally {
+    await Promise.all([owner.context.close(), staff.context.close()]);
+  }
+});
+
+test("real product sale period and limit can be configured and cleared", async ({
+  browser,
+}) => {
+  const owner = await login(browser);
+  try {
+    const { customer } = await fixture(owner.context);
+    const tag = suffix();
+    const category = await created(owner.context, "/product-categories", {
+      code: "P" + tag.toUpperCase(),
+      name: "검증 분류 " + tag,
+      kind: "시간권",
+    });
+    const product = await created(owner.context, "/products?scope=all", {
+      name: "판매 제한 검증 " + tag,
+      priceKrw: 12000,
+      terms: { kind: "시간권", includedMinutes: 60, validDays: null },
+      status: "판매 중",
+      categoryId: category.id,
+      branchIds: ["1"],
+    });
+    const path = "/products/" + product.id;
+    const payment = {
+      customerId: customer.id,
+      productId: product.id,
+      branchId: "1",
+      method: "카드",
+    };
+    const assertSaleError = async (detail: Record<string, unknown>) => {
+      const response = await api(owner.context, "/payments", payment);
+      expect(response.status(), await response.text()).toBe(409);
+      expect(await response.json()).toMatchObject(detail);
+    };
+
+    const salesStartsAt = period().startAt.replace(".000Z", "Z");
+    const salesEndsAt = period(48).startAt.replace(".000Z", "Z");
+    const seoulInput = (instant: string) =>
+      new Date(Date.parse(instant) + 9 * 3600000).toISOString().slice(0, 16);
+    await owner.page.goto("/app/1/products");
+    await owner.page
+      .getByRole("button", { name: "상품 상세: " + product.name })
+      .click();
+    const panel = owner.page.getByRole("dialog");
+    const start = panel.getByLabel("판매 시작", { exact: true });
+    const end = panel.getByLabel("판매 종료", { exact: true });
+    const limit = panel.getByLabel("판매 한도 (개)");
+    const save = panel.getByRole("button", { name: "상품 정보 저장" });
+    async function saveAndRead() {
+      const saved = owner.page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api" + path) && r.request().method() === "PATCH",
+      );
+      await save.click();
+      const response = await saved;
+      expect(response.status(), await response.text()).toBe(200);
+      return response.json();
+    }
+    await start.fill(seoulInput(salesStartsAt));
+    await end.fill(seoulInput(salesEndsAt));
+    await limit.fill("1");
+    expect(await saveAndRead()).toMatchObject({
+      salesStartsAt,
+      salesEndsAt,
+      salesLimit: 1,
+      remainingQuantity: 1,
+    });
+    await assertSaleError({
+      code: "PRODUCT_NOT_IN_SALE_PERIOD",
+      salesStartsAt,
+      salesEndsAt,
+    });
+
+    await start.fill("");
+    await end.fill("");
+    expect(await saveAndRead()).toMatchObject({
+      salesStartsAt: null,
+      salesEndsAt: null,
+      salesLimit: 1,
+    });
+    await created(owner.context, "/payments", payment);
+    await assertSaleError({
+      code: "PRODUCT_SALE_LIMIT_REACHED",
+      salesLimit: 1,
+      soldQuantity: 1,
+    });
+
+    await limit.fill("");
+    const unlimited = await saveAndRead();
+    expect(unlimited).toMatchObject({
+      salesLimit: null,
+      remainingQuantity: null,
+    });
+    await created(owner.context, "/payments", payment);
+    const stopped = await api(
+      owner.context,
+      path + "/status",
+      { version: unlimited.version, status: "판매 중지" },
+      "POST",
+    );
+    expect(stopped.status(), await stopped.text()).toBe(200);
+    await assertSaleError({ code: "PRODUCT_NOT_ON_SALE" });
+  } finally {
+    await owner.context.close();
+  }
+});

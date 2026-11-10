@@ -38,6 +38,12 @@ const product = (over: Partial<Product> = {}): Product => ({
   category,
   branchIds: ["a", "b"],
   canEdit: true,
+  salesStartsAt: null,
+  salesEndsAt: null,
+  salesLimit: null,
+  soldQuantity: 0,
+  remainingQuantity: null,
+  saleAvailability: "판매 가능",
   ...over,
 });
 const user = (over: Partial<Employee> = {}) =>

@@ -94,7 +94,7 @@ const meta = z.object({ page: positive, pageSize: positive, total: integer });
 const roomPage = z.object({ items: z.array(roomSchema), meta }),
   reservationPage = z.object({ items: z.array(reservationSchema), meta });
 const calendar = z.object({
-  closedDates: z.array(z.iso.date()).optional(),
+  closedDates: z.array(z.iso.date()).default([]),
   from: instant,
   to: instant,
   items: z.array(reservationSchema),
