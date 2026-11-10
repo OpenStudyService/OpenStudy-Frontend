@@ -1,5 +1,6 @@
 import { homeSummary } from "./home";
 import { salesHandlers } from "./sales";
+import { closureHandlers } from "./closures";
 import { roomHandlers } from "./rooms";
 import { workforceHandlers } from "./workforce";
 import { attendanceHandlers } from "./attendance";
@@ -357,6 +358,7 @@ export const handlers = [
   ...attendanceHandlers,
   ...workforceHandlers,
   ...roomHandlers,
+  ...closureHandlers,
   ...lockerHandlers,
   ...customerHistoryHandlers,
   ...collaborationHandlers,

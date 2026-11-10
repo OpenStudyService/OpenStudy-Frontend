@@ -1,3 +1,5 @@
+import { closureRows } from "./closures";
+import { shiftClosureDate, type HomeClosure } from "../shared/domain/closures";
 import { z } from "zod";
 import type { components } from "../shared/api/foundation.generated";
 import { businessDate, can, overlap } from "../shared/domain/schema";
@@ -26,7 +28,9 @@ function ratio(numerator: number, denominator: number): S["Ratio"] {
   };
 }
 
-export function homeSummary(request: Request): S["HomeSummary"] {
+export function homeSummary(
+  request: Request,
+): S["HomeSummary"] & { closures: HomeClosure[] } {
   const user = store.activeUser();
   const params = new URL(request.url).searchParams;
   const scope = params.get("scope") || "all";
@@ -187,6 +191,24 @@ export function homeSummary(request: Request): S["HomeSummary"] {
     );
   const taskSource = { scope, ...filter, dueTo: dayEnd };
   return {
+    closures: branchIds
+      .flatMap((branchId) =>
+        closureRows(branchId)
+          .filter(
+            (row) => row.date >= date && row.date <= shiftClosureDate(date, 7),
+          )
+          .map((row) => ({
+            branchId,
+            branchName: store.get("branches", branchId).name,
+            date: row.date,
+            note: row.note,
+            today: row.date === date,
+          })),
+      )
+      .sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) || a.branchId.localeCompare(b.branchId),
+      ),
     meta: {
       branchIds,
       allBranches: scope === "all",

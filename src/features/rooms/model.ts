@@ -14,7 +14,9 @@ export type RoomReservationCreate = S["RoomReservationCreate"];
 export type RoomReservationCancel = S["RoomReservationCancel"];
 export type RoomUsageChange = S["RoomUsageChange"];
 export type RoomReservationPage = S["RoomReservationPage"];
-export type RoomReservationCalendar = S["RoomReservationCalendar"];
+export type RoomReservationCalendar = S["RoomReservationCalendar"] & {
+  closedDates?: string[];
+};
 export type ReservationBilling = S["ReservationBilling"];
 export type RoomFilters = {
   page?: number;

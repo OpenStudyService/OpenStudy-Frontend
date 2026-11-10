@@ -387,6 +387,7 @@ function PaymentPanelSession({
                     "passes",
                     "customers",
                     "sales",
+                    "products",
                     "lookups",
                   );
                 }}
@@ -517,6 +518,7 @@ function PassPanelSession({
                     "passes",
                     "customers",
                     "sales",
+                    "products",
                     "lookups",
                   );
                 }}

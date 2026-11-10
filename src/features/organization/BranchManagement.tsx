@@ -2,7 +2,9 @@ import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState, type FormEvent } from "react";
 import { useApp } from "../../app/context";
-import { api, queryString } from "../../shared/api/client";
+import { admin } from "../../shared/domain/schema";
+import { BranchClosures } from "./BranchClosures";
+import { api, MOCK, queryString } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
 import {
   Badge,
@@ -43,6 +45,7 @@ function BranchManagementContent() {
   const { session, scope } = useApp();
   const { page, search, setPage, setSearch } = useListSearch("branch");
   const [selected, setSelected] = useState<Branch | "new" | null>(null);
+  const [closureBranch, setClosureBranch] = useState<Branch | null>(null);
   const data = useOrganizationList<"BranchPage">(
     `/branches?${queryString({ scope, page, pageSize: 20, q: search })}`,
   );
@@ -82,6 +85,14 @@ function BranchManagementContent() {
                   <p className="help">{branch.hours}</p>
                   <Badge>{branch.status}</Badge>
                 </div>
+                {(MOCK || admin(session.user, branch.id)) && (
+                  <Button onClick={() => setClosureBranch(branch)}>
+                    {admin(session.user, branch.id)
+                      ? "휴무일 관리"
+                      : "휴무일 보기"}
+                    : {branch.name}
+                  </Button>
+                )}
                 {canManageBranch(session.user, branch.id) && (
                   <Button onClick={() => setSelected(branch)}>
                     지점 수정: {branch.name}
@@ -93,6 +104,15 @@ function BranchManagementContent() {
           <Pager page={page} total={data.data.meta.total} onChange={setPage} />
         </>
       )}
+      <Panel
+        open={closureBranch !== null}
+        onClose={() => setClosureBranch(null)}
+        title={`휴무일 · ${closureBranch?.name ?? ""}`}
+      >
+        {closureBranch && (
+          <BranchClosures key={closureBranch.id} branch={closureBranch} />
+        )}
+      </Panel>
       <Panel
         open={selected !== null}
         onClose={() => setSelected(null)}

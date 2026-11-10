@@ -2,8 +2,9 @@ import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
-import { api, queryString } from "../../shared/api/client";
-import type { components } from "../../shared/api/foundation.generated";
+import { api, ApiError, MOCK, queryString } from "../../shared/api/client";
+import type { ProductPage } from "../products/model";
+import { saleAvailability, saleMessages } from "../../shared/domain/sale";
 import { can, won } from "../../shared/domain/schema";
 import {
   Button,
@@ -15,7 +16,12 @@ import { Field } from "../organization/shared";
 import { createPayment } from "./api";
 import type { Payment, PaymentCreate as CreateBody } from "./model";
 import { useSubmission } from "./useSubmission";
-import { CustomerSelector, MockPaymentNotice, dateTime } from "./shared";
+import {
+  CustomerSelector,
+  MockPaymentNotice,
+  dateTime,
+  useSalesClock,
+} from "./shared";
 
 export function PaymentCreate({
   onSaved,
@@ -25,6 +31,7 @@ export function PaymentCreate({
   onBusyChange: (busy: boolean) => void;
 }) {
   const { session, scope } = useApp();
+  const now = useSalesClock();
   const mounted = useRef(true);
   const submitting = useRef(false);
   useEffect(() => {
@@ -72,17 +79,31 @@ export function PaymentCreate({
       productPage,
     ],
     queryFn: ({ signal }) =>
-      api<components["schemas"]["ProductPage"]>(
-        `/products?${queryString({ scope: branchId, status: "판매 중", q: productSearch, page: productPage, pageSize: 20, sort: "name", direction: "asc" })}`,
+      api<ProductPage>(
+        `/products?${queryString({ scope: branchId, status: MOCK ? undefined : "판매 중", q: productSearch, page: productPage, pageSize: 20, sort: "name", direction: "asc" })}`,
         { signal },
       ),
     enabled: !!branchId,
     retry: false,
   });
   const selected = products.data?.items.find((p) => p.id === productId);
+  const availability =
+    selected?.soldQuantity === undefined
+      ? selected?.saleAvailability
+      : saleAvailability(selected, now, selected.soldQuantity);
+  const saleCode =
+    selected?.status === "판매 중지"
+      ? "PRODUCT_NOT_ON_SALE"
+      : availability === "판매 전" || availability === "판매 종료"
+        ? "PRODUCT_NOT_IN_SALE_PERIOD"
+        : availability === "한도 소진"
+          ? "PRODUCT_SALE_LIMIT_REACHED"
+          : "";
+  const errorCode =
+    write.error instanceof ApiError ? write.error.detail.code : "";
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (submitting.current || write.pending) return;
+    if (submitting.current || write.pending || saleCode) return;
     if (
       !branchId ||
       !customerId ||
@@ -231,17 +252,20 @@ export function PaymentCreate({
           </select>
         </Field>
       </fieldset>
+      {saleCode && <FieldError>{saleMessages[saleCode]}</FieldError>}
       {validation && <FieldError>{validation}</FieldError>}
       {write.error && (
         <FieldError>
-          {write.error.message} 입력을 유지했어요. 같은 내용으로 다시 제출하면
-          동일한 요청으로 재시도합니다.
+          {saleMessages[errorCode] ?? write.error.message} 입력을 유지했어요.
+          같은 내용으로 다시 제출하면 동일한 요청으로 재시도합니다.
         </FieldError>
       )}
       <Button
         type="submit"
         variant="primary"
-        disabled={write.pending || !selected || !customerId || !branchId}
+        disabled={
+          write.pending || !selected || !customerId || !branchId || !!saleCode
+        }
       >
         {write.pending
           ? "결제 처리 중…"

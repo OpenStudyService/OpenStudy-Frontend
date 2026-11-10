@@ -57,3 +57,33 @@ test("Mock reservations provide calendar/list views and enforce whole-hour contr
     page.getByRole("button", { name: "목록 보기", exact: true }),
   ).toBeVisible();
 });
+
+test("Mock branch closure appears on home and disables reservation time selection", async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto("/app/gangnam/settings");
+  await page.getByRole("button", { name: "휴무일 관리: 강남점" }).click();
+  const panel = page.getByRole("dialog");
+  const date = await panel.getByLabel("휴무 날짜 (한국 시간)").inputValue();
+  await panel.getByLabel("휴무 안내 문구").fill("시설 점검");
+  await panel.getByRole("button", { name: "휴무일 등록", exact: true }).click();
+  await expect(
+    panel.getByRole("status").getByText(`${date} 휴무일을 등록했어요.`),
+  ).toBeVisible();
+  await page.goto("/app/gangnam/home");
+  await expect(
+    page.getByText("오늘 · " + date + " · 강남점 · 시설 점검"),
+  ).toBeVisible();
+  await page.goto("/app/gangnam/reservations?detail=new");
+  const reservation = page.getByRole("dialog");
+  await expect(
+    reservation.getByText("지점 휴무일에는 새 예약을 시작할 수 없어요."),
+  ).toBeVisible();
+  await expect(
+    reservation.getByRole("combobox", { name: "시작 시각 (한국 시간)" }),
+  ).toBeDisabled();
+  await expect(
+    reservation.getByRole("button", { name: "예약 등록" }),
+  ).toBeDisabled();
+});

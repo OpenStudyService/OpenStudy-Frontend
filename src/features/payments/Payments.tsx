@@ -313,6 +313,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
                   "passes",
                   "customers",
                   "sales",
+                  "products",
                   "lookups",
                 );
               }}

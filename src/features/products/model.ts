@@ -2,13 +2,23 @@ import type { components } from "../../shared/api/foundation.generated";
 import { won } from "../../shared/domain/schema";
 import type { Employee } from "../../shared/domain/schema";
 
-export type Product = components["schemas"]["Product"];
+import { formatDateTime } from "../../shared/domain/format";
+import type { SaleInfo, SaleSettings } from "../../shared/domain/sale";
+
+export type Product = components["schemas"]["Product"] & SaleInfo;
+export type ProductPage = Omit<
+  components["schemas"]["ProductPage"],
+  "items"
+> & { items: Product[] };
 export type ProductTerms = components["schemas"]["ProductTerms"];
 export type ProductCategory = components["schemas"]["ProductCategory"];
 export type ProductRevision = components["schemas"]["ProductRevision"];
-export type ProductSnapshot = components["schemas"]["ProductSnapshot"];
-export type ProductCreate = components["schemas"]["ProductCreate"];
-export type ProductUpdate = components["schemas"]["ProductUpdate"];
+export type ProductSnapshot = components["schemas"]["ProductSnapshot"] &
+  SaleSettings;
+export type ProductCreate = components["schemas"]["ProductCreate"] &
+  SaleSettings;
+export type ProductUpdate = components["schemas"]["ProductUpdate"] &
+  SaleSettings;
 export type Kind = ProductTerms["kind"];
 export type SaleStatus = Product["status"];
 
@@ -20,6 +30,9 @@ export const KRW_MAX = Number.MAX_SAFE_INTEGER;
 
 /** Text inputs stay strings so "empty" and "0" are distinguishable from a number. */
 export interface Draft {
+  salesStartsAt: string;
+  salesEndsAt: string;
+  salesLimit: string;
   name: string;
   price: string;
   kind: Kind;
@@ -36,6 +49,9 @@ export interface Draft {
 export type Errors = Partial<Record<keyof Draft, string>>;
 
 export const emptyDraft = (kind: Kind = "시간권"): Draft => ({
+  salesStartsAt: "",
+  salesEndsAt: "",
+  salesLimit: "",
   name: "",
   price: "",
   kind,
@@ -53,6 +69,9 @@ export function draftFromProduct(product: Product): Draft {
   const { terms } = product;
   const base = {
     ...emptyDraft(terms.kind),
+    salesStartsAt: seoulInput(product.salesStartsAt),
+    salesEndsAt: seoulInput(product.salesEndsAt),
+    salesLimit: String(product.salesLimit ?? ""),
     name: product.name,
     price: String(product.priceKrw),
     categoryId: product.category.id,
@@ -141,6 +160,27 @@ export function termsFromDraft(draft: Draft): {
         },
       };
 }
+const seoulInput = (value?: string | null) =>
+  value
+    ? new Date(Date.parse(value) + 9 * 3600000).toISOString().slice(0, 19)
+    : "";
+const saleStamp = (value: string) =>
+  value ? new Date(value + "+09:00").toISOString().replace(".000Z", "Z") : null;
+export function saleLabel(product: SaleInfo) {
+  if (!product.saleAvailability) return "";
+  const starts = product.salesStartsAt
+    ? formatDateTime(product.salesStartsAt)
+    : "시작 제한 없음";
+  const ends = product.salesEndsAt
+    ? formatDateTime(product.salesEndsAt)
+    : "종료 제한 없음";
+  const limit =
+    product.salesLimit == null
+      ? "한도 없음"
+      : `한도 ${product.salesLimit}개 · 남은 수량 ${product.remainingQuantity ?? "—"}개`;
+  return `${product.saleAvailability} · ${starts} ~ ${ends} · ${limit}`;
+}
+
 export function validateDraft(
   draft: Draft,
   mode: "create" | "edit",
@@ -156,6 +196,19 @@ export function validateDraft(
   if (!draft.categoryId) errors.categoryId = "분류를 선택해 주세요.";
   if (mode === "create" && !draft.branchIds.length)
     errors.branchIds = "판매 지점을 하나 이상 선택해 주세요.";
+  for (const key of ["salesStartsAt", "salesEndsAt"] as const) {
+    if (draft[key] && !Number.isFinite(Date.parse(draft[key] + "+09:00")))
+      errors[key] = "올바른 날짜와 시각을 입력해 주세요.";
+  }
+  if (draft.salesLimit && positiveInteger(draft.salesLimit, 1000000) === null)
+    errors.salesLimit = unitError("판매 한도", 1000000);
+  if (
+    draft.salesStartsAt &&
+    draft.salesEndsAt &&
+    Date.parse(draft.salesStartsAt + "+09:00") >=
+      Date.parse(draft.salesEndsAt + "+09:00")
+  )
+    errors.salesEndsAt = "판매 종료는 판매 시작보다 늦어야 해요.";
   return { errors, terms, priceKrw: priceKrw ?? undefined };
 }
 export const hasErrors = (errors: Errors) => Object.keys(errors).length > 0;
@@ -166,6 +219,11 @@ export function createBody(
   priceKrw: number,
 ): ProductCreate {
   return {
+    ...(draft.salesStartsAt
+      ? { salesStartsAt: saleStamp(draft.salesStartsAt) }
+      : {}),
+    ...(draft.salesEndsAt ? { salesEndsAt: saleStamp(draft.salesEndsAt) } : {}),
+    ...(draft.salesLimit ? { salesLimit: Number(draft.salesLimit) } : {}),
     name: draft.name.trim(),
     priceKrw,
     terms,
@@ -195,6 +253,15 @@ export function updateBody(
   if (priceKrw !== base.priceKrw) body.priceKrw = priceKrw;
   if (!sameTerms(terms, base.terms)) body.terms = terms;
   if (draft.categoryId !== base.category.id) body.categoryId = draft.categoryId;
+  for (const key of ["salesStartsAt", "salesEndsAt"] as const) {
+    if (
+      Date.parse(base[key] ?? "") !== Date.parse(draft[key] + "+09:00") &&
+      (base[key] || draft[key])
+    )
+      body[key] = saleStamp(draft[key]);
+  }
+  if (String(base.salesLimit ?? "") !== draft.salesLimit)
+    body.salesLimit = draft.salesLimit ? Number(draft.salesLimit) : null;
   return Object.keys(body).length > 1 ? body : null;
 }
 
@@ -267,7 +334,28 @@ export function snapshotChanges(
     ["판매 상태", (s) => s.status],
     ["분류", (s) => `${s.categoryName} (${s.categoryCode})`],
     ["판매 지점", (s) => names(s.branchIds)],
+    [
+      "판매 시작",
+      (s) => (s.salesStartsAt ? formatDateTime(s.salesStartsAt) : "—"),
+    ],
+    ["판매 종료", (s) => (s.salesEndsAt ? formatDateTime(s.salesEndsAt) : "—")],
+    ["판매 한도", (s) => s.salesLimit?.toString() ?? "—"],
   ];
+  if (
+    !(
+      "salesStartsAt" in after ||
+      "salesEndsAt" in after ||
+      "salesLimit" in after
+    ) &&
+    (!before ||
+      !(
+        "salesStartsAt" in before ||
+        "salesEndsAt" in before ||
+        "salesLimit" in before
+      ))
+  ) {
+    fields.splice(-3);
+  }
   return fields
     .map(([label, read]) => ({
       label,

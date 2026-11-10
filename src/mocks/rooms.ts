@@ -1,8 +1,9 @@
 /** M6 room contract adapter over the existing demo ledgers. Never imported in live mode. */
+import { closureRows } from "./closures";
 import { http, HttpResponse } from "msw/http";
 import { delay } from "msw";
 import { z } from "zod";
-import { can } from "../shared/domain/schema";
+import { businessDate, can } from "../shared/domain/schema";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import type { components } from "../shared/api/foundation.generated";
 import { assert, DomainError, store } from "./store";
@@ -187,6 +188,9 @@ const respond =
       if (e instanceof DomainError)
         return HttpResponse.json(
           {
+            ...(e.target
+              ? { ...e.target, requestId: crypto.randomUUID() }
+              : {}),
             code: e.code,
             message: e.message,
             fieldErrors: e.fieldErrors,
@@ -507,6 +511,15 @@ export const roomHandlers = [
       return {
         from,
         to,
+        closedDates: closureRows(branch)
+          .filter(({ date }) => {
+            const midnight = Date.parse(date + "T00:00:00+09:00");
+            return (
+              midnight < Date.parse(to!) &&
+              midnight + 86400000 > Date.parse(from!)
+            );
+          })
+          .map(({ date }) => date),
         items: filtered({ ...a, request: new Request(url) }, u)
           .filter((row) => row.status !== "결제 실패")
           .sort(
@@ -600,6 +613,17 @@ export const roomHandlers = [
           409,
           "ROOM_TIME_CONFLICT",
         );
+        const closedDate = businessDate(b.startAt);
+        if (closureRows(b.branchId).some((row) => row.date === closedDate))
+          throw new DomainError(
+            409,
+            "BRANCH_CLOSED_DAY",
+            "지점 휴무일에는 새 예약을 시작할 수 없어요.",
+            undefined,
+            undefined,
+            undefined,
+            { closedDate },
+          );
         const now = store.now(),
           id = crypto.randomUUID(),
           approved = b.mockOutcome !== "FAILED",

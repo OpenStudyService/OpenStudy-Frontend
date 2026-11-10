@@ -57,7 +57,13 @@ const productTerms = z.discriminatedUnion("kind", [
     validDays: unit.nullable(),
   }),
 ]);
+const saleFields = {
+  salesStartsAt: z.string().nullable().optional(),
+  salesEndsAt: z.string().nullable().optional(),
+  salesLimit: z.number().int().min(1).max(1000000).nullable().optional(),
+};
 const productSnapshot = z.object({
+  ...saleFields,
   schemaVersion: z.literal(1),
   code: str,
   name: str,
@@ -161,6 +167,7 @@ export const schemas = {
   // Canonical product contract (Backend #16). `branchId` is always "all": the
   // sale branches live in `branchIds`, so a product is never one branch's row.
   products: base.extend({
+    ...saleFields,
     code: str,
     name: str,
     priceKrw: money.positive(),

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { api, MOCK, queryString } from "../../shared/api/client";
-import type { components } from "../../shared/api/foundation.generated";
+import { saleAvailabilities } from "../../shared/domain/sale";
 import {
   Badge,
   Button,
@@ -20,10 +20,14 @@ import { ProductCreate } from "./ProductCreate";
 import { ProductDetail } from "./ProductDetail";
 import { useCategories } from "./hooks";
 import { won } from "../../shared/domain/schema";
-import { canWriteBranch, kinds, saleStatuses, termsLabel } from "./model";
-import type { Product } from "./model";
-
-type ProductPage = components["schemas"]["ProductPage"];
+import {
+  canWriteBranch,
+  kinds,
+  saleStatuses,
+  termsLabel,
+  saleLabel,
+} from "./model";
+import type { Product, ProductPage } from "./model";
 
 export function ProductManagement() {
   const { session, scope } = useApp();
@@ -33,6 +37,7 @@ export function ProductManagement() {
   const tab = params.get("tab") === "categories" ? "categories" : "products";
   const { page, search, setPage, setSearch } = useListSearch("product");
   const status = params.get("productStatus") || "";
+  const availability = MOCK ? (params.get("productAvailability") ?? "") : "";
   const kind = params.get("productKind") || "";
   const categoryId = params.get("productCategory") || "";
   const [selected, setSelected] = useState<Product | "new" | null>(null);
@@ -59,10 +64,11 @@ export function ProductManagement() {
       status,
       kind,
       categoryId,
+      availability,
     ],
     queryFn: ({ signal }) =>
       api<ProductPage>(
-        `/products?${queryString({ scope, page, pageSize: 20, q: search, status, kind, categoryId, sort: "name", direction: "asc" })}`,
+        `/products?${queryString({ scope, page, pageSize: 20, q: search, status, kind, categoryId, availability, sort: "name", direction: "asc" })}`,
         { signal },
       ),
     enabled: tab === "products",
@@ -88,6 +94,19 @@ export function ProductManagement() {
           </Button>
         )}
       </Heading>
+      {tab === "products" && MOCK && (
+        <Field label="판매 가능 여부">
+          <select
+            value={availability}
+            onChange={(e) => setFilter("productAvailability", e.target.value)}
+          >
+            <option value="">전체</option>
+            {saleAvailabilities.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </Field>
+      )}
       {MOCK && (
         <p className="help mb-4">
           데모 화면입니다. 변경 내용은 실제 상품 정보에 반영되지 않습니다.
@@ -183,6 +202,9 @@ export function ProductManagement() {
                         {product.category.name} · {won(product.priceKrw)}
                       </p>
                       <p>{termsLabel(product.terms)}</p>
+                      {saleLabel(product) && (
+                        <p className="help">{saleLabel(product)}</p>
+                      )}
                       <p className="help">
                         판매 지점:{" "}
                         {product.branchIds.map(branchName).join(", ")}

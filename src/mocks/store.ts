@@ -5,6 +5,7 @@ import type {
   Resource,
   ResourceMap,
 } from "../shared/domain/schema";
+import type { StoredClosure } from "../shared/domain/closures";
 import { seed } from "./seed";
 import { reconcileChannels } from "../features/chat/model";
 
@@ -17,6 +18,7 @@ export class DomainError extends Error {
     public fieldErrors?: Record<string, string>,
     public latestVersion?: number,
     public reloadUrl?: string,
+    public target?: Record<string, string | number | null>,
   ) {
     super(message);
   }
@@ -71,8 +73,9 @@ function publicLedger(db: Database) {
     passes: db.passes.filter((row) => fixtureIds.has(row.memberId)),
   };
 }
+type MockDatabase = Database & { branchClosures?: StoredClosure[] };
 interface Saved {
-  db: Database;
+  db: MockDatabase;
   persona: string | null;
   sequence: number;
   idempotency: Record<
@@ -81,7 +84,7 @@ interface Saved {
   >;
 }
 export class MockStore {
-  db: Database = seed();
+  db: MockDatabase = seed();
   persona: string | null = null;
   sequence = 100;
   scenario = "normal";
