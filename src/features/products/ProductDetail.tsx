@@ -16,6 +16,7 @@ import {
   hasErrors,
   snapshotChanges,
   termsLabel,
+  saleLabel,
   updateBody,
   validateDraft,
 } from "./model";
@@ -192,6 +193,7 @@ export function ProductDetail({
           {product.code} · {product.category.name} · {won(product.priceKrw)}
         </p>
         <p>{termsLabel(product.terms)}</p>
+        {saleLabel(product) && <p className="help">{saleLabel(product)}</p>}
         <p>
           <Badge>{product.status}</Badge> 판매 지점:{" "}
           {product.branchIds.map(branchName).join(", ")} · 버전{" "}

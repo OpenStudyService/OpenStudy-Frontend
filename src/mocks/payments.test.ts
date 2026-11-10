@@ -8,13 +8,14 @@ import {
   vi,
 } from "vitest";
 import { setupServer } from "msw/node";
+import { productHandlers } from "./products";
 import { paymentHandlers } from "./payments";
 import { MockStore, store } from "./store";
 import type { components } from "../shared/api/foundation.generated";
 
 type Payment = components["schemas"]["Payment"];
 type Pass = components["schemas"]["Pass"];
-const server = setupServer(...paymentHandlers);
+const server = setupServer(...paymentHandlers, ...productHandlers);
 beforeAll(() => server.listen());
 beforeEach(() => {
   store.reset();
@@ -310,4 +311,81 @@ it("does not persist entered refund reasons or new-customer transactions, while 
     ),
   ).toBe(true);
   expect(store.get("payments", payment.id).reason).toBe(privateReason);
+});
+
+it("checks sale status, branch, period and approved-sale limit in order", async () => {
+  const product = store.get("products", createBody.productId);
+  product.status = "판매 중지";
+  product.branchIds = ["seongsu"];
+  product.salesStartsAt = "2026-10-20T00:00:00+09:00";
+  product.salesLimit = 1;
+  const failure = async (code: string, target = {}) => {
+    const response = await post("/payments", {
+      ...createBody,
+      mockOutcome: "FAILED",
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code,
+      requestId: expect.any(String),
+      ...target,
+    });
+  };
+  await failure("PRODUCT_NOT_ON_SALE");
+  product.status = "판매 중";
+  await failure("PRODUCT_NOT_AVAILABLE_AT_BRANCH");
+  product.branchIds = ["gangnam"];
+  await failure("PRODUCT_NOT_IN_SALE_PERIOD", {
+    salesStartsAt: product.salesStartsAt,
+    salesEndsAt: null,
+  });
+  const patch = async (body: object) => {
+    const response = await fetch(url(`/products/${product.id}`), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": "openstudy-mock-csrf",
+      },
+      body: JSON.stringify(body),
+    });
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  const cleared = await patch({
+    version: product.version,
+    salesStartsAt: null,
+  });
+  expect(cleared).toMatchObject({ salesStartsAt: null, salesLimit: 1 });
+  const sold = store.db.payments.filter(
+    (row) => row.productId === product.id && row.status === "승인",
+  ).length;
+  await patch({ version: cleared.version, salesLimit: sold + 1 });
+  const responses = await Promise.all([
+    post("/payments", createBody),
+    post("/payments", createBody),
+  ]);
+  expect(responses.map((response) => response.status).sort()).toEqual([
+    201, 409,
+  ]);
+  await failure("PRODUCT_SALE_LIMIT_REACHED", {
+    salesLimit: sold + 1,
+    soldQuantity: sold + 1,
+  });
+  const filtered = await get(
+    "/products?availability=" + encodeURIComponent("한도 소진"),
+  );
+  expect(await filtered.json()).toMatchObject({
+    items: [{ id: product.id, remainingQuantity: 0 }],
+  });
+  const accepted = await responses
+    .find((response) => response.status === 201)!
+    .json();
+  expect(
+    (await post(`/payments/${accepted.id}/refund`, { reason: "미사용" }))
+      .status,
+  ).toBe(200);
+  expect(await (await get(`/products/${product.id}`)).json()).toMatchObject({
+    remainingQuantity: 1,
+    saleAvailability: "판매 가능",
+  });
 });

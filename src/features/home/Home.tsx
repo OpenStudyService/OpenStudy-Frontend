@@ -19,7 +19,11 @@ import {
   State,
 } from "../../shared/ui/primitives";
 
-type HomeSummary = components["schemas"]["HomeSummary"];
+import type { HomeClosure } from "../../shared/domain/closures";
+
+type HomeSummary = components["schemas"]["HomeSummary"] & {
+  closures?: HomeClosure[];
+};
 type HomeLink = components["schemas"]["HomeLink"];
 type Ratio = components["schemas"]["Ratio"];
 type HomeQuery = NonNullable<
@@ -167,6 +171,20 @@ export function Home() {
         error={data.error}
         retry={() => void data.refetch()}
       />
+      {!!d?.closures?.length && (
+        <section className="card mb-4 p-4">
+          <h2>지점 휴무 안내</h2>
+          <ul>
+            {d.closures.map((closure) => (
+              <li key={closure.branchId + ":" + closure.date}>
+                {closure.today ? "오늘 · " : ""}
+                {closure.date} · {closure.branchName}
+                {closure.note ? ` · ${closure.note}` : ""}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="hero">
         <div className="relative z-10 flex items-center justify-between gap-6">
           <div>

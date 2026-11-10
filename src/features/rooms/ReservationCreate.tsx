@@ -98,20 +98,24 @@ export function ReservationCreate({
         branch,
         stamp(date),
         new Date(Date.parse(stamp(date)) + 2 * 86400000).toISOString(),
-        roomId,
+        roomId || undefined,
         signal,
       ),
-    enabled:
-      showSchedule &&
-      !!branch &&
-      !!roomId &&
-      Number.isFinite(Date.parse(stamp(date))),
+    enabled: !!branch && Number.isFinite(Date.parse(stamp(date))),
     retry: false,
   });
+  const closed =
+    schedule.data?.closedDates?.includes(date) ||
+    (!schedule.data?.closedDates &&
+      error instanceof ApiError &&
+      error.detail.code === "BRANCH_CLOSED_DAY" &&
+      error.detail.closedDate === date);
+  const checkingSchedule =
+    schedule.fetchStatus === "fetching" && !schedule.data;
   const touch = () => setDirty(true);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (write.busy || blocked) return;
+    if (write.busy || blocked || closed || checkingSchedule) return;
     setError(null);
     if (
       !branches.some((b) => b.id === branch) ||
@@ -161,7 +165,10 @@ export function ReservationCreate({
       setError(e as Error);
       if (e instanceof ApiError) {
         if ([401, 403, 404].includes(e.status)) setBlocked(true);
-        if (e.detail.code === "ROOM_TIME_CONFLICT") {
+        if (
+          e.detail.code === "ROOM_TIME_CONFLICT" ||
+          e.detail.code === "BRANCH_CLOSED_DAY"
+        ) {
           setShowSchedule(true);
           void query.invalidateQueries({
             queryKey: ["data", session.user.id, scope, "room-reservations"],
@@ -186,6 +193,7 @@ export function ReservationCreate({
             value={branch}
             onChange={(e) => {
               touch();
+              setError(null);
               setBranch(e.target.value);
               setRoomId("");
               setCustomerId("");
@@ -260,14 +268,19 @@ export function ReservationCreate({
             value={date}
             onChange={(e) => {
               touch();
+              setError(null);
               setDate(e.target.value);
             }}
           />
         </Field>
+        {closed && (
+          <p role="status">지점 휴무일에는 새 예약을 시작할 수 없어요.</p>
+        )}
         <Field label="시작 시각 (한국 시간)">
           <select
             aria-label="시작 시각 (한국 시간)"
             value={hour}
+            disabled={closed || checkingSchedule}
             onChange={(e) => {
               touch();
               setHour(Number(e.target.value));
@@ -284,6 +297,7 @@ export function ReservationCreate({
           <select
             aria-label="이용 시간"
             value={hours}
+            disabled={closed || checkingSchedule}
             onChange={(e) => {
               touch();
               setHours(Number(e.target.value));
@@ -405,7 +419,13 @@ export function ReservationCreate({
         type="submit"
         variant="primary"
         className="mt-5"
-        disabled={write.busy || blocked || !branches.length}
+        disabled={
+          write.busy ||
+          blocked ||
+          !branches.length ||
+          closed ||
+          checkingSchedule
+        }
       >
         {write.busy ? "등록 중…" : "예약 등록"}
       </Button>

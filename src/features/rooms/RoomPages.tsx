@@ -371,7 +371,13 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
             retry={() => void current.refetch()}
           />
         ) : view === "calendar" ? (
-          <Calendar from={from} to={to} rows={items} show={show} />
+          <Calendar
+            from={from}
+            to={to}
+            rows={items}
+            closedDates={calendar.data?.closedDates}
+            show={show}
+          />
         ) : items.length ? (
           <ReservationTable rows={items} show={show} />
         ) : (
@@ -443,10 +449,12 @@ function Calendar({
   from,
   to,
   rows,
+  closedDates,
   show,
 }: {
   from: string;
   to: string;
+  closedDates?: string[];
   rows: RoomReservation[];
   show: (id: string) => void;
 }) {
@@ -469,6 +477,9 @@ function Calendar({
             key={date}
           >
             <h3>{date}</h3>
+            {closedDates?.includes(date) && (
+              <p className="help">지점 휴무 · 새 예약 시작 불가</p>
+            )}
             {events.length ? (
               events.map((r) => (
                 <Button

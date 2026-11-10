@@ -1,5 +1,6 @@
 /** M4 contract handlers share the demo ledger with customers and seat usage. */
 import { delay } from "msw";
+import { saleAvailability, saleMessages } from "../shared/domain/sale";
 import { http, HttpResponse } from "msw/http";
 import { z } from "zod";
 import type { components } from "../shared/api/foundation.generated";
@@ -262,6 +263,12 @@ function replay(
   value.accepted.set(scoped, { fingerprint, result: structuredClone(result) });
   return result;
 }
+const soldQuantity = (id: string) =>
+  store.db.payments.filter((p) => p.productId === id && p.status === "승인")
+    .length;
+
+export { soldQuantity };
+
 export const paymentResponse =
   (
     task: (args: Args, actor: Employee) => unknown | Promise<unknown>,
@@ -298,6 +305,7 @@ export const paymentResponse =
           "CSRF_INVALID",
         );
       const result = await task(args, actor);
+      if (status === 204) return new HttpResponse(null, { status });
       return HttpResponse.json(result as Record<string, unknown>, {
         status,
         headers: { "Cache-Control": "no-store" },
@@ -321,6 +329,7 @@ export const paymentResponse =
             : new DomainError(500, "MOCK_ERROR", "요청을 처리하지 못했습니다.");
       return HttpResponse.json(
         {
+          ...failure.target,
           code: failure.code,
           message: failure.message,
           ...(failure.fieldErrors ? { fieldErrors: failure.fieldErrors } : {}),
@@ -449,6 +458,35 @@ export const paymentHandlers = [
           409,
           "PRODUCT_NOT_AVAILABLE_AT_BRANCH",
         );
+        const sold = soldQuantity(product.id);
+        const availability = saleAvailability(
+          product,
+          Date.parse(store.now()),
+          sold,
+        );
+        if (availability === "판매 전" || availability === "판매 종료")
+          throw new DomainError(
+            409,
+            "PRODUCT_NOT_IN_SALE_PERIOD",
+            saleMessages.PRODUCT_NOT_IN_SALE_PERIOD,
+            undefined,
+            undefined,
+            undefined,
+            {
+              salesStartsAt: product.salesStartsAt ?? null,
+              salesEndsAt: product.salesEndsAt ?? null,
+            },
+          );
+        if (availability === "한도 소진")
+          throw new DomainError(
+            409,
+            "PRODUCT_SALE_LIMIT_REACHED",
+            saleMessages.PRODUCT_SALE_LIMIT_REACHED,
+            undefined,
+            undefined,
+            undefined,
+            { salesLimit: product.salesLimit ?? null, soldQuantity: sold },
+          );
         const approved = body.mockOutcome === "APPROVED",
           now = store.now(),
           row = store.add("payments", body.branchId, {

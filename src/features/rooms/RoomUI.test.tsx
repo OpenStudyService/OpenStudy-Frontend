@@ -347,3 +347,19 @@ it("does not keep a private room title after an access-denied detail refresh", a
   ).toBeVisible();
   expect(screen.queryByText("공부방")).not.toBeInTheDocument();
 });
+
+it("disables start and duration selection on a branch closure date", async () => {
+  vi.mocked(roomApi.calendar).mockResolvedValue({
+    from: "2026-11-03T00:00:00+09:00",
+    to: "2026-11-04T15:00:00Z",
+    items: [],
+    closedDates: ["2026-11-03"],
+  });
+  mount(<ReservationCreate onSaved={vi.fn()} />);
+  expect(
+    await screen.findByText("지점 휴무일에는 새 예약을 시작할 수 없어요."),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("시작 시각 (한국 시간)")).toBeDisabled();
+  expect(screen.getByLabelText("이용 시간")).toBeDisabled();
+  expect(screen.getByRole("button", { name: "예약 등록" })).toBeDisabled();
+});

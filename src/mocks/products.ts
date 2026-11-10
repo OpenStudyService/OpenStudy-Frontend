@@ -1,4 +1,7 @@
 /** Contract fixtures for Backend #16 (pass products). The server remains the authority for every rule. */
+import { saleAvailability, saleAvailabilities } from "../shared/domain/sale";
+import type { SaleSettings } from "../shared/domain/sale";
+import { soldQuantity } from "./payments";
 import { http, HttpResponse } from "msw/http";
 import { z } from "zod";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
@@ -41,8 +44,38 @@ const terms = z.discriminatedUnion("kind", [
 ]);
 const status = z.enum(["판매 중", "판매 중지"]);
 const name = z.string().trim().min(1).max(120);
+const saleTime = z.iso
+  .datetime({ offset: true, precision: 0 })
+  .nullable()
+  .optional();
+const saleFields = {
+  salesStartsAt: saleTime,
+  salesEndsAt: saleTime,
+  salesLimit: z.number().int().min(1).max(1000000).nullable().optional(),
+};
+const sales = (p: SaleSettings) => ({
+  salesStartsAt: p.salesStartsAt ?? null,
+  salesEndsAt: p.salesEndsAt ?? null,
+  salesLimit: p.salesLimit ?? null,
+});
+function checkPeriod(p: SaleSettings) {
+  if (
+    p.salesStartsAt &&
+    p.salesEndsAt &&
+    Date.parse(p.salesStartsAt) >= Date.parse(p.salesEndsAt)
+  )
+    throw new DomainError(
+      422,
+      "VALIDATION_FAILED",
+      "판매 기간을 확인해 주세요.",
+      {
+        salesEndsAt: "판매 종료는 판매 시작보다 늦어야 해요.",
+      },
+    );
+}
 const create = z
   .object({
+    ...saleFields,
     name,
     priceKrw: price,
     terms,
@@ -53,6 +86,7 @@ const create = z
   .strict();
 const update = z
   .object({
+    ...saleFields,
     version,
     name: name.optional(),
     priceKrw: price.optional(),
@@ -115,23 +149,34 @@ function product(id: string, actor: Employee): Row {
   );
   return row;
 }
-const view = (actor: Employee, p: Row) => ({
-  id: p.id,
-  version: p.version,
-  createdAt: p.createdAt,
-  updatedAt: p.updatedAt,
-  code: p.code,
-  name: p.name,
-  priceKrw: p.priceKrw,
-  terms: p.terms,
-  status: p.status,
-  category: categoryOf(p.categoryId),
-  branchIds: p.branchIds.filter((id) => readable(actor, id)),
-  canEdit: p.branchIds.every((id) => writable(actor, id)),
-});
+const availability = (p: Row, sold = soldQuantity(p.id)) =>
+  saleAvailability(p, Date.parse(store.now()), sold);
+const view = (actor: Employee, p: Row) => {
+  const sold = soldQuantity(p.id);
+  return {
+    ...sales(p),
+    soldQuantity: sold,
+    remainingQuantity:
+      p.salesLimit == null ? null : Math.max(p.salesLimit - sold, 0),
+    saleAvailability: availability(p, sold),
+    id: p.id,
+    version: p.version,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    code: p.code,
+    name: p.name,
+    priceKrw: p.priceKrw,
+    terms: p.terms,
+    status: p.status,
+    category: categoryOf(p.categoryId),
+    branchIds: p.branchIds.filter((id) => readable(actor, id)),
+    canEdit: p.branchIds.every((id) => writable(actor, id)),
+  };
+};
 function snapshot(p: Row): Snapshot {
   const category = categoryOf(p.categoryId);
   return structuredClone({
+    ...sales(p),
     schemaVersion: 1 as const,
     code: p.code,
     name: p.name,
@@ -398,12 +443,15 @@ export const productHandlers = [
         403,
         "SCOPE_DENIED",
       );
+      const filter = q.get("availability");
+      if (filter !== null) z.enum(saleAvailabilities).parse(filter);
       const rows =
         store.scenario === "empty"
           ? []
           : store.db.products.filter(
               (p) =>
                 visible(actor, p) &&
+                (!filter || availability(p) === filter) &&
                 (scope === "all" || p.branchIds.includes(scope)) &&
                 (!q.get("status") || p.status === q.get("status")) &&
                 (!q.get("kind") || p.terms.kind === q.get("kind")) &&
@@ -429,6 +477,7 @@ export const productHandlers = [
     "/api/products",
     response(async ({ request }, actor) => {
       const input = await body(create, request);
+      checkPeriod(input);
       return store.transaction(idempotencyKey(request), input, () => {
         const category = categoryOf(input.categoryId);
         if (category.kind !== input.terms.kind || category.status !== "활성")
@@ -453,6 +502,7 @@ export const productHandlers = [
           status: input.status,
           categoryId: input.categoryId,
           branchIds: [...input.branchIds],
+          ...sales(input),
           history: [],
         });
         row.history.push({
@@ -503,12 +553,23 @@ export const productHandlers = [
         }
         const before = snapshot(row);
         const next = {
+          salesStartsAt:
+            input.salesStartsAt === undefined
+              ? row.salesStartsAt
+              : input.salesStartsAt,
+          salesEndsAt:
+            input.salesEndsAt === undefined
+              ? row.salesEndsAt
+              : input.salesEndsAt,
+          salesLimit:
+            input.salesLimit === undefined ? row.salesLimit : input.salesLimit,
           name: input.name ?? row.name,
           priceKrw: input.priceKrw ?? row.priceKrw,
           terms: input.terms ?? row.terms,
           categoryId: input.categoryId ?? row.categoryId,
         };
         const after = { ...row, ...next };
+        checkPeriod(after);
         if (JSON.stringify(snapshot(after as Row)) === JSON.stringify(before))
           return view(actor, row);
         Object.assign(row, next);
