@@ -645,6 +645,7 @@ export const roomHandlers = [
           memberId: c.id,
           productId: "",
           reservationId: id,
+          roomPaymentMethod: b.method,
           amount,
           method: b.method === "현금" ? "Mock 현금" : "Mock 카드",
           status: approved ? "승인" : "실패",

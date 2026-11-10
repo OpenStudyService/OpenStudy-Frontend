@@ -4,6 +4,7 @@ export type ErrorBody = Omit<components["schemas"]["ApiError"], "requestId"> & {
   requestId?: string;
   mergedIntoCustomerId?: string | null;
   closureId?: string | null;
+  closingId?: string | null;
   closedDate?: string | null;
   salesStartsAt?: string | null;
   salesEndsAt?: string | null;
@@ -150,11 +151,12 @@ export async function api<T>(
   return body.trim() ? (JSON.parse(body) as T) : (undefined as T);
 }
 export const queryString = (
-  values: Record<string, string | number | undefined>,
+  values: Record<string, string | number | readonly string[] | undefined>,
 ) => {
   const p = new URLSearchParams();
   Object.entries(values).forEach(([k, v]) => {
-    if (v !== undefined && v !== "") p.set(k, String(v));
+    if (Array.isArray(v)) v.forEach((item) => p.append(k, item));
+    else if (v !== undefined && v !== "") p.set(k, String(v));
   });
   return p.toString();
 };

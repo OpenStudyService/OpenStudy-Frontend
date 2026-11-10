@@ -9,6 +9,7 @@ import type { Employee, ResourceMap } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
 import { matchesCustomer, rejectMergedCustomer } from "./customer-identity";
 import { recordUsage } from "./pass-history";
+import { formatBusinessDate } from "../shared/domain/format";
 
 type Seat = components["schemas"]["Seat"];
 type Session = components["schemas"]["SeatSession"];
@@ -452,7 +453,136 @@ function sessionChanged(row: Usage) {
   // The generic workspace event uses the legacy usage resource for home consumers.
   store.emit("usage", row.id, row.branchId);
 }
+function trendRatio(
+  numerator: number,
+  denominator: number,
+): components["schemas"]["Ratio"] {
+  return {
+    numerator,
+    denominator,
+    state: denominator ? "value" : "notApplicable",
+    percent: denominator
+      ? Math.round((numerator / denominator) * 1000) / 10
+      : null,
+  };
+}
+
+function occupancyTrend(
+  request: Request,
+  actor: Employee,
+): components["schemas"]["SeatOccupancyTrend"] {
+  const query = new URL(request.url).searchParams;
+  const branchId = id.parse(query.get("branchId"));
+  assert(
+    readable(actor, branchId),
+    "지점에 접근할 수 없습니다.",
+    403,
+    "FORBIDDEN",
+  );
+  const granularity = z
+    .enum(["hour", "day"])
+    .parse(query.get("granularity") ?? "hour");
+  const asOf = store.now();
+  const day = 86_400_000;
+  const midnight = Date.parse(`${formatBusinessDate(asOf)}T00:00:00+09:00`);
+  const instant = z.iso.datetime({ offset: true });
+  const requestedFrom = query.get("from");
+  const requestedTo = query.get("to");
+  const from =
+    requestedFrom === null
+      ? midnight
+      : Date.parse(instant.parse(requestedFrom));
+  const to =
+    requestedTo === null
+      ? midnight + day
+      : Date.parse(instant.parse(requestedTo));
+  assert(
+    (requestedFrom === null) === (requestedTo === null) && from < to,
+    "조회 기간을 확인해 주세요.",
+    422,
+    "VALIDATION_FAILED",
+  );
+  assert(
+    to - from <= (granularity === "hour" ? 31 : 366) * day,
+    "조회 기간이 너무 깁니다.",
+    422,
+    "PERIOD_TOO_LONG",
+  );
+  const iso = (time: number) => new Date(time).toISOString();
+  const step = granularity === "hour" ? 3_600_000 : day;
+  const offset = 9 * 3_600_000;
+  const now = Date.parse(asOf);
+  const seats = (store.scenario === "empty" ? [] : store.db.seats).filter(
+    (row) => row.branchId === branchId,
+  );
+  const sessions = (store.scenario === "empty" ? [] : store.db.usage).filter(
+    (row) => row.branchId === branchId,
+  );
+  const items: components["schemas"]["SeatOccupancyBucket"][] = [];
+  let occupiedTotal = 0;
+  let capacityTotal = 0;
+  for (
+    let bucketStart = Math.floor((from + offset) / step) * step - offset;
+    bucketStart < to;
+    bucketStart += step
+  ) {
+    const bucketEnd = bucketStart + step;
+    const start = Math.max(from, bucketStart);
+    const end = Math.max(start, Math.min(to, bucketEnd, now));
+    const seatCount = seats.filter(
+      (row) => Date.parse(row.createdAt) < end,
+    ).length;
+    const capacitySeatMinutes = Math.floor(
+      (seatCount * (end - start)) / 60_000,
+    );
+    const occupiedSeatMinutes = Math.floor(
+      sessions.reduce((sum, row) => {
+        const overlap =
+          Math.min(end, row.endedAt ? Date.parse(row.endedAt) : now) -
+          Math.max(start, Date.parse(row.startedAt));
+        return sum + Math.max(0, overlap);
+      }, 0) / 60_000,
+    );
+    occupiedTotal += occupiedSeatMinutes;
+    capacityTotal += capacitySeatMinutes;
+    const local = iso(bucketStart + offset);
+    items.push({
+      bucketStart: iso(bucketStart),
+      bucketEnd: iso(bucketEnd),
+      start: iso(start),
+      end: iso(end),
+      partial: start !== bucketStart || end !== bucketEnd,
+      label:
+        granularity === "hour"
+          ? local.slice(0, 16).replace("T", " ")
+          : local.slice(0, 10),
+      seatCount,
+      capacitySeatMinutes,
+      occupiedSeatMinutes,
+      occupancy: trendRatio(occupiedSeatMinutes, capacitySeatMinutes),
+    });
+  }
+  return {
+    branchId,
+    granularity,
+    from: iso(from),
+    to: iso(to),
+    asOf,
+    timeZone: "Asia/Seoul",
+    items,
+    totals: {
+      occupiedSeatMinutes: occupiedTotal,
+      capacitySeatMinutes: capacityTotal,
+      occupancy: trendRatio(occupiedTotal, capacityTotal),
+    },
+  };
+}
+
 export const seatHandlers = [
+  http.get(
+    "/api/seats/occupancy-trend",
+    response((a, actor) => occupancyTrend(a.request, actor)),
+  ),
   http.get(
     "/api/seats/board",
     response((a, actor) => {

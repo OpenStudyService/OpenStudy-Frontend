@@ -168,6 +168,17 @@ const scoped = (path: string, scope: string) =>
   `${path}?${queryString({ scope })}`;
 
 export const seatApi = {
+  occupancyTrend(
+    filters: NonNullable<
+      operations["getSeatOccupancyTrend"]["parameters"]["query"]
+    >,
+    signal: AbortSignal,
+  ) {
+    return api<Schemas["SeatOccupancyTrend"]>(
+      `/seats/occupancy-trend?${queryString(filters)}`,
+      { signal },
+    );
+  },
   async history(
     filters: NonNullable<operations["listSeatSessions"]["parameters"]["query"]>,
     signal?: AbortSignal,

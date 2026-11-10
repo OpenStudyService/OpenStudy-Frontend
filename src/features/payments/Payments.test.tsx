@@ -131,6 +131,23 @@ beforeEach(() => {
   vi.mocked(listPayments).mockImplementation(async () => ({
     items: [payment],
     meta: { page: 1, pageSize: 20, total: 1 },
+    filter: {
+      branchIds: ["gangnam"],
+      status: null,
+      from: null,
+      to: null,
+      customerId: null,
+      methods: [],
+      productKinds: [],
+      categoryCode: null,
+      operatorIds: [],
+      processingBranchIds: [],
+    },
+    summary: {
+      approved: { count: 1, amountKrw: payment.amountKrw },
+      refunded: { count: 0, amountKrw: 0 },
+      failed: { count: 0, amountKrw: 0 },
+    },
   }));
   vi.mocked(listPasses).mockImplementation(async () => ({
     items: [pass],
@@ -239,6 +256,30 @@ it("converts the selected Korean calendar dates into inclusive-start exclusive-e
         from: "2026-10-31T15:00:00.000Z",
         to: "2026-11-02T15:00:00.000Z",
         status: "승인",
+      }),
+      expect.anything(),
+    ),
+  );
+});
+
+it("restores advanced filters from a shared payments URL", async () => {
+  const search = new URLSearchParams([
+    ["methods", "카드"],
+    ["methods", "현금"],
+    ["productKinds", "시간권"],
+    ["categoryCode", "TIME"],
+    ["operatorIds", "owner"],
+    ["processingBranchIds", "gangnam"],
+  ]);
+  mount(<Payments />, `?${search}`);
+  await waitFor(() =>
+    expect(listPayments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        methods: ["카드", "현금"],
+        productKinds: ["시간권"],
+        categoryCode: "TIME",
+        operatorIds: ["owner"],
+        processingBranchIds: ["gangnam"],
       }),
       expect.anything(),
     ),

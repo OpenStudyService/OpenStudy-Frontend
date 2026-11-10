@@ -1,5 +1,6 @@
 import { homeSummary } from "./home";
 import { salesHandlers } from "./sales";
+import { dailyClosingHandlers } from "./daily-closings";
 import { closureHandlers } from "./closures";
 import { roomHandlers } from "./rooms";
 import { workforceHandlers } from "./workforce";
@@ -355,6 +356,7 @@ export const handlers = [
     () => new HttpResponse(null, { status: 404 }),
   ),
   ...salesHandlers,
+  ...dailyClosingHandlers,
   ...attendanceHandlers,
   ...workforceHandlers,
   ...roomHandlers,

@@ -15,13 +15,24 @@ import { ApiError } from "../../shared/api/client";
 import { seatApi } from "./api";
 import type { Seat, SeatBoard, SeatSession } from "./model";
 import { Seats } from "./Seats";
+import type { components } from "../../shared/api/foundation.generated";
 
 const app = vi.hoisted(() => ({ value: {} as AppContext }));
 vi.mock("../../app/context", () => ({ useApp: () => app.value }));
+vi.mock("../analysis/Charts", () => ({
+  SalesTrendChart: ({ rows }: { rows: { value: number | null }[] }) => (
+    <div
+      role="img"
+      aria-label="좌석 점유율 추세 차트"
+      data-values={JSON.stringify(rows.map((row) => row.value))}
+    />
+  ),
+}));
 vi.mock("./api", () => ({
   seatApi: {
     board: vi.fn(),
     occupancy: vi.fn(),
+    occupancyTrend: vi.fn(),
     detail: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -36,6 +47,69 @@ vi.mock("./api", () => ({
 let seat: Seat;
 let usage: SeatSession;
 const clients: QueryClient[] = [];
+
+it("keeps unavailable occupancy separate from a measured zero", async () => {
+  const ratio = {
+    state: "value",
+    percent: 0,
+    numerator: 0,
+    denominator: 60,
+  } as const;
+  const unavailable = {
+    state: "notApplicable",
+    percent: null,
+    numerator: 0,
+    denominator: 0,
+  } as const;
+  const bucket = {
+    bucketStart: "2026-11-09T15:00:00Z",
+    bucketEnd: "2026-11-09T16:00:00Z",
+    start: "2026-11-09T15:00:00Z",
+    end: "2026-11-09T16:00:00Z",
+    partial: false,
+    label: "2026-11-10 00:00",
+    seatCount: 1,
+    occupiedSeatMinutes: 0,
+    capacitySeatMinutes: 60,
+    occupancy: ratio,
+  };
+  const trend: components["schemas"]["SeatOccupancyTrend"] = {
+    branchId: "gangnam",
+    granularity: "hour",
+    from: bucket.start,
+    to: "2026-11-09T17:00:00Z",
+    timeZone: "Asia/Seoul",
+    asOf: bucket.end,
+    totals: {
+      occupiedSeatMinutes: 0,
+      capacitySeatMinutes: 60,
+      occupancy: ratio,
+    },
+    items: [
+      bucket,
+      {
+        ...bucket,
+        label: "2026-11-10 01:00",
+        bucketStart: bucket.end,
+        occupancy: unavailable,
+        capacitySeatMinutes: 0,
+      },
+    ],
+  };
+  vi.mocked(seatApi.occupancyTrend).mockResolvedValue(trend);
+  show();
+  await userEvent.click(screen.getByRole("button", { name: "좌석 점유 추이" }));
+  const table = await screen.findByRole("table", {}, { timeout: 4000 });
+  expect(
+    within(table).getByRole("row", { name: /00:00.*0\.0%/ }),
+  ).toBeVisible();
+  expect(
+    within(table).getByRole("row", { name: /01:00.*해당 없음/ }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("img", { name: "좌석 점유율 추세 차트" }),
+  ).toHaveAttribute("data-values", "[0,null]");
+});
 beforeEach(() => {
   vi.resetAllMocks();
   sessionStorage.clear();
