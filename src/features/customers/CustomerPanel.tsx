@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { useUi } from "../../app/store";
 import { ApiError } from "../../shared/api/client";
@@ -15,7 +15,7 @@ import {
 } from "../../shared/ui/primitives";
 import { customerApi } from "./api";
 import { canCreateCustomer, customerStatuses } from "./model";
-import type { Customer } from "./model";
+import type { Customer, CustomerStatusChange } from "./model";
 import {
   useCustomerDetail,
   useCustomerLeaveGuard,
@@ -24,6 +24,11 @@ import {
 import { CustomerForm, LatestCustomer } from "./CustomerForm";
 import { CustomerHistory } from "../pass-history/CustomerHistory";
 import { CustomerSpaceHistory } from "./CustomerSpaceHistory";
+import { CustomerMergeHistory } from "./CustomerMergeHistory";
+import {
+  CustomerMergeErrorLink,
+  customerDetailUrl,
+} from "./CustomerMergeErrorLink";
 
 export function CustomerPanel(props: { id: string; onClose: () => void }) {
   const { session, scope } = useApp();
@@ -104,7 +109,7 @@ function CustomerPanelSession({
         <ErrorState error={row.error} retry={() => void row.refetch()} />
       ) : (
         customer &&
-        (editing || changingStatus ? (
+        ((editing || changingStatus) && customer.status !== "병합됨" ? (
           customer.canEdit && session.user.status === "활성" ? (
             editing ? (
               <CustomerForm
@@ -164,16 +169,38 @@ function CustomerPanelSession({
                 </dd>
               </div>
             </dl>
-            <CustomerHistory customerId={customer.id} />
-            <CustomerSpaceHistory customerId={customer.id} />
-            {customer.canEdit && session.user.status === "활성" && (
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button onClick={() => mode("edit", "1")}>수정하기</Button>
-                <Button onClick={() => mode("action", "status")}>
-                  상태 변경
-                </Button>
-              </div>
+            {customer.mergedInto && (
+              <p className="tip mt-4">
+                병합 대상 고객{" "}
+                <Link
+                  className="cell-link"
+                  to={customerDetailUrl(scope, customer.mergedInto.id)}
+                >
+                  {customer.mergedInto.name} ({customer.mergedInto.memberNo})
+                </Link>
+              </p>
             )}
+            {customer.absorbedCustomerCount > 0 && (
+              <p className="help mt-4">
+                흡수된 고객 {customer.absorbedCustomerCount}명
+              </p>
+            )}
+            <CustomerMergeHistory customerId={customer.id} />
+            <CustomerHistory customerId={customer.id} />
+            <CustomerSpaceHistory
+              customerId={customer.id}
+              includeAbsorbed={customer.absorbedCustomerCount > 0}
+            />
+            {customer.status !== "병합됨" &&
+              customer.canEdit &&
+              session.user.status === "활성" && (
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <Button onClick={() => mode("edit", "1")}>수정하기</Button>
+                  <Button onClick={() => mode("action", "status")}>
+                    상태 변경
+                  </Button>
+                </div>
+              )}
           </>
         ))
       )}
@@ -192,7 +219,9 @@ function CustomerStatusForm({
     query = useQueryClient(),
     write = useCustomerWrite();
   const [base, setBase] = useState(customer),
-    [status, setStatus] = useState(customer.status),
+    [status, setStatus] = useState<CustomerStatusChange["status"]>(
+      customer.status === "병합됨" ? "정상" : customer.status,
+    ),
     [reason, setReason] = useState("");
   const [failure, setFailure] = useState<Error | null>(null),
     [errors, setErrors] = useState<Record<string, string>>({}),
@@ -260,7 +289,7 @@ function CustomerStatusForm({
           value={status}
           disabled={write.busy || denied}
           onChange={(event) =>
-            setStatus(event.target.value as Customer["status"])
+            setStatus(event.target.value as CustomerStatusChange["status"])
           }
         >
           {customerStatuses.map((value) => (
@@ -287,6 +316,7 @@ function CustomerStatusForm({
         {errors.reason && <FieldError>{errors.reason}</FieldError>}
       </label>
       {failure && <FieldError>{failure.message}</FieldError>}
+      <CustomerMergeErrorLink error={failure} />
       {conflict && (
         <section className="tip" aria-label="버전 충돌 확인">
           <p>

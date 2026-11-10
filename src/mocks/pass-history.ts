@@ -11,6 +11,7 @@ import type {
 import type { Pass } from "../features/payments/model";
 import { assert, DomainError, store } from "./store";
 import { customer } from "./customers";
+import { matchesCustomer } from "./customer-identity";
 import { passView, paymentResponse } from "./payments";
 
 type Usage = ResourceMap["usage"];
@@ -202,7 +203,9 @@ export const passHistoryHandlers = [
       const passes: CustomerHistory["passes"] = [],
         events: HistoryEvent[] = [];
       for (const row of store.db.passes.filter(
-        (p) => p.memberId === member.id && selected.includes(p.branchId),
+        (p) =>
+          matchesCustomer(p.memberId, member.id) &&
+          selected.includes(p.branchId),
       )) {
         const pass = passView(actor, row),
           payment = store.get("payments", row.paymentId);

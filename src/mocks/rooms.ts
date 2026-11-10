@@ -7,6 +7,7 @@ import { businessDate, can } from "../shared/domain/schema";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import type { components } from "../shared/api/foundation.generated";
 import { assert, DomainError, store } from "./store";
+import { matchesCustomer, rejectMergedCustomer } from "./customer-identity";
 type S = components["schemas"];
 type Args = {
   request: Request;
@@ -299,7 +300,8 @@ function filtered(a: Args, u: Employee) {
       (r) =>
         branches.includes(r.branchId) &&
         (!p.get("roomId") || r.roomId === p.get("roomId")) &&
-        (!p.get("customerId") || r.memberId === p.get("customerId")),
+        (!p.get("customerId") ||
+          matchesCustomer(r.memberId, p.get("customerId")!)),
     )
     .map((r) => booking(r, u))
     .filter(
@@ -595,6 +597,7 @@ export const roomHandlers = [
           404,
           "NOT_FOUND",
         );
+        rejectMergedCustomer(c, "CUSTOMER_NOT_ACTIVE");
         assert(
           c.status === "정상",
           "정상 상태 고객만 예약할 수 있습니다.",

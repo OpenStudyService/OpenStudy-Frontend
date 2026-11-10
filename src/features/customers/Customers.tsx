@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -18,14 +19,17 @@ import { Icon } from "../../shared/ui/Icon";
 import { customerApi } from "./api";
 import {
   canCreateCustomer,
-  customerStatuses,
+  customerListStatuses,
   parseCustomerFilters,
 } from "./model";
 import { CustomerPanel } from "./CustomerPanel";
+import { CustomerDuplicates } from "./CustomerDuplicates";
 
 export function Customers({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp(),
     [params, setParams] = useSearchParams();
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  const canMerge = session.user.owner && session.user.status === "활성";
   const filters = parseCustomerFilters(params);
   const rows = useQuery({
     queryKey: ["data", session.user.id, scope, "customers", "list", filters],
@@ -77,16 +81,24 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
       회원 등록
     </Button>
   );
+  const actions = (
+    <>
+      {create}
+      {canMerge && (
+        <Button onClick={() => setDuplicatesOpen(true)}>중복 고객 확인</Button>
+      )}
+    </>
+  );
   return (
     <section className={embedded ? "" : "page"}>
       {embedded ? (
-        <div className="mb-4 flex justify-end">{create}</div>
+        <div className="mb-4 flex justify-end">{actions}</div>
       ) : (
         <Heading
           title="회원 관리"
           description="회원 정보와 응대 내용을 확인하고 관리해요."
         >
-          {create}
+          {actions}
         </Heading>
       )}
       {MOCK && (
@@ -110,7 +122,7 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
             onChange={(event) => filter("status", event.target.value)}
           >
             <option value="">전체 상태</option>
-            {customerStatuses.map((status) => (
+            {customerListStatuses.map((status) => (
               <option key={status}>{status}</option>
             ))}
           </select>
@@ -268,6 +280,16 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
           </div>
         </footer>
       </div>
+      {canMerge && duplicatesOpen && (
+        <CustomerDuplicates
+          key={session.user.id}
+          onClose={() => setDuplicatesOpen(false)}
+          onMerged={(id) => {
+            setDuplicatesOpen(false);
+            show(id);
+          }}
+        />
+      )}
       {params.get("detail") && (
         <CustomerPanel id={params.get("detail")!} onClose={close} />
       )}

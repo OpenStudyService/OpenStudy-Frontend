@@ -6,6 +6,7 @@ import { canReadCrossBranch } from "../features/customers/history-api";
 import { can } from "../shared/domain/schema";
 import { assert, store } from "./store";
 import { customer } from "./customers";
+import { matchesCustomer } from "./customer-identity";
 import { booking } from "./rooms";
 import { assignmentView } from "./lockers";
 import { passView, paymentResponse } from "./payments";
@@ -35,13 +36,19 @@ export const customerHistoryHandlers = [
           store.scenario === "empty"
             ? []
             : store.db.reservations
-                .filter((r) => r.memberId === id && selected(r.branchId))
+                .filter(
+                  (r) =>
+                    matchesCustomer(r.memberId, id) && selected(r.branchId),
+                )
                 .map((r) => booking(r, actor)),
         assignments:
           store.scenario === "empty"
             ? []
             : assignments()
-                .filter((r) => r.customer.id === id && selected(r.branchId))
+                .filter(
+                  (r) =>
+                    matchesCustomer(r.customer.id, id) && selected(r.branchId),
+                )
                 .map((r) => assignmentView(r, actor)),
       };
     }),
@@ -77,7 +84,7 @@ export const customerHistoryHandlers = [
         interactions.set(store.events, log); // Does not qualify a customer for exact lookup/inquiry targeting.
         const usages: CrossBranchSummary["usages"] = [
           ...store.db.usage
-            .filter((r) => r.memberId === id)
+            .filter((r) => matchesCustomer(r.memberId, id))
             .map((r) => ({
               kind: "좌석" as const,
               branchId: r.branchId,
@@ -85,7 +92,7 @@ export const customerHistoryHandlers = [
               endAt: r.endedAt || null,
             })),
           ...store.db.reservations
-            .filter((r) => r.memberId === id)
+            .filter((r) => matchesCustomer(r.memberId, id))
             .map((r) => booking(r, actor, true))
             .filter((r) => r.usage)
             .map((r) => ({
@@ -97,7 +104,8 @@ export const customerHistoryHandlers = [
           ...assignments()
             .filter(
               (r) =>
-                r.customer.id === id && ["배정", "반납"].includes(r.status),
+                matchesCustomer(r.customer.id, id) &&
+                ["배정", "반납"].includes(r.status),
             )
             .flatMap((r) => {
               const startAt = new Date(
@@ -123,7 +131,7 @@ export const customerHistoryHandlers = [
             store.scenario === "empty"
               ? []
               : store.db.passes
-                  .filter((r) => r.memberId === id)
+                  .filter((r) => matchesCustomer(r.memberId, id))
                   .map((r) => {
                     const p = passView(actor, r);
                     return {

@@ -144,7 +144,8 @@ export const schemas = {
     name: str,
     email: z.email().or(z.literal("")),
     phone: str,
-    status: z.enum(["정상", "이용 제한", "비활성"]),
+    status: z.enum(["정상", "이용 제한", "비활성", "병합됨"]),
+    mergedIntoCustomerId: z.string().optional(),
     note: z.string(),
     branchIds: z.array(str),
     // Optional demo metadata for canonical /customers; not a second customer ledger.

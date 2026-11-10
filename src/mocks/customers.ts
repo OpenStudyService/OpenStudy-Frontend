@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { components } from "../shared/api/foundation.generated";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
+import { matchesCustomer, rejectMergedCustomer } from "./customer-identity";
 
 type Customer = components["schemas"]["Customer"];
 type CustomerItem = components["schemas"]["CustomerListItem"];
@@ -14,6 +15,7 @@ type Args = {
   params: Record<string, string | readonly string[] | undefined>;
 };
 const statuses = z.enum(["정상", "이용 제한", "비활성"]);
+const listStatuses = z.enum([...statuses.options, "병합됨"]);
 const name = z.string().trim().min(1).max(100);
 const phone = z
   .string()
@@ -57,6 +59,13 @@ const statusInput = z
     reason: z.string().trim().min(1).max(500),
   })
   .strict();
+
+const mergeInput = z.strictObject({
+  version,
+  absorbedCustomerId: z.string().min(1),
+  absorbedVersion: version,
+  reason: z.string().trim().min(1).max(500),
+});
 
 // Reset creates a new events array. Transaction rollback only replaces db, so it must not erase accepted request keys.
 const creations = new WeakMap<
@@ -113,8 +122,11 @@ function related(row: Row) {
     ...new Set(
       [
         registration(row),
+        ...store.db.members
+          .filter((member) => member.mergedIntoCustomerId === row.id)
+          .map(registration),
         ...store.db.payments
-          .filter((p) => p.memberId === row.id)
+          .filter((p) => matchesCustomer(p.memberId, row.id))
           .map((p) => p.branchId),
       ].filter((id): id is string => !!id),
     ),
@@ -155,7 +167,15 @@ function item(row: Row): CustomerItem {
     registeredAt: row.registeredAt ?? row.createdAt,
   };
 }
+const summary = (row: Row) => ({
+  id: row.id,
+  memberNo: number(row),
+  name: row.name,
+});
 function detail(actor: Employee, row: Row): Customer {
+  const target = store.db.members.find(
+    (member) => member.id === row.mergedIntoCustomerId,
+  );
   return {
     ...item(row),
     version: row.version,
@@ -163,7 +183,11 @@ function detail(actor: Employee, row: Row): Customer {
     memo: row.note || null,
     statusReason: row.statusReason ?? null,
     updatedAt: row.updatedAt,
-    canEdit: editable(actor, row),
+    canEdit: row.status !== "병합됨" && editable(actor, row),
+    mergedInto: target ? summary(target) : null,
+    absorbedCustomerCount: store.db.members.filter(
+      (member) => member.mergedIntoCustomerId === row.id,
+    ).length,
   };
 }
 function requireVersion(row: Row, expected: number) {
@@ -215,6 +239,7 @@ function errorResponse(error: unknown) {
       ...(failure.latestVersion !== undefined
         ? { latestVersion: failure.latestVersion, reloadUrl: failure.reloadUrl }
         : {}),
+      ...failure.target,
       requestId: crypto.randomUUID(),
     },
     { status: failure.status, headers: { "Cache-Control": "no-store" } },
@@ -273,6 +298,152 @@ const response =
 
 export const customerHandlers = [
   http.get(
+    "/api/customer-duplicates",
+    response(({ request }, actor) => {
+      assert(
+        actor.owner,
+        "사장님만 중복 고객을 볼 수 있습니다.",
+        403,
+        "FORBIDDEN",
+      );
+      const params = new URL(request.url).searchParams;
+      const page = z.coerce
+        .number()
+        .int()
+        .positive()
+        .parse(params.get("page") ?? 1);
+      const pageSize = z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .parse(params.get("pageSize") ?? 20);
+      const groups = new Map<
+        string,
+        components["schemas"]["DuplicateCustomer"][]
+      >();
+      for (const row of store.scenario === "empty" ? [] : store.db.members) {
+        const { phone, status, ...base } = item(row);
+        if (status === "병합됨") continue;
+        const payments = store.db.payments.filter(
+          (payment) => payment.memberId === row.id,
+        );
+        const lastActivityAt =
+          [
+            ...payments.map((payment) => payment.createdAt),
+            ...store.db.usage
+              .filter((usage) => usage.memberId === row.id)
+              .map((usage) => usage.startedAt),
+          ]
+            .sort()
+            .at(-1) ?? null;
+        const rows = groups.get(phone) ?? [];
+        rows.push({
+          ...base,
+          status,
+          paymentCount: payments.length,
+          lastActivityAt,
+        });
+        groups.set(phone, rows);
+      }
+      const items = Array.from(groups, ([phone, customers]) => ({
+        phone,
+        customers: customers.sort(
+          (a, b) =>
+            a.registeredAt.localeCompare(b.registeredAt) ||
+            a.id.localeCompare(b.id),
+        ),
+      }))
+        .filter((group) => group.customers.length > 1)
+        .sort(
+          (a, b) =>
+            b.customers.length - a.customers.length ||
+            a.phone.localeCompare(b.phone),
+        );
+      return {
+        items: items.slice((page - 1) * pageSize, page * pageSize),
+        meta: { page, pageSize, total: items.length },
+      };
+    }),
+  ),
+  http.post(
+    "/api/customers/:id/merge",
+    response(async ({ request, params }, principal) => {
+      const input = mergeInput.parse(await request.json());
+      const actor = currentActor(principal.id);
+      assert(
+        actor.owner,
+        "사장님만 고객을 병합할 수 있습니다.",
+        403,
+        "FORBIDDEN",
+      );
+      const id = String(params.id);
+      assert(
+        id !== input.absorbedCustomerId,
+        "같은 고객끼리는 병합할 수 없습니다.",
+        422,
+        "CUSTOMER_MERGE_SELF",
+      );
+      return store.transaction(undefined, input, () => {
+        const target = store.get("members", id);
+        const absorbed = store.get("members", input.absorbedCustomerId);
+        rejectMergedCustomer(target, "CUSTOMER_ALREADY_MERGED");
+        rejectMergedCustomer(absorbed, "CUSTOMER_ALREADY_MERGED");
+        requireVersion(target, input.version);
+        requireVersion(absorbed, input.absorbedVersion);
+
+        const at = store.now();
+        const moved = store.db.members.filter(
+          (row) => row.mergedIntoCustomerId === absorbed.id,
+        );
+        const history = (store.db.customerMerges ??= []);
+        for (const row of [absorbed, ...moved]) {
+          row.status = "병합됨";
+          row.mergedIntoCustomerId = target.id;
+          row.version++;
+          row.updatedAt = at;
+          history.push({
+            id: crypto.randomUUID(),
+            target: summary(target),
+            absorbed: summary(row),
+            via: row === absorbed ? null : summary(absorbed),
+            mergedBy: { id: actor.id, name: actor.name },
+            mergedAt: at,
+            reason: input.reason,
+          });
+        }
+        target.version++;
+        target.updatedAt = at;
+        changed(target, actor, "MERGED", ["mergedIntoCustomerId"]);
+        return detail(actor, target);
+      });
+    }),
+  ),
+  http.get(
+    "/api/customers/:id/merges",
+    response(({ request, params }, actor) => {
+      const { id } = customer(actor, request, String(params.id));
+      const liveSummary = (record: ReturnType<typeof summary>) =>
+        summary(store.get("members", record.id));
+      return {
+        items: (store.db.customerMerges ?? [])
+          .filter(
+            (record) =>
+              record.target.id === id ||
+              record.absorbed.id === id ||
+              record.via?.id === id,
+          )
+          .reverse()
+          .map((record) => ({
+            ...record,
+            target: liveSummary(record.target),
+            absorbed: liveSummary(record.absorbed),
+            via: record.via && liveSummary(record.via),
+          })),
+      };
+    }),
+  ),
+  http.get(
     "/api/customers",
     response(({ request }, actor) => {
       const scope = selected(actor, request),
@@ -303,13 +474,13 @@ export const customerHandlers = [
         422,
         "VALIDATION_FAILED",
       );
-      if (status !== null) statuses.parse(status);
+      if (status !== null) listStatuses.parse(status);
       const digits = q.replace(/[\s-]/g, ""),
         phoneQuery = /^[0-9]{4,}$/.test(digits) ? digits : null;
       const rows = (store.scenario === "empty" ? [] : store.db.members).filter(
         (row) =>
           visible(actor, row, scope) &&
-          (!status || row.status === status) &&
+          (status ? row.status === status : row.status !== "병합됨") &&
           (!q ||
             row.name.toLocaleLowerCase().includes(q.toLocaleLowerCase()) ||
             number(row).toLocaleLowerCase() === q.toLocaleLowerCase() ||
@@ -435,6 +606,7 @@ export const customerHandlers = [
         403,
         "FORBIDDEN",
       );
+      rejectMergedCustomer(row, "CUSTOMER_ALREADY_MERGED");
       requireVersion(row, parsed.version);
       const update = {
         name: parsed.name ?? row.name,
@@ -466,6 +638,7 @@ export const customerHandlers = [
         403,
         "FORBIDDEN",
       );
+      rejectMergedCustomer(row, "CUSTOMER_ALREADY_MERGED");
       requireVersion(row, input.version);
       if (row.status === input.status) return detail(actor, row);
       const previous = row.status,

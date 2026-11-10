@@ -6,6 +6,7 @@ import type { components } from "../shared/api/foundation.generated";
 import { can } from "../shared/domain/schema";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
+import { matchesCustomer, rejectMergedCustomer } from "./customer-identity";
 
 type S = components["schemas"];
 type LockerRow = ResourceMap["lockers"];
@@ -409,6 +410,7 @@ const respond =
           fieldErrors: error.fieldErrors,
           latestVersion: error.latestVersion,
           reloadUrl: error.reloadUrl,
+          ...error.target,
           requestId: crypto.randomUUID(),
         },
         { status: error.status },
@@ -582,7 +584,8 @@ export const lockerHandlers = [
             (l) =>
               branches.includes(l.branchId) &&
               (!q.has("lockerId") || l.locker.id === q.get("lockerId")) &&
-              (!q.has("customerId") || l.customer.id === q.get("customerId")) &&
+              (!q.has("customerId") ||
+                matchesCustomer(l.customer.id, q.get("customerId")!)) &&
               (!filter || l.status === filter),
           )
           .sort(
@@ -636,6 +639,7 @@ export const lockerHandlers = [
           404,
           "NOT_FOUND",
         );
+        rejectMergedCustomer(c, "CUSTOMER_NOT_ACTIVE");
         assert(
           c.status === "정상",
           "정상 고객만 결제할 수 있습니다.",

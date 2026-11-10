@@ -7,6 +7,7 @@ import type { components } from "../shared/api/foundation.generated";
 import { admin, can } from "../shared/domain/schema";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
+import { matchesCustomer, rejectMergedCustomer } from "./customer-identity";
 import { recordUsage } from "./pass-history";
 
 type Seat = components["schemas"]["Seat"];
@@ -433,6 +434,7 @@ const response =
           fieldErrors: failure.fieldErrors,
           latestVersion: failure.latestVersion,
           reloadUrl: failure.reloadUrl,
+          ...failure.target,
           requestId: crypto.randomUUID(),
         },
         { status: failure.status },
@@ -586,13 +588,19 @@ export const seatHandlers = [
         "FORBIDDEN",
       );
       const now = store.now();
+      const matched = (
+        store.scenario === "empty" ? [] : store.db.members
+      ).filter((m) =>
+        input.memberNo !== undefined
+          ? customer(m.id).memberNo === input.memberNo
+          : m.phone.replace(/[\s-]/g, "") === input.phone,
+      );
+      const targetIds = new Set(
+        matched.map((m) => m.mergedIntoCustomerId ?? m.id),
+      );
       return {
-        items: (store.scenario === "empty" ? [] : store.db.members)
-          .filter((m) =>
-            input.memberNo !== undefined
-              ? customer(m.id).memberNo === input.memberNo
-              : m.phone.replace(/[\s-]/g, "") === input.phone,
-          )
+        items: store.db.members
+          .filter((m) => targetIds.has(m.id) && m.status !== "병합됨")
           .sort((a, b) =>
             customer(a.id).memberNo.localeCompare(customer(b.id).memberNo),
           )
@@ -613,7 +621,10 @@ export const seatHandlers = [
                   }
                 : null,
               usablePasses: store.db.passes
-                .filter((p) => p.memberId === m.id && !passError(p, now))
+                .filter(
+                  (p) =>
+                    matchesCustomer(p.memberId, m.id) && !passError(p, now),
+                )
                 .map((p) => ({
                   id: p.id,
                   kind: p.kind,
@@ -636,11 +647,14 @@ export const seatHandlers = [
       return transact(a, "check-in", seat.id, input, () => {
         running(seat.branchId);
         available(seat);
+        const member = store.get("members", input.customerId);
+        rejectMergedCustomer(member, "CUSTOMER_NOT_ACTIVE");
         const pass = store.db.passes.find(
-          (p) => p.id === input.passId && p.memberId === input.customerId,
+          (p) =>
+            p.id === input.passId &&
+            matchesCustomer(p.memberId, input.customerId),
         );
         assert(pass, "이용권을 찾을 수 없습니다.", 404, "NOT_FOUND");
-        const member = store.get("members", input.customerId);
         assert(
           member.status === "정상",
           "입실할 수 없는 고객입니다.",
@@ -723,7 +737,7 @@ export const seatHandlers = [
                 query.get("status")) &&
             (!query.has("seatId") || u.seatId === query.get("seatId")) &&
             (!query.has("customerId") ||
-              u.memberId === query.get("customerId")) &&
+              matchesCustomer(u.memberId, query.get("customerId")!)) &&
             (!query.has("from") ||
               Date.parse(u.startedAt) >= Date.parse(query.get("from")!)) &&
             (!query.has("to") ||

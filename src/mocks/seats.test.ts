@@ -548,3 +548,55 @@ it("checks CSRF and active authorization before replaying a successful key", asy
     (await request("/seats", "POST", { ...body, seatNo: "C-02" }, key)).status,
   ).toBe(403);
 });
+
+it("looks up the target and allows it to check in with an absorbed customer's pass", async () => {
+  const absorbed = store.get("members", "member-2");
+  const target = store.get("members", "member-3");
+  target.status = "정상";
+  const pass = store.db.passes.find(
+    (row) => row.memberId === absorbed.id && row.status === "활성",
+  )!;
+  expect(pass).toBeDefined();
+  const merge = await request(`/customers/${target.id}/merge`, "POST", {
+    version: target.version,
+    absorbedCustomerId: absorbed.id,
+    absorbedVersion: absorbed.version,
+    reason: "중복 등록",
+  });
+  expect(merge.status).toBe(200);
+  const lookup = await request("/customer-lookups/check-in", "POST", {
+    branchId: "gangnam",
+    phone: absorbed.phone.replace(/[\s-]/g, ""),
+  });
+  expect(lookup.status).toBe(200);
+  expect((await lookup.json()).items).toEqual([
+    expect.objectContaining({
+      customer: expect.objectContaining({ id: target.id }),
+      usablePasses: expect.arrayContaining([
+        expect.objectContaining({ id: pass.id }),
+      ]),
+    }),
+  ]);
+  const checkIn = {
+    seatId: "gangnam-seat-1",
+    customerId: absorbed.id,
+    passId: pass.id,
+  };
+  const denied = await request("/seat-sessions", "POST", checkIn);
+  expect(denied.status).toBe(409);
+  expect(await denied.json()).toMatchObject({
+    code: "CUSTOMER_NOT_ACTIVE",
+    mergedIntoCustomerId: target.id,
+  });
+
+  const result = await request("/seat-sessions", "POST", {
+    ...checkIn,
+    customerId: target.id,
+  });
+  expect(result.status).toBe(201);
+  expect(await result.json()).toMatchObject({
+    customer: { id: target.id },
+    pass: { id: pass.id },
+  });
+  expect(store.get("passes", pass.id).memberId).toBe(absorbed.id);
+});

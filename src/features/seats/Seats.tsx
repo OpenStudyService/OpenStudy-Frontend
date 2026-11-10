@@ -1,3 +1,4 @@
+import { CustomerMergeErrorLink } from "../customers/CustomerMergeErrorLink";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
@@ -958,6 +959,7 @@ function CheckInForm({
         </form>
       )}
       {errors.feedback}
+      <CustomerMergeErrorLink error={errors.error} />
       {retryBody && (
         <Button
           disabled={

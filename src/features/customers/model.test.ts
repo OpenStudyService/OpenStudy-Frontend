@@ -23,6 +23,8 @@ const customer: Customer = {
   registeredBranchId: "gangnam",
   registeredAt: "2026-10-29T00:00:00Z",
   updatedAt: "2026-10-29T00:00:00Z",
+  mergedInto: null,
+  absorbedCustomerCount: 0,
   canEdit: true,
 };
 it("requires an explicit registration branch in all-branch view and validates canonical field limits", () => {

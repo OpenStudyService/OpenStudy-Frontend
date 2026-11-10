@@ -2,6 +2,7 @@ import type { components } from "./foundation.generated";
 // Transport failures and legacy mock responses may have no server request ID.
 export type ErrorBody = Omit<components["schemas"]["ApiError"], "requestId"> & {
   requestId?: string;
+  mergedIntoCustomerId?: string | null;
   closureId?: string | null;
   closedDate?: string | null;
   salesStartsAt?: string | null;

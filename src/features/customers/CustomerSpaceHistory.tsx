@@ -22,13 +22,31 @@ import {
 } from "./history-api";
 import type { CrossBranchSummary } from "./history-api";
 
-export function CustomerSpaceHistory({ customerId }: { customerId: string }) {
+export function CustomerSpaceHistory({
+  customerId,
+  includeAbsorbed = false,
+}: {
+  customerId: string;
+  includeAbsorbed?: boolean;
+}) {
   const { session, scope } = useApp();
   // This component is also safe when mounted outside CustomerPanel's keyed session.
   const identity = JSON.stringify([customerId, scope, session.user]);
-  return <HistorySession key={identity} customerId={customerId} />;
+  return (
+    <HistorySession
+      key={identity}
+      customerId={customerId}
+      includeAbsorbed={includeAbsorbed}
+    />
+  );
 }
-function HistorySession({ customerId }: { customerId: string }) {
+function HistorySession({
+  customerId,
+  includeAbsorbed,
+}: {
+  customerId: string;
+  includeAbsorbed: boolean;
+}) {
   const { session, scope } = useApp();
   const client = useQueryClient();
   const [visible, setVisible] = useState(false);
@@ -41,13 +59,19 @@ function HistorySession({ customerId }: { customerId: string }) {
       "customers",
       "space-history",
       customerId,
+      includeAbsorbed,
       session.user.status,
       session.user.owner,
       session.user.memberships,
     ],
     queryFn: async ({ signal }) => {
       try {
-        return await getSpaceHistory(customerId, scope, signal);
+        return await getSpaceHistory(
+          customerId,
+          scope,
+          signal,
+          includeAbsorbed,
+        );
       } catch (error) {
         if (
           !signal.aborted &&

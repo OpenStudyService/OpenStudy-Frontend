@@ -481,3 +481,127 @@ it.each([
     expect(store.db.members).toEqual(before);
   },
 );
+
+it("groups duplicates and preserves the original customers and history after OWNER merges", async () => {
+  const target = await created({ name: "대상" });
+  const absorbed = await created({ name: "흡수" });
+  const final = await created({ name: "최종", phone: "01011110000" });
+  const path = `/customers/${target.id}/merge`;
+  const body = {
+    version: target.version,
+    absorbedCustomerId: absorbed.id,
+    absorbedVersion: absorbed.version,
+    reason: "중복 등록",
+  };
+  const duplicates = await (
+    await request("/customer-duplicates?pageSize=1")
+  ).json();
+  expect(duplicates).toMatchObject({
+    items: [
+      {
+        phone: "01012345678",
+        customers: [
+          { id: target.id, paymentCount: 0, lastActivityAt: null },
+          { id: absorbed.id },
+        ],
+      },
+    ],
+    meta: { pageSize: 1 },
+  });
+
+  store.persona = "junho";
+  expect((await request("/customer-duplicates")).status).toBe(403);
+  expect((await request(path, "POST", body)).status).toBe(403);
+  store.persona = "owner";
+
+  async function conflict(
+    url: string,
+    method: string,
+    data: object,
+    status: number,
+    detail: object,
+  ) {
+    const r = await request(url, method, data);
+    expect(r.status).toBe(status);
+    expect(await r.json()).toMatchObject(detail);
+  }
+  await conflict(
+    path,
+    "POST",
+    { ...body, absorbedCustomerId: target.id },
+    422,
+    { code: "CUSTOMER_MERGE_SELF" },
+  );
+  await conflict(
+    path,
+    "POST",
+    { ...body, absorbedVersion: absorbed.version + 1 },
+    409,
+    {
+      code: "VERSION_CONFLICT",
+      latestVersion: absorbed.version,
+      reloadUrl: `/api/customers/${absorbed.id}`,
+    },
+  );
+  const merged = await request(path, "POST", body);
+  expect(merged.status).toBe(200);
+  expect(await merged.json()).toMatchObject({
+    id: target.id,
+    version: target.version + 1,
+    absorbedCustomerCount: 1,
+  });
+  await conflict(path, "POST", body, 409, {
+    code: "CUSTOMER_ALREADY_MERGED",
+    mergedIntoCustomerId: target.id,
+  });
+  await conflict(
+    `/customers/${absorbed.id}`,
+    "PATCH",
+    { version: absorbed.version + 1, name: "다른 이름" },
+    409,
+    { code: "CUSTOMER_ALREADY_MERGED", mergedIntoCustomerId: target.id },
+  );
+  await conflict(
+    `/customers/${absorbed.id}/status`,
+    "POST",
+    { version: absorbed.version + 1, status: "정상", reason: "복원" },
+    409,
+    { code: "CUSTOMER_ALREADY_MERGED", mergedIntoCustomerId: target.id },
+  );
+
+  const next = await request(`/customers/${final.id}/merge`, "POST", {
+    version: final.version,
+    absorbedCustomerId: target.id,
+    absorbedVersion: target.version + 1,
+    reason: "추가 확인",
+  });
+  expect(next.status).toBe(200);
+  expect(await next.json()).toMatchObject({
+    id: final.id,
+    absorbedCustomerCount: 2,
+  });
+  store.persona = "junho";
+  const record = await (await request(`/customers/${absorbed.id}`)).json();
+  expect(record).toMatchObject({
+    status: "병합됨",
+    canEdit: false,
+    mergedInto: { id: final.id },
+  });
+  const history = await (
+    await request(`/customers/${absorbed.id}/merges`)
+  ).json();
+  expect(history.items).toMatchObject([
+    { target: { id: final.id }, via: { id: target.id }, reason: "추가 확인" },
+    { target: { id: target.id }, via: null, reason: "중복 등록" },
+  ]);
+  const defaultList = await (
+    await request(`/customers?q=${absorbed.memberNo}`)
+  ).json();
+  expect(defaultList.items).toEqual([]);
+  const mergedList = await (
+    await request(`/customers?q=${absorbed.memberNo}&status=병합됨`)
+  ).json();
+  expect(mergedList.items).toMatchObject([
+    { id: absorbed.id, status: "병합됨" },
+  ]);
+});
