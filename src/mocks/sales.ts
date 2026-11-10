@@ -4,7 +4,8 @@ import { http, HttpResponse } from "msw/http";
 import { z } from "zod";
 import { can } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
-import { salesProductSnapshot } from "./payments";
+import { paymentView, salesProductSnapshot } from "./payments";
+import type { components } from "../shared/api/foundation.generated";
 
 const purposes = ["이용권", "스터디룸", "사물함"] as const;
 type Purpose = (typeof purposes)[number];
@@ -49,7 +50,7 @@ function invalid(
   assert(condition, message, 422, code);
 }
 type SalesRead =
-  "revenue" | "branches" | "ledger" | "volume" | "products" | "trend";
+  "revenue" | "branches" | "ledger" | "volume" | "products" | "trend" | "usage";
 type ProductSnapshot = NonNullable<ReturnType<typeof salesProductSnapshot>>;
 function volume(rows: Entry[]) {
   const paymentCount = rows.filter((row) => row.entryType === "승인").length;
@@ -145,14 +146,47 @@ function build(request: Request, kind: SalesRead) {
       ? z.enum(["day", "week", "month"]).parse(q.get("granularity") ?? "day")
       : null;
   const passes =
-    kind === "volume" || kind === "products" || measure === "passes";
-  const purpose = passes
-    ? "이용권"
-    : q.has("purpose")
-      ? z.enum(purposes).parse(q.get("purpose"))
-      : null;
+    kind === "volume" ||
+    kind === "products" ||
+    kind === "usage" ||
+    measure === "passes";
+  const methods = z
+    .array(z.enum(["현금", "카드", "계좌이체", "기타"]))
+    .parse(q.getAll("methods"));
+  const productKinds = z
+    .array(z.enum(["시간권", "기간권", "정액권"]))
+    .parse(q.getAll("productKinds"));
+  const operatorIds = q.getAll("operatorIds");
+  const processingBranchIds = q.getAll("processingBranchIds");
+  for (const values of [
+    methods,
+    productKinds,
+    operatorIds,
+    processingBranchIds,
+  ])
+    invalid(
+      values.every(Boolean) && values.length === new Set(values).size,
+      "필터를 확인해 주세요.",
+    );
+  assert(
+    processingBranchIds.every(
+      (id) =>
+        store.db.branches.some((branch) => branch.id === id) && can(actor, id),
+    ),
+    "지점에 접근할 수 없습니다.",
+    403,
+    "FORBIDDEN",
+  );
+  const passOnly = productKinds.length > 0 || q.has("categoryCode");
+  const requestedPurpose = q.has("purpose")
+    ? z.enum(purposes).parse(q.get("purpose"))
+    : null;
+  const purpose = passes || passOnly ? "이용권" : requestedPurpose;
   invalid(
-    passes ? !q.has("purpose") : !q.has("productId") && !q.has("categoryCode"),
+    passes
+      ? !q.has("purpose")
+      : !q.has("productId") &&
+          (!passOnly || !requestedPurpose || requestedPurpose === "이용권"),
     "집계에 적용할 수 없는 필터입니다.",
   );
   const productId = q.get("productId"),
@@ -178,7 +212,7 @@ function build(request: Request, kind: SalesRead) {
     Date.parse(at) >= Date.parse(from) &&
     Date.parse(at) < Date.parse(to) &&
     Date.parse(at) <= Date.parse(asOf);
-  if (store.scenario !== "empty")
+  if (kind !== "usage" && store.scenario !== "empty")
     for (const row of store.db.payments) {
       if (
         !branchIds.includes(row.branchId) ||
@@ -194,6 +228,13 @@ function build(request: Request, kind: SalesRead) {
       if (productId !== null && row.productId !== productId) continue;
       if (categoryCode !== null && snapshot?.categoryCode !== categoryCode)
         continue;
+      if (
+        productKinds.length &&
+        (!snapshot || !productKinds.includes(snapshot.kind))
+      )
+        continue;
+      const payment = paymentView(actor, row);
+      if (methods.length && !methods.includes(payment.method)) continue;
       if (snapshot) snapshots.set(row.id, snapshot);
       const approvedAt = row.canonical?.approvedAt ?? row.approvedAt;
       const refund = row.canonical?.refund;
@@ -209,7 +250,11 @@ function build(request: Request, kind: SalesRead) {
         approvedAt,
         canViewPayment: can(actor, row.branchId, "payments:read"),
       };
-      if ((!entryType || entryType === "승인") && within(approvedAt))
+      if (
+        (!entryType || entryType === "승인") &&
+        within(approvedAt) &&
+        (!operatorIds.length || operatorIds.includes(payment.createdBy.id))
+      )
         rows.push({
           ...common,
           id: `payment-${row.id}`,
@@ -225,6 +270,13 @@ function build(request: Request, kind: SalesRead) {
       if (
         (!entryType || entryType === "환불") &&
         refundedAt &&
+        (!operatorIds.length ||
+          (!!payment.refund &&
+            operatorIds.includes(payment.refund.processedBy.id))) &&
+        (!processingBranchIds.length ||
+          processingBranchIds.includes(
+            refund?.processingBranchId ?? row.refundBranchId,
+          )) &&
         Date.parse(refundedAt) <= Date.parse(asOf) &&
         within(basisAt)
       )
@@ -259,8 +311,42 @@ function build(request: Request, kind: SalesRead) {
       purpose,
       productId,
       categoryCode,
+      methods,
+      productKinds,
+      operatorIds,
+      processingBranchIds,
       granularity,
     },
+    conditionNotes: [
+      ...(passOnly
+        ? [{ code: "PASS_ONLY", message: "이용권 결제만 집계했다" }]
+        : []),
+      ...(processingBranchIds.length
+        ? [
+            {
+              code: "REFUND_PROCESSING_BRANCH",
+              message:
+                "환불은 처리 지점 조건에 맞는 것만, 승인은 조건과 무관하다",
+            },
+          ]
+        : []),
+      ...(operatorIds.length
+        ? [
+            {
+              code: "OPERATOR_BY_ENTRY",
+              message: "승인은 결제 처리자, 환불은 환불 처리자로 골랐다",
+            },
+          ]
+        : []),
+      ...(methods.length
+        ? [
+            {
+              code: "REFUND_BY_PAYMENT_METHOD",
+              message: "환불은 원결제 수단으로 나눴다",
+            },
+          ]
+        : []),
+    ],
     defaultPeriod,
     timeZone: "Asia/Seoul",
     currency: "KRW",
@@ -289,6 +375,93 @@ function build(request: Request, kind: SalesRead) {
           { id: "sales.refund_count", unit: "건" },
         ],
   });
+  if (kind === "usage") {
+    type Schemas = components["schemas"];
+    type Amounts = Schemas["PassUsageAmounts"];
+    const empty = (): Amounts => ({
+      sessionCount: 0,
+      usedMinutes: 0,
+      usedCreditKrw: 0,
+    });
+    const add = (a: Amounts, b: Amounts) => {
+      a.sessionCount += b.sessionCount;
+      a.usedMinutes += b.usedMinutes;
+      a.usedCreditKrw += b.usedCreditKrw;
+      return a;
+    };
+    const groups = new Map<string, Map<string | null, Amounts>>();
+    const total = empty();
+    let sourceRowCount = 0;
+    for (const use of store.scenario === "empty" ? [] : store.db.usage) {
+      if (!branchIds.includes(use.branchId)) continue;
+      const pass = store.db.passes.find((p) => p.id === use.passId);
+      if (!pass || (productKinds.length && !productKinds.includes(pass.kind)))
+        continue;
+      const payment = store.db.payments.find((p) => p.id === pass.paymentId);
+      if (productId && payment?.productId !== productId) continue;
+      if (
+        categoryCode &&
+        (!payment ||
+          salesProductSnapshot(payment).categoryCode !== categoryCode)
+      )
+        continue;
+      const started = within(use.startedAt);
+      const charged =
+        !!use.endedAt && within(use.endedAt) && pass.kind !== "기간권";
+      if (!started && !charged) continue;
+      sourceRowCount += Number(started) + Number(charged);
+      const cell = {
+        sessionCount: Number(started),
+        usedMinutes: charged && pass.kind === "시간권" ? use.charged : 0,
+        usedCreditKrw: charged && pass.kind === "정액권" ? use.charged : 0,
+      };
+      const saleBranch = can(actor, pass.branchId, "sales:read")
+        ? pass.branchId
+        : null;
+      const usage =
+        groups.get(use.branchId) ?? new Map<string | null, Amounts>();
+      usage.set(saleBranch, add(usage.get(saleBranch) ?? empty(), cell));
+      groups.set(use.branchId, usage);
+      add(total, cell);
+    }
+    const items = [...groups]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([branchId, group]) => {
+        const bySaleBranch = [...group]
+          .sort(([a], [b]) => (a ?? "").localeCompare(b ?? ""))
+          .map(([saleBranchId, amounts]) => ({
+            ...amounts,
+            saleBranchId,
+            visible: saleBranchId !== null,
+            label: saleBranchId === null ? "다른 지점" : null,
+          }));
+        return { branchId, bySaleBranch, ...bySaleBranch.reduce(add, empty()) };
+      });
+    const base = aggregation(items.length);
+    return {
+      items,
+      totals: total,
+      aggregation: {
+        ...base,
+        condition: { ...base.condition, refundBasis: null },
+        sourceRowCount,
+        dataStatus: sourceRowCount ? "hasData" : "noData",
+        metrics: [
+          { id: "pass.usage_session_count", unit: "건" },
+          { id: "pass.usage_minutes", unit: "분" },
+          { id: "pass.usage_credit_krw", unit: "원" },
+        ],
+        conditionNotes: [
+          ...base.conditionNotes,
+          {
+            code: "USAGE_NOT_REVENUE",
+            message:
+              "이용권 사용량이며 매출이 아닙니다. 매출은 판매 지점에 귀속됩니다.",
+          },
+        ],
+      },
+    };
+  }
   if (kind === "revenue")
     return {
       aggregation: aggregation(purpose ? 1 : 3),
@@ -476,6 +649,7 @@ export const salesHandlers = [
   http.get("/api/sales/revenue/branches", handler("branches")),
   http.get("/api/sales/ledger", handler("ledger")),
   http.get("/api/sales/passes/volume", handler("volume")),
+  http.get("/api/sales/passes/usage", handler("usage")),
   http.get("/api/sales/passes/products", handler("products")),
   http.get("/api/sales/trend", handler("trend")),
 ];

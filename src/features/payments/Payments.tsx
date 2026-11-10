@@ -1,10 +1,14 @@
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
-import { formatBusinessDate, formatKrw } from "../../shared/domain/format";
+import {
+  formatBusinessDate,
+  formatDateTime,
+  formatKrw,
+} from "../../shared/domain/format";
 import { can } from "../../shared/domain/schema";
 import {
   Badge,
@@ -16,6 +20,11 @@ import {
 } from "../../shared/ui/primitives";
 import { Field } from "../organization/shared";
 import { listPayments } from "./api";
+import {
+  AdvancedFilters,
+  AppliedAdvancedFilters,
+  readAdvancedFilters,
+} from "./AdvancedFilters";
 import { paymentStatuses } from "./model";
 import type { Payment, PaymentFilters } from "./model";
 import { PaymentCreate, PaymentResult } from "./PaymentCreate";
@@ -52,6 +61,8 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
   const { session, scope } = useApp();
   const query = useQueryClient();
   const { params, page, update } = useSalesSearch();
+  const [, setParams] = useSearchParams();
+  const advanced = readAdvancedFilters(params);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Payment>();
   const branch = params.get("branchId") ?? "";
@@ -68,6 +79,8 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
     (!!from && fromStart === undefined) || (!!to && toStart === undefined);
   const invalidRange = invalidDate || (!!from && !!to && from > to);
   const filters: PaymentFilters = {
+    ...advanced,
+    categoryCode: advanced.categoryCode ?? undefined,
     scope: requestedScope,
     page,
     pageSize: 20,
@@ -193,6 +206,19 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
               </select>
             </Field>
           </div>
+          <AdvancedFilters
+            values={advanced}
+            branches={session.branches.filter((b) => can(session.user, b.id))}
+            change={(key, values) =>
+              setParams((previous) => {
+                const next = new URLSearchParams(previous);
+                next.delete(key);
+                values.forEach((value) => next.append(key, value));
+                next.delete("page");
+                return next;
+              })
+            }
+          />
           <CustomerSelector
             value={filters.customerId ?? ""}
             onChange={(id) => update("customerId", id)}
@@ -216,6 +242,50 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
           ) : (
             payments.data && (
               <>
+                <section
+                  aria-label="결제 목록 적용 조건과 합계"
+                  className="my-4"
+                >
+                  <AppliedAdvancedFilters values={payments.data.filter} />
+                  <p className="help">
+                    적용 지점{" "}
+                    {payments.data.filter.branchIds
+                      .map(
+                        (id) =>
+                          session.branches.find((b) => b.id === id)?.name ?? id,
+                      )
+                      .join(", ")}{" "}
+                    · {payments.data.filter.status ?? "전체 상태"}
+                    {payments.data.filter.customerId &&
+                      ` · 고객 ID ${payments.data.filter.customerId}`}
+                  </p>
+                  <p className="help">
+                    결제 생성 시각{" "}
+                    {payments.data.filter.from
+                      ? formatDateTime(payments.data.filter.from)
+                      : "제한 없음"}
+                    {" ~ "}
+                    {payments.data.filter.to
+                      ? `${formatDateTime(payments.data.filter.to)} 미만`
+                      : "제한 없음"}
+                  </p>
+                  <dl className="grid gap-2 sm:grid-cols-3">
+                    {(
+                      [
+                        ["승인", payments.data.summary.approved],
+                        ["실패", payments.data.summary.failed],
+                        ["환불", payments.data.summary.refunded],
+                      ] as const
+                    ).map(([label, total]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>
+                          {total.count}건 · {formatKrw(total.amountKrw)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
                 {!payments.data.items.length ? (
                   <State title="조건에 맞는 결제가 없어요" />
                 ) : (
@@ -241,7 +311,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
                                 {p.customer.memberNo}
                               </span>
                             </td>
-                            <td>{p.productName}</td>
+                            <td>{p.productName ?? p.purpose}</td>
                             <td>
                               {session.branches.find((b) => b.id === p.branchId)
                                 ?.name ?? p.branchId}

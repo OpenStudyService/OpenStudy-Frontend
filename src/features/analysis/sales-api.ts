@@ -1,17 +1,21 @@
 import { z } from "zod";
-import { api, ApiError, MOCK } from "../../shared/api/client";
+import { api, ApiError, MOCK, queryString } from "../../shared/api/client";
+import type { AdvancedFilterValues } from "../payments/AdvancedFilters";
 import type { components } from "../../shared/api/foundation.generated";
 
 export type SalesPurpose = "이용권" | "스터디룸" | "사물함";
 export type RefundBasis = "processedDate" | "paymentDate";
 export type BranchSort =
   "netAmount" | "approvedAmount" | "refundAmount" | "branchId" | "requested";
-export interface SalesCondition {
+export interface SalesCondition extends Partial<
+  Omit<AdvancedFilterValues, "categoryCode">
+> {
   branchIds?: string[];
   from?: string;
   to?: string;
   refundBasis?: RefundBasis;
   purpose?: SalesPurpose;
+  categoryCode?: string;
 }
 const id = MOCK ? z.string().min(1) : z.string().regex(/^[1-9][0-9]{0,19}$/);
 const integer = z
@@ -62,7 +66,11 @@ const conditionSchema = z
     refundBasis: z.enum(["processedDate", "paymentDate"]),
     purpose: purpose.nullable(),
     productId: z.null(),
-    categoryCode: z.null(),
+    categoryCode: z.string().nullable(),
+    methods: z.array(z.enum(["현금", "카드", "계좌이체", "기타"])),
+    productKinds: z.array(z.enum(["시간권", "기간권", "정액권"])),
+    operatorIds: z.array(id),
+    processingBranchIds: z.array(id),
     granularity: granularitySchema.nullable(),
   })
   .refine(
@@ -74,6 +82,18 @@ const conditionSchema = z
 const aggregationSchema = z
   .strictObject({
     condition: conditionSchema,
+    conditionNotes: z.array(
+      z.strictObject({
+        code: z.enum([
+          "PASS_ONLY",
+          "REFUND_PROCESSING_BRANCH",
+          "OPERATOR_BY_ENTRY",
+          "REFUND_BY_PAYMENT_METHOD",
+          "USAGE_NOT_REVENUE",
+        ]),
+        message: z.string(),
+      }),
+    ),
     defaultPeriod: z.boolean(),
     timeZone: z.literal("Asia/Seoul"),
     currency: z.literal("KRW"),
@@ -417,17 +437,7 @@ function params(
   options: Record<string, string | number | undefined> = {},
 ) {
   validateSalesCondition(condition);
-  const result = new URLSearchParams();
-  condition.branchIds?.forEach((v) => result.append("branchIds", v));
-  for (const [key, value] of Object.entries({
-    from: condition.from,
-    to: condition.to,
-    refundBasis: condition.refundBasis,
-    purpose: condition.purpose,
-    ...options,
-  }))
-    if (value !== undefined) result.set(key, String(value));
-  return result.toString();
+  return queryString({ ...condition, ...options });
 }
 function parse<T extends { aggregation: AggregationMeta }>(
   schema: z.ZodType<T>,
@@ -460,7 +470,22 @@ function parse<T extends { aggregation: AggregationMeta }>(
     (!condition.to || Date.parse(c.to) === Date.parse(condition.to)) &&
     c.refundBasis === (condition.refundBasis ?? "processedDate") &&
     c.purpose ===
-      (measure === "passes" ? "이용권" : (condition.purpose ?? null)) &&
+      (measure === "passes" ||
+      condition.productKinds?.length ||
+      condition.categoryCode
+        ? "이용권"
+        : (condition.purpose ?? null)) &&
+    c.categoryCode === (condition.categoryCode ?? null) &&
+    (
+      ["methods", "productKinds", "operatorIds", "processingBranchIds"] as const
+    ).every((key) => {
+      const requested = condition[key] ?? [];
+      const applied: string[] = c[key];
+      return (
+        requested.length === applied.length &&
+        requested.every((value) => applied.includes(value))
+      );
+    }) &&
     c.allBranches === (condition.branchIds === undefined) &&
     (!condition.branchIds ||
       (condition.branchIds.length === c.branchIds.length &&

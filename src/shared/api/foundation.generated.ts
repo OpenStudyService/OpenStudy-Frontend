@@ -724,66 +724,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/customer-duplicates": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * 중복 의심 고객 묶음
-     * @description 같은 숫자 연락처의 병합되지 않은 고객이 둘 이상인 묶음(M13-D13). 고객 수 내림차순, 같으면 연락처 오름차순.
-     */
-    get: operations["listCustomerDuplicates"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/customers/{id}/merge": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * 고객 병합
-     * @description 흡수 고객을 병합됨으로 바꾸고 대상 고객 참조를 남긴다. 결제·이용권·이용 기록의 고객 참조는 바꾸지 않는다(M13-D07). 되돌리지 않는다.
-     */
-    post: operations["mergeCustomer"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/customers/{id}/merges": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * 고객 병합 이력
-     * @description 이 고객이 대상이거나 흡수된 병합 이력, 최신순.
-     */
-    get: operations["listCustomerMerges"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/payments": {
     parameters: {
       query?: never;
@@ -793,13 +733,13 @@ export interface paths {
     };
     /**
      * Mock 결제 목록
-     * @description scope 지점 중 payments:read가 있는 지점의 결제만 반환한다. from·to는 createdAt 기준 [from, to) UTC다. 고급 필터(수단·분류·처리자)는 M13.
+     * @description scope 지점 중 payments:read가 있는 지점의 결제만 반환한다. from·to는 createdAt 기준 [from, to) UTC다. 고급 필터(수단·분류·처리자)는 M13. customerId가 대상 고객이면 흡수 고객의 행도 담는다(M13-D07). (#114) 응답 PaymentPage에 filter·summary를 더한다(FR-PAY-13). 고급 필터(methods·productKinds·categoryCode·operatorIds·processingBranchIds)는 M13-D10(#116)이다. 결제 행의 처리자는 결제 처리자(created_by)이고, processingBranchIds는 환불 상태 행만 그 환불의 처리 지점으로 좁힌다(2026-11-10 #116 구현에서 정함).
      */
     get: operations["listPayments"];
     put?: never;
     /**
      * Mock 결제 생성·이용권 발급
-     * @description 고객·지점·상품을 서버에서 검증하고 상품의 현재 가격으로 금액을 산정한다. 승인이면 결제와 이용권 1장을 한 트랜잭션으로 확정하고, 실패면 실패 결제만 남기고 이용권을 만들지 않는다. 두 결과 모두 201이며 멱등 결과로 저장한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 판정 순서: 판매 중지 → 판매 지점 → 판매 기간 → 남은 한도(M13-D06). 판매 기간 밖은 409 PRODUCT_NOT_IN_SALE_PERIOD, 한도 소진은 409 PRODUCT_SALE_LIMIT_REACHED(#113).
+     * @description 고객·지점·상품을 서버에서 검증하고 상품의 현재 가격으로 금액을 산정한다. 승인이면 결제와 이용권 1장을 한 트랜잭션으로 확정하고, 실패면 실패 결제만 남기고 이용권을 만들지 않는다. 두 결과 모두 201이며 멱등 결과로 저장한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 판정 순서: 판매 중지 → 판매 지점 → 판매 기간 → 남은 한도(M13-D06). 판매 기간 밖은 409 PRODUCT_NOT_IN_SALE_PERIOD, 한도 소진은 409 PRODUCT_SALE_LIMIT_REACHED(#113). 병합된 고객은 409 CUSTOMER_NOT_ACTIVE이고 mergedIntoCustomerId로 대상 고객을 알려 준다(M13-D07, #114).
      */
     post: operations["createPayment"];
     delete?: never;
@@ -839,7 +779,7 @@ export interface paths {
     put?: never;
     /**
      * 미사용 이용권 전액 환불
-     * @description 원결제·이용권을 잠근 뒤 승인 상태, 실제 사용 이력 없음, 미만료(expiresAt이 없거나 현재 < expiresAt)를 다시 확인한다. 환불 사건·결제 환불·이용권 환불·감사·멱등 결과를 한 트랜잭션으로 남긴다. 금액은 원결제 전액이며 처리 지점은 원결제 지점이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 이용권 결제만 받는다. 스터디룸은 예약 취소로만 환불하고 사물함은 환불하지 않으므로 다른 목적의 결제는 409 PAYMENT_NOT_REFUNDABLE이다.
+     * @description 원결제·이용권을 잠근 뒤 승인 상태, 실제 사용 이력 없음, 미만료(expiresAt이 없거나 현재 < expiresAt)를 다시 확인한다. 환불 사건·결제 환불·이용권 환불·감사·멱등 결과를 한 트랜잭션으로 남긴다. 금액은 원결제 전액이며 처리 지점은 원결제 지점이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 이용권 결제만 받는다. 스터디룸은 예약 취소로만 환불하고 사물함은 환불하지 않으므로 다른 목적의 결제는 409 PAYMENT_NOT_REFUNDABLE이다. 원결제 승인 시각이 마감된 날이면 같은 트랜잭션에서 daily_closing_adjustments를 남긴다(M13-D04·D11). 요청·응답은 그대로다. (#115)
      */
     post: operations["refundPayment"];
     delete?: never;
@@ -857,7 +797,7 @@ export interface paths {
     };
     /**
      * 발급 이용권 목록
-     * @description 구매 지점이 scope 안에 있는 이용권만 반환한다. 다른 지점에서 산 이용권 요약은 M6(FR-MEM-03). status는 요청 시각 기준 실효 상태로 검색한다.
+     * @description 구매 지점이 scope 안에 있는 이용권만 반환한다. 다른 지점에서 산 이용권 요약은 M6(FR-MEM-03). status는 요청 시각 기준 실효 상태로 검색한다. customerId가 대상 고객이면 흡수 고객의 행도 담는다(M13-D07). (#114)
      */
     get: operations["listPasses"];
     put?: never;
@@ -1007,7 +947,7 @@ export interface paths {
     put?: never;
     /**
      * 입실용 정확 일치 고객 조회
-     * @description 회원번호 또는 연락처가 정확히 일치하는 고객(최대 10명)과 지금 쓸 수 있는 이용권만 반환한다. 일치 고객마다 customer_service_interactions에, 일치 없음은 audit_events에 기록한다. 일반 고객 조회 범위는 넓히지 않는다. 횟수 제한은 후속(M5-D08).
+     * @description 회원번호 또는 연락처가 정확히 일치하는 고객(최대 10명)과 지금 쓸 수 있는 이용권만 반환한다. 일치 고객마다 customer_service_interactions에, 일치 없음은 audit_events에 기록한다. 일반 고객 조회 범위는 넓히지 않는다. 횟수 제한은 후속(M5-D08). 흡수 고객은 결과에서 빼고 대상 고객을 찾는다. 흡수 고객의 사용 가능 이용권은 대상 고객의 후보에 함께 나온다(2026-11-10 사용자 결정, #114).
      */
     post: operations["lookupCheckInCustomer"];
     delete?: never;
@@ -1025,13 +965,13 @@ export interface paths {
     };
     /**
      * 입퇴실 이력
-     * @description 이용 지점이 scope 안인 이용 기록. 고객 조회 범위와 무관하며 고객은 최소 정보만 담는다(M5-D06). 구매 지점과 이용 지점을 구분한다.
+     * @description 이용 지점이 scope 안인 이용 기록. 고객 조회 범위와 무관하며 고객은 최소 정보만 담는다(M5-D06). 구매 지점과 이용 지점을 구분한다. customerId가 대상 고객이면 흡수 고객의 행도 담는다(M13-D07). (#114)
      */
     get: operations["listSeatSessions"];
     put?: never;
     /**
      * 직원 예외 입실
-     * @description 좌석·고객·이용권을 잠근 뒤 검증하고 활성 이용 기록을 만든다. 같은 좌석·같은 고객의 동시 입실은 하나만 성공한다. 이용권은 모든 활성 지점에서 사용 가능하다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @description 좌석·고객·이용권을 잠근 뒤 검증하고 활성 이용 기록을 만든다. 같은 좌석·같은 고객의 동시 입실은 하나만 성공한다. 이용권은 모든 활성 지점에서 사용 가능하다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 병합된 고객은 409 CUSTOMER_NOT_ACTIVE이고 mergedIntoCustomerId로 대상 고객을 알려 준다(M13-D07, #114). 대상 고객은 흡수된 고객의 이용권으로 입실할 수 있다(2026-11-10 사용자 결정, #114).
      */
     post: operations["checkIn"];
     delete?: never;
@@ -1129,7 +1069,7 @@ export interface paths {
     };
     /**
      * 고객의 구매·사용 내역
-     * @description 고객 조회 범위(M4-D05) 안의 고객만. 구매 지점이 scope 안인 이용권의 구매·환불·이용·조정 사건과 원장 대조를 준다. 다른 지점에서의 이용도 이용 지점·시각·증감량을 담되 처리자·사유는 담지 않는다. 결제 금액은 담지 않는다.
+     * @description 고객 조회 범위(M4-D05) 안의 고객만. 구매 지점이 scope 안인 이용권의 구매·환불·이용·조정 사건과 원장 대조를 준다. 다른 지점에서의 이용도 이용 지점·시각·증감량을 담되 처리자·사유는 담지 않는다. 결제 금액은 담지 않는다. 흡수 고객의 기록을 함께 담는다(M13-D07). (#114)
      */
     get: operations["getCustomerPassHistory"];
     put?: never;
@@ -1964,13 +1904,13 @@ export interface paths {
     };
     /**
      * 예약 목록
-     * @description scope 지점의 예약을 startAt 내림차순으로 반환한다. 기간 필터는 구간이 겹치는 예약을 고른다.
+     * @description scope 지점의 예약을 startAt 내림차순으로 반환한다. 기간 필터는 구간이 겹치는 예약을 고른다. customerId가 대상 고객이면 흡수 고객의 행도 담는다(M13-D07). (#114)
      */
     get: operations["listRoomReservations"];
     put?: never;
     /**
      * 예약 생성과 선결제
-     * @description 입력 오류(422)와 시간 중복(409 ROOM_TIME_CONFLICT)을 구분한다. 승인이면 결제·예약·슬롯을 한 트랜잭션으로 확정하고, 실패면 실패 결제와 결제 실패 예약만 남기며 슬롯을 점유하지 않는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 시작 시각의 Asia/Seoul 날짜가 휴무일이면 409 BRANCH_CLOSED_DAY(M13-D01, #112).
+     * @description 입력 오류(422)와 시간 중복(409 ROOM_TIME_CONFLICT)을 구분한다. 승인이면 결제·예약·슬롯을 한 트랜잭션으로 확정하고, 실패면 실패 결제와 결제 실패 예약만 남기며 슬롯을 점유하지 않는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 시작 시각의 Asia/Seoul 날짜가 휴무일이면 409 BRANCH_CLOSED_DAY(M13-D01, #112). 병합된 고객은 409 CUSTOMER_NOT_ACTIVE이고 mergedIntoCustomerId로 대상 고객을 알려 준다(M13-D07, #114).
      */
     post: operations["createRoomReservation"];
     delete?: never;
@@ -2030,7 +1970,7 @@ export interface paths {
     put?: never;
     /**
      * 예약 취소·전액 환불
-     * @description 시작 시각 전의 확정 예약만 취소한다. 환불 사건·결제 환불·예약 취소·슬롯 해제를 한 트랜잭션으로 처리한다. 운영 중지 지점에서도 허용한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @description 시작 시각 전의 확정 예약만 취소한다. 환불 사건·결제 환불·예약 취소·슬롯 해제를 한 트랜잭션으로 처리한다. 운영 중지 지점에서도 허용한다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 원결제 승인 시각이 마감된 날이면 같은 트랜잭션에서 daily_closing_adjustments를 남긴다(M13-D04·D11). 요청·응답은 그대로다. (#115)
      */
     post: operations["cancelRoomReservation"];
     delete?: never;
@@ -2202,7 +2142,7 @@ export interface paths {
     put?: never;
     /**
      * 사물함 유료 배정
-     * @description 기간은 28일 배수이고, 승인이면 결제·배정·과금을 한 트랜잭션으로 확정한다. 실패면 실패 결제와 결제 실패 배정만 남는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT.
+     * @description 기간은 28일 배수이고, 승인이면 결제·배정·과금을 한 트랜잭션으로 확정한다. 실패면 실패 결제와 결제 실패 배정만 남는다. 두 결과 모두 201이다. 같은 키·같은 입력은 저장된 결과, 같은 키·다른 입력은 409 IDEMPOTENCY_CONFLICT. 병합된 고객은 409 CUSTOMER_NOT_ACTIVE이고 mergedIntoCustomerId로 대상 고객을 알려 준다(M13-D07, #114).
      */
     post: operations["createLockerAssignment"];
     delete?: never;
@@ -2300,7 +2240,7 @@ export interface paths {
     };
     /**
      * 고객 룸·사물함 이력
-     * @description 고객 조회 범위(M4-D05) 안의 고객만 조회한다. scope 지점의 기록만 담고 금액·결제 참조는 각 지점의 payments:read 또는 payments:write가 있을 때만 담는다.
+     * @description 고객 조회 범위(M4-D05) 안의 고객만 조회한다. scope 지점의 기록만 담고 금액·결제 참조는 각 지점의 payments:read 또는 payments:write가 있을 때만 담는다. 흡수 고객의 기록을 함께 담는다(M13-D07). (#114)
      */
     get: operations["getCustomerSpaceHistory"];
     put?: never;
@@ -2548,7 +2488,7 @@ export interface paths {
     };
     /**
      * 기간·지점 매출
-     * @description 승인액·환불액·순매출과 용도별 소계를 반환한다. 이용권·스터디룸·사물함 결제를 모두 포함하고(M9-D03) 원결제 지점에 귀속하며, 환불도 처리 지점이 아니라 원결제 지점에서 차감한다(M9-D05). 실패 결제와 이용권 소비 차감은 포함하지 않는다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     * @description 승인액·환불액·순매출과 용도별 소계를 반환한다. 이용권·스터디룸·사물함 결제를 모두 포함하고(M9-D03) 원결제 지점에 귀속하며, 환불도 처리 지점이 아니라 원결제 지점에서 차감한다(M9-D05). 실패 결제와 이용권 소비 차감은 포함하지 않는다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다. 고급 필터(methods·productKinds·categoryCode·operatorIds·processingBranchIds)는 M13-D10(#116)이다.
      */
     get: operations["getRevenueSummary"];
     put?: never;
@@ -2568,7 +2508,7 @@ export interface paths {
     };
     /**
      * 지점별 매출 비교
-     * @description 적용 지점마다 한 행의 매출을 요청한 정렬로 반환한다. 거래가 없는 지점도 0과 dataStatus=noData로 담는다. sort=requested는 branchIds를 보낸 순서(생략 시 ID 오름차순)이고, 금액 정렬의 동률은 branchId를 같은 방향으로 정렬한다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     * @description 적용 지점마다 한 행의 매출을 요청한 정렬로 반환한다. 거래가 없는 지점도 0과 dataStatus=noData로 담는다. sort=requested는 branchIds를 보낸 순서(생략 시 ID 오름차순)이고, 금액 정렬의 동률은 branchId를 같은 방향으로 정렬한다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다. 고급 필터(methods·productKinds·categoryCode·operatorIds·processingBranchIds)는 M13-D10(#116)이다.
      */
     get: operations["compareBranchRevenue"];
     put?: never;
@@ -2588,7 +2528,7 @@ export interface paths {
     };
     /**
      * 매출 최소 원장
-     * @description 매출 집계의 근거가 되는 승인 항목과 환불 항목을 페이지로 반환한다. 고객 이름·연락처·고객 ID·결제 수단·처리자·환불 사유는 담지 않는다. 같은 조건의 GET /sales/revenue와 합계가 같다. 정렬은 basisAt, 같으면 승인 → 환불, 같으면 원천 ID이며 모두 direction(기본 desc)을 따른다. 결제 상세는 GET /payments/{id}에서 payments:read를 따로 확인한다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     * @description 매출 집계의 근거가 되는 승인 항목과 환불 항목을 페이지로 반환한다. 고객 이름·연락처·고객 ID·결제 수단·처리자·환불 사유는 담지 않는다. 같은 조건의 GET /sales/revenue와 합계가 같다. 정렬은 basisAt, 같으면 승인 → 환불, 같으면 원천 ID이며 모두 direction(기본 desc)을 따른다. 결제 상세는 GET /payments/{id}에서 payments:read를 따로 확인한다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다. 고급 필터(methods·productKinds·categoryCode·operatorIds·processingBranchIds)는 M13-D10(#116)이다.
      */
     get: operations["listSalesLedger"];
     put?: never;
@@ -2608,7 +2548,7 @@ export interface paths {
     };
     /**
      * 이용권 결제 건수·판매량·발급 건수
-     * @description 이용권 결제만 대상으로 결제 건수(건), 판매 수량·환불 수량·순판매량(개), 발급 건수(개)를 따로 반환한다(M9-D06). 환불된 판매는 순판매량에서 빠지고 발급 건수에는 남는다. 실패 결제는 어느 지표에도 없다. 환불 수량은 refundBasis를 따른다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     * @description 이용권 결제만 대상으로 결제 건수(건), 판매 수량·환불 수량·순판매량(개), 발급 건수(개)를 따로 반환한다(M9-D06). 환불된 판매는 순판매량에서 빠지고 발급 건수에는 남는다. 실패 결제는 어느 지표에도 없다. 환불 수량은 refundBasis를 따른다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다. 고급 필터(methods·productKinds·categoryCode·operatorIds·processingBranchIds)는 M13-D10(#116)이다.
      */
     get: operations["getPassSalesVolume"];
     put?: never;
@@ -2628,7 +2568,7 @@ export interface paths {
     };
     /**
      * 이용권 상품별 판매량·순위
-     * @description 판매 당시 상품 스냅샷(상품 ID·상품명·분류 코드·분류 이름)마다 판매량과 순위를 반환한다. 순서는 netSoldQuantity 내림차순, 같으면 productId·productName·categoryCode·categoryName 오름차순으로 고정한다. 기간에 원거래가 없는 상품은 행이 없다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     * @description 판매 당시 상품 스냅샷(상품 ID·상품명·분류 코드·분류 이름)마다 판매량과 순위를 반환한다. 순서는 netSoldQuantity 내림차순, 같으면 productId·productName·categoryCode·categoryName 오름차순으로 고정한다. 기간에 원거래가 없는 상품은 행이 없다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다. 고급 필터(methods·productKinds·categoryCode·operatorIds·processingBranchIds)는 M13-D10(#116)이다.
      */
     get: operations["listPassProductSales"];
     put?: never;
@@ -2648,7 +2588,7 @@ export interface paths {
     };
     /**
      * 매출·이용권 판매량 추세
-     * @description 기간 안의 모든 일·주·월 구간을 시간 오름차순으로 반환하고 거래가 없는 구간은 0과 noData로 채운다. 주는 월요일 0시(Asia/Seoul)에 시작한다. 경계에 걸친 첫·마지막 구간은 기간 안의 부분만 집계하고 partial과 aggregation.partial로 표시한다(M9-D04). 구간 합은 totals와 같다. measure=revenue는 purpose 필터를, measure=passes는 productId·categoryCode 필터를 받는다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다.
+     * @description 기간 안의 모든 일·주·월 구간을 시간 오름차순으로 반환하고 거래가 없는 구간은 0과 noData로 채운다. 주는 월요일 0시(Asia/Seoul)에 시작한다. 경계에 걸친 첫·마지막 구간은 기간 안의 부분만 집계하고 partial과 aggregation.partial로 표시한다(M9-D04). 구간 합은 totals와 같다. measure=revenue는 purpose 필터를, measure=passes는 productId·categoryCode 필터를 받는다. 기간은 Asia/Seoul 해석의 [from, to)이고 생략하면 이번 달 1일 0시~내일 0시 미만, 366일 초과는 422 PERIOD_TOO_LONG이다. 요청한 지점 중 하나라도 sales:read가 없으면 403이며 조용히 제외하지 않는다. 고급 필터(methods·productKinds·categoryCode·operatorIds·processingBranchIds)는 M13-D10(#116)이다.
      */
     get: operations["getSalesTrend"];
     put?: never;
@@ -2831,7 +2771,51 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/branch-closures/{id}": {
+  "/leave-grants": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 휴가 부여 목록
+     * @description 조회 범위: OWNER 전부, 원부여 지점 MANAGER는 그 지점 부여, 본인은 자기 부여(소속 무관). 정렬 validThrough 오름차순, 같으면 id.
+     */
+    get: operations["listLeaveGrants"];
+    put?: never;
+    /**
+     * 휴가 부여
+     * @description 원부여 지점의 활성 소속 활성 직원에게 휴가를 부여하고 원장 GRANT(키 grant:{id})를 남긴다. 운영 중지 지점은 409 BRANCH_NOT_ACTIVE.
+     */
+    post: operations["createLeaveGrant"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-grants/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 휴가 부여 상세
+     * @description 잔여량 원장(events)을 함께 반환한다. 볼 수 없으면 404.
+     */
+    get: operations["getLeaveGrant"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-grants/{id}/adjust": {
     parameters: {
       query?: never;
       header?: never;
@@ -2840,19 +2824,439 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    post?: never;
     /**
-     * 지점 휴무일 삭제
-     * @description date > 오늘(Asia/Seoul)인 휴무일만 삭제한다. 오늘 또는 지난 휴무일은 409 CLOSURE_ALREADY_STARTED.
+     * 휴가 잔여 보정
+     * @description remaining_days만 증감하고 원장 ADJUST(키 adjust:{id}:{보정 뒤 version})를 남긴다. 결과가 음수면 409 LEAVE_BALANCE_INSUFFICIENT. 운영 중지 지점에서도 허용.
      */
-    delete: operations["deleteBranchClosure"];
+    post: operations["adjustLeaveGrant"];
+    delete?: never;
     options?: never;
     head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/leave-balance": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
     /**
-     * 지점 휴무일 안내 수정
-     * @description 안내 문구만 바꾼다. 날짜는 바꿀 수 없다.
+     * 본인 휴가 잔여량
+     * @description 직원 단위로 모든 부여의 잔여를 반환한다(M12-D02).
      */
-    patch: operations["updateBranchClosure"];
+    get: operations["getMyLeaveBalance"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/employees/{employeeId}/leave-balance": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 직원 휴가 잔여량
+     * @description OWNER 또는 대상 직원이 활성 소속인 지점의 MANAGER. 조건을 만족하지 않거나 직원이 없으면 404.
+     */
+    get: operations["getEmployeeLeaveBalance"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 휴가 신청 목록
+     * @description 조회 범위: OWNER 전부, 신청 지점 MANAGER는 그 지점 신청, 본인은 자기 신청(소속 무관). from·to는 휴가 기간과 겹치는 신청. 정렬 startsOn 내림차순, 같으면 id.
+     */
+    get: operations["listLeaveRequests"];
+    put?: never;
+    /**
+     * 휴가 신청
+     * @description 본인 신청. branchId는 활성 소속 지점. 같은 직원의 신청·승인 휴가와 겹치면 409 LEAVE_OVERLAP, 유효한 부여의 잔여가 부족하면 409 LEAVE_BALANCE_INSUFFICIENT(안내, 승인 때 재검사).
+     */
+    post: operations["createLeaveRequest"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-requests/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 휴가 신청 상세
+     * @description 차감 배분(allocations)을 포함한다. 볼 수 없으면 404.
+     */
+    get: operations["getLeaveRequest"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-requests/{id}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 휴가 승인
+     * @description 같은 직원의 다른 승인 휴가와 겹치면 409 LEAVE_OVERLAP(승인자가 볼 수 있는 신청 ID만), 예정 근무와 겹치면 409 LEAVE_SHIFT_CONFLICT(M12-D03, conflicts). 만료일이 빠른 부여부터 차감하고 leave_allocations와 원장 USE(키 leave:{id}:use:{grantId})를 남긴다(M12-D06·D07). 검사 순서 상태 → version.
+     */
+    post: operations["approveLeaveRequest"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-requests/{id}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 휴가 반려
+     * @description 사유는 받지 않는다(V1 칼럼 없음). 잔여량은 바뀌지 않는다.
+     */
+    post: operations["rejectLeaveRequest"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-requests/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 휴가 신청 취소
+     * @description 본인이 승인 전(신청 상태) 신청을 취소한다. 승인된 신청은 409 INVALID_STATE.
+     */
+    post: operations["cancelLeaveRequest"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/leave-requests/{id}/cancel-approval": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 휴가 승인 취소
+     * @description 시작일(Asia/Seoul) 전에만 승인을 취소한다(2026-11-09 사용자 결정, 아니면 409 LEAVE_ALREADY_STARTED). 배분을 원래 부여로 복원하고 원장 RESTORE(키 leave:{id}:restore:{grantId})를 남긴다.
+     */
+    post: operations["cancelLeaveApproval"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-corrections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 근태 정정 목록
+     * @description M8 근태 조회 범위(기록 지점)를 따른다. from·to는 근태 workDate. 정렬 createdAt 내림차순, 같으면 id.
+     */
+    get: operations["listAttendanceCorrections"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-records/{id}/corrections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 근태 정정 신청
+     * @description 본인의 퇴근한 근태만. 출퇴근 또는 휴게 구간 하나를 정정 신청한다(M12-D01). 같은 근태에 처리되지 않은 정정이 있으면 409 CORRECTION_PENDING. 겹침·휴게 위치는 신청과 승인 때 모두 검사한다.
+     */
+    post: operations["createAttendanceCorrection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-corrections/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 근태 정정 상세
+     * @description 원본·정정 값과 처리 정보. 볼 수 없으면 404.
+     */
+    get: operations["getAttendanceCorrection"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-corrections/{id}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 근태 정정 승인
+     * @description 정정 뒤 구간이 같은 직원의 다른 근태와 겹치면 409 CORRECTION_OVERLAP, 휴게가 근무 구간 밖이면 409 CORRECTION_BREAK_OUTSIDE(M12-D08). 승인하면 근태·휴게를 바꾸고 실근무 분은 M8-D07 계산을 쓴다(M12-D01).
+     */
+    post: operations["approveAttendanceCorrection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-corrections/{id}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 근태 정정 반려
+     * @description 근태는 바뀌지 않는다. 반려 사유(reason)는 필수이고 audit_events(action=REJECTED)에 처리자와 함께 남기며, 응답 decision.reason으로 보여 준다(2026-11-09 사용자 결정, #107).
+     */
+    post: operations["rejectAttendanceCorrection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/attendance-corrections/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 근태 정정 신청 취소
+     * @description 본인이 승인 전 신청을 취소한다. 승인된 정정은 취소하지 않는다(M12-D08).
+     */
+    post: operations["cancelAttendanceCorrection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shift-swaps": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 대체근무 목록
+     * @description 조회 범위: OWNER, 근무 지점 MANAGER, 신청자와 대체 직원(근무 지점이 현재 유효 소속). employeeId·mine은 신청자 또는 대체 직원. from·to는 제안 시작 시각(proposedStartsAt)의 Asia/Seoul 날짜. 정렬 createdAt 내림차순, 같으면 id.
+     */
+    get: operations["listShiftSwaps"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shifts/{id}/swaps": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 대체근무 신청
+     * @description 원래 담당자가 시작 전 본인 근무에 대해서만 신청한다. 대체 직원 동의 단계는 없다(M12-D04). 대체 직원의 다른 근무·승인 휴가와 겹치면 409 SHIFT_CONFLICT(M8 충돌 응답).
+     */
+    post: operations["createShiftSwap"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shift-swaps/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 대체근무 상세
+     * @description 볼 수 없으면 404.
+     */
+    get: operations["getShiftSwap"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shift-swaps/{id}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 대체근무 승인
+     * @description shiftVersion이 근무의 현재 version과 다르거나, 신청 이후 근무가 바뀌었거나, 근무 담당자가 신청자가 아니면 409 SHIFT_VERSION_CONFLICT(shiftId·latestVersion·reloadUrl). 승인하면 근무의 담당자·시각을 바꾸고 shift_events SWAPPED를 남긴다.
+     */
+    post: operations["approveShiftSwap"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shift-swaps/{id}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 대체근무 반려
+     * @description 근무는 바뀌지 않는다. 사유는 받지 않는다.
+     */
+    post: operations["rejectShiftSwap"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shift-swaps/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 대체근무 신청 취소
+     * @description 본인이 승인 전 신청을 취소한다.
+     */
+    post: operations["cancelShiftSwap"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/shift-swaps/{id}/cancel-approval": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 대체근무 승인 취소
+     * @description 승인 뒤 근무가 바뀌지 않았고(version 동일) 시작 전이며 원래 담당자에게 새 충돌이 없을 때만 원래 담당·시간으로 복원한다(M12-D09). 근무가 바뀌었으면 409 SWAP_RESTORE_CONFLICT(shiftId·latestVersion·approvedVersion·reloadUrl).
+     */
+    post: operations["cancelShiftSwapApproval"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/branches/{id}/closures": {
@@ -2879,285 +3283,178 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/branch-closures/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * 지점 휴무일 삭제
+     * @description date > 오늘(Asia/Seoul)인 휴무일만 삭제한다. 오늘 또는 지난 휴무일은 409 CLOSURE_ALREADY_STARTED.
+     */
+    delete: operations["deleteBranchClosure"];
+    options?: never;
+    head?: never;
+    /**
+     * 지점 휴무일 안내 수정
+     * @description 안내 문구만 바꾼다. 날짜는 바꿀 수 없다.
+     */
+    patch: operations["updateBranchClosure"];
+    trace?: never;
+  };
+  "/customer-duplicates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 중복 의심 고객 묶음
+     * @description 같은 숫자 연락처의 병합되지 않은 고객이 둘 이상인 묶음(M13-D13). 고객 수 내림차순, 같으면 연락처 오름차순.
+     */
+    get: operations["listCustomerDuplicates"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}/merge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 고객 병합
+     * @description 흡수 고객을 병합됨으로 바꾸고 대상 고객 참조를 남긴다. 결제·이용권·이용 기록의 고객 참조는 바꾸지 않는다(M13-D07). 되돌리지 않는다.
+     */
+    post: operations["mergeCustomer"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/customers/{id}/merges": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 고객 병합 이력
+     * @description 이 고객이 대상이거나 흡수된 병합 이력, 최신순.
+     */
+    get: operations["listCustomerMerges"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/daily-closings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 일별 마감 목록
+     * @description branchIds는 M9와 같은 규칙(생략하면 sales:read가 있는 모든 지점). from·to는 날짜(포함), 최대 366일. from·to를 생략하면 지난달 1일부터 오늘까지다(2026-11-10 #115 구현에서 정함).
+     */
+    get: operations["listDailyClosings"];
+    put?: never;
+    /**
+     * 일별 마감
+     * @description 끝난 날(businessDate < 오늘, Asia/Seoul)만 마감한다(M13-D11). 처리일·원결제일 기준 수치를 모두 저장한다. 마감은 어떤 업무도 막지 않는다(M13-D04).
+     */
+    post: operations["createDailyClosing"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/daily-closings/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 일별 마감 상세
+     * @description 마감 스냅샷, 현재 원결제일 기준 수치, 차이, 조정 이력. 조정 이력은 환불이 만든다.
+     */
+    get: operations["getDailyClosing"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sales/passes/usage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 이용 지점별 이용권 사용량
+     * @description 매출이 아닌 이용권 사용량(입실 수·시간권 차감 분·정액권 차감액)을 이용 지점별로, 판매 지점별 내역과 함께 준다(M13-D12). 권한 밖 판매 지점은 하나로 합친다.
+     */
+    get: operations["getPassUsageByBranch"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/seats/occupancy-trend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 좌석 점유 추이
+     * @description 시간·일 구간별 점유한 좌석·분 ÷ (좌석 수 × 구간 분)(M13-D09). 기본 hour·오늘 하루. hour는 최대 31일, day는 최대 366일.
+     */
+    get: operations["getSeatOccupancyTrend"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
-    LeaveGrant: {
-      id: components["schemas"]["Id"];
-      version: components["schemas"]["Version"];
-      employee: components["schemas"]["ActorSummary"];
-      originBranchId: components["schemas"]["Id"];
-      grantYear: number;
-      /** Format: date */
-      validFrom: string;
-      /** Format: date */
-      validThrough: string;
-      grantedDays: number;
-      remainingDays: number;
-      /** @description validThrough < 오늘(Asia/Seoul) */
-      expired: boolean;
-      reason: string;
-      grantedBy: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      createdAt: string;
-      /** @description 원부여 지점의 MANAGER 이상. 화면 안내용 */
-      canAdjust: boolean;
-    };
-    LeaveBalanceEvent: {
-      /**
-       * @description DB GRANT, ADJUST, USE, RESTORE
-       * @enum {string}
-       */
-      type: "부여" | "보정" | "사용" | "복원";
-      deltaDays: number;
-      leaveRequestId: components["schemas"]["Id"] | null;
-      reason: string | null;
-      actor: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      createdAt: string;
-    };
-    LeaveGrantDetail: {
-      id: components["schemas"]["Id"];
-      version: components["schemas"]["Version"];
-      employee: components["schemas"]["ActorSummary"];
-      originBranchId: components["schemas"]["Id"];
-      grantYear: number;
-      /** Format: date */
-      validFrom: string;
-      /** Format: date */
-      validThrough: string;
-      grantedDays: number;
-      remainingDays: number;
-      /** @description validThrough < 오늘(Asia/Seoul) */
-      expired: boolean;
-      reason: string;
-      grantedBy: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      createdAt: string;
-      /** @description 원부여 지점의 MANAGER 이상. 화면 안내용 */
-      canAdjust: boolean;
-      /** @description 시간순 */
-      events: components["schemas"]["LeaveBalanceEvent"][];
-    };
-    LeaveGrantCreate: {
-      employeeId: components["schemas"]["Id"];
-      originBranchId: components["schemas"]["Id"];
-      grantYear: number;
-      /** Format: date */
-      validFrom: string;
-      /** Format: date */
-      validThrough: string;
-      grantedDays: number;
-      reason: string;
-    };
-    LeaveBalanceGrant: {
-      grantId: components["schemas"]["Id"];
-      originBranchId: components["schemas"]["Id"];
-      grantYear: number;
-      /** Format: date */
-      validFrom: string;
-      /** Format: date */
-      validThrough: string;
-      grantedDays: number;
-      remainingDays: number;
-      expired: boolean;
-    };
-    LeaveBalance: {
-      employee: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      asOf: string;
-      /** @description 만료되지 않은 부여의 잔여 합 */
-      totalRemainingDays: number;
-      /** @description validThrough 오름차순, 같으면 grantId */
-      grants: components["schemas"]["LeaveBalanceGrant"][];
-    };
-    LeaveAllocation: {
-      grantId: components["schemas"]["Id"];
-      days: number;
-      restored: boolean;
-    };
-    LeaveRequest: {
-      id: components["schemas"]["Id"];
-      version: components["schemas"]["Version"];
-      status: components["schemas"]["RequestStatus"];
-      employee: components["schemas"]["ActorSummary"];
-      branchId: components["schemas"]["Id"];
-      /** Format: date */
-      startsOn: string;
-      /** Format: date */
-      endsOn: string;
-      requestedDays: number;
-      reason: string;
-      decision: components["schemas"]["RequestDecision"] | null;
-      cancellation: components["schemas"]["RequestCancellation"] | null;
-      allocations: components["schemas"]["LeaveAllocation"][];
-      /** Format: date-time */
-      createdAt: string;
-      canApprove: boolean;
-      canReject: boolean;
-      canCancel: boolean;
-      canCancelApproval: boolean;
-    };
-    LeaveRequestCreate: {
-      branchId: components["schemas"]["Id"];
-      /** Format: date */
-      startsOn: string;
-      /** Format: date */
-      endsOn: string;
-      requestedDays: number;
-      reason: string;
-    };
-    RequestStatus: "신청" | "승인" | "반려" | "취소";
-    RequestDecision: {
-      by: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      at: string;
-    };
-    RequestCancellation: {
-      /** @enum {string} */
-      kind: "신청 취소" | "승인 취소";
-      by: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      at: string;
-    };
-    AttendanceCorrectionKind: "출퇴근" | "휴게";
-    AttendanceCorrectionValues: {
-      /** Format: date-time */
-      clockInAt: string | null;
-      /** Format: date-time */
-      clockOutAt: string | null;
-      /** Format: date-time */
-      breakStartedAt: string | null;
-      /** Format: date-time */
-      breakEndedAt: string | null;
-    };
-    AttendanceCorrection: {
-      id: components["schemas"]["Id"];
-      version: components["schemas"]["Version"];
-      status: components["schemas"]["RequestStatus"];
-      kind: components["schemas"]["AttendanceCorrectionKind"];
-      attendanceRecordId: components["schemas"]["Id"];
-      branchId: components["schemas"]["Id"];
-      employee: components["schemas"]["ActorSummary"];
-      breakId: components["schemas"]["Id"] | null;
-      before: components["schemas"]["AttendanceCorrectionValues"];
-      after: components["schemas"]["AttendanceCorrectionValues"];
-      reason: string;
-      decision: components["schemas"]["AttendanceCorrectionDecision"] | null;
-      cancellation: components["schemas"]["RequestCancellation"] | null;
-      /** Format: date-time */
-      createdAt: string;
-      canApprove: boolean;
-      canReject: boolean;
-      canCancel: boolean;
-    };
-    AttendanceCorrectionPage: {
-      items: components["schemas"]["AttendanceCorrection"][];
-      meta: components["schemas"]["PageMeta"];
-    };
-    AttendanceCorrectionCreate: {
-      kind: components["schemas"]["AttendanceCorrectionKind"];
-      /** Format: date-time */
-      clockInAt?: string;
-      /** Format: date-time */
-      clockOutAt?: string;
-      breakId?: components["schemas"]["Id"];
-      /** Format: date-time */
-      breakStartedAt?: string;
-      /** Format: date-time */
-      breakEndedAt?: string;
-      reason: string;
-    };
-    AttendanceCorrectionReject: {
-      version: components["schemas"]["Version"];
-      reason: string;
-    };
-    AttendanceCorrectionDecision: {
-      by: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      at: string;
-      reason: string | null;
-    };
-    AttendanceConflict: {
-      visible: boolean;
-      /** @enum {string} */
-      label: "근태" | "다른 지점 근태";
-      /** Format: date-time */
-      overlapStartsAt: string;
-      /** Format: date-time */
-      overlapEndsAt: string;
-      attendanceRecordId: components["schemas"]["Id"] | null;
-    };
-    ShiftSwap: {
-      id: components["schemas"]["Id"];
-      version: components["schemas"]["Version"];
-      status: components["schemas"]["RequestStatus"];
-      shiftId: components["schemas"]["Id"];
-      branchId: components["schemas"]["Id"];
-      requester: components["schemas"]["ActorSummary"];
-      replacement: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      originalStartsAt: string;
-      /** Format: date-time */
-      originalEndsAt: string;
-      /** Format: date-time */
-      proposedStartsAt: string;
-      /** Format: date-time */
-      proposedEndsAt: string;
-      shiftVersion: components["schemas"]["Version"];
-      reason: string;
-      decision: components["schemas"]["RequestDecision"] | null;
-      cancellation: components["schemas"]["RequestCancellation"] | null;
-      /** Format: date-time */
-      createdAt: string;
-      canApprove: boolean;
-      canReject: boolean;
-      canCancel: boolean;
-      canCancelApproval: boolean;
-    };
-    ShiftSwapPage: {
-      items: components["schemas"]["ShiftSwap"][];
-      meta: components["schemas"]["PageMeta"];
-    };
-    ShiftSwapCreate: {
-      replacementEmployeeId: components["schemas"]["Id"];
-      /** Format: date-time */
-      proposedStartsAt: string;
-      /** Format: date-time */
-      proposedEndsAt: string;
-      reason: string;
-    };
-    ShiftSwapApprove: {
-      version: components["schemas"]["Version"];
-      shiftVersion: components["schemas"]["Version"];
-    };
-    WorkforceRequestConflictError: {
-      code: string;
-      message: string;
-      requestId: string;
-      fieldErrors?: {
-        [key: string]: string;
-      };
-      latestVersion?: components["schemas"]["Version"];
-      reloadUrl?: string;
-      /** @description LEAVE_SHIFT_CONFLICT, SHIFT_CONFLICT */
-      conflicts?: components["schemas"]["ShiftConflict"][];
-      /** @description CORRECTION_OVERLAP */
-      attendanceConflicts?: components["schemas"]["AttendanceConflict"][];
-      /** @description CORRECTION_BREAK_OUTSIDE */
-      breakIds?: components["schemas"]["Id"][];
-      /** @description LEAVE_BALANCE_INSUFFICIENT */
-      requiredDays?: number;
-      /** @description LEAVE_BALANCE_INSUFFICIENT */
-      availableDays?: number;
-      /** @description LEAVE_OVERLAP */
-      overlappingRequestIds?: components["schemas"]["Id"][];
-      pendingCorrectionId?: components["schemas"]["Id"];
-      pendingSwapId?: components["schemas"]["Id"];
-      shiftId?: components["schemas"]["Id"];
-      approvedVersion?: components["schemas"]["Version"];
-    };
     /**
      * @description BIGINT UNSIGNED를 표현하는 10진 문자열. 서버는 DB 상한도 검증한다.
      * @example 1
@@ -3871,50 +4168,6 @@ export interface components {
       items: components["schemas"]["CustomerListItem"][];
       meta: components["schemas"]["PageMeta"];
     };
-    DuplicateCustomer: {
-      id: components["schemas"]["Id"];
-      memberNo: string;
-      name: string;
-      /** @enum {string} */
-      status: "정상" | "이용 제한" | "비활성";
-      registeredBranchId: components["schemas"]["Id"] | null;
-      /** Format: date-time */
-      registeredAt: string;
-      paymentCount: number;
-      /** Format: date-time */
-      lastActivityAt: string | null;
-    };
-    /** @description 같은 숫자 연락처의 병합되지 않은 고객 묶음(M13-D13). 고객은 등록 시각 순. */
-    CustomerDuplicateGroup: {
-      phone: string;
-      customers: components["schemas"]["DuplicateCustomer"][];
-    };
-    CustomerDuplicatePage: {
-      items: components["schemas"]["CustomerDuplicateGroup"][];
-      meta: components["schemas"]["PageMeta"];
-    };
-    /** @description 경로의 고객이 남고 absorbedCustomerId가 흡수된다. 되돌리지 않는다(M13-D03). */
-    CustomerMerge: {
-      version: components["schemas"]["Version"];
-      absorbedCustomerId: components["schemas"]["Id"];
-      absorbedVersion: components["schemas"]["Version"];
-      reason: string;
-    };
-    CustomerMergeRecord: {
-      id: components["schemas"]["Id"];
-      target: components["schemas"]["CustomerSummary"];
-      absorbed: components["schemas"]["CustomerSummary"];
-      /** @description 연쇄 병합으로 옮겨진 경우 원래 대상이던 중간 고객. */
-      via: components["schemas"]["CustomerSummary"] | null;
-      mergedBy: components["schemas"]["ActorSummary"];
-      /** Format: date-time */
-      mergedAt: string;
-      reason: string;
-    };
-    /** @description 최신순. 페이지 없음. */
-    CustomerMergeList: {
-      items: components["schemas"]["CustomerMergeRecord"][];
-    };
     /**
      * @description 회원번호·상태·등록 시각은 서버가 정한다. 신규 고객은 정상 상태로 등록한다.
      * @example {
@@ -4030,6 +4283,8 @@ export interface components {
     PaymentPage: {
       items: components["schemas"]["Payment"][];
       meta: components["schemas"]["PageMeta"];
+      filter: components["schemas"]["PaymentFilter"];
+      summary: components["schemas"]["PaymentListSummary"];
     };
     /**
      * @description 금액 필드는 없다. 환불 금액은 원결제 amountKrw 전액이다(M4-D04, 부분 환불 없음).
@@ -5505,10 +5760,10 @@ export interface components {
       conflicts?: components["schemas"]["ShiftConflict"][];
     };
     /**
-     * @description 원=원화 정수 금액, 건=결제·환불·업무 건수, 개=이용권 수량, %=백분율(소수 첫째 자리).
+     * @description 원=원화 정수 금액, 건=결제·환불·업무 건수, 개=이용권 수량, %=백분율(소수 첫째 자리). 분=이용권 차감 분(M13).
      * @enum {string}
      */
-    MetricUnit: "원" | "건" | "개" | "%";
+    MetricUnit: "원" | "건" | "개" | "%" | "분";
     /**
      * @description noData=조건에 맞는 원거래 행이 없음. 합계는 0으로 채우지만 '계산 결과 0'(hasData)과 구분한다(M9-D09).
      * @enum {string}
@@ -5547,8 +5802,11 @@ export interface components {
        * @description 적용한 종료(제외), UTC.
        */
       to: string | null;
-      /** @enum {string} */
-      refundBasis: "processedDate" | "paymentDate";
+      /**
+       * @description 이용 지점 사용량(getPassUsageByBranch)은 null.
+       * @enum {string|null}
+       */
+      refundBasis: "processedDate" | "paymentDate" | null;
       /**
        * @description 용도 필터. 이용권 지표 operation은 항상 이용권이다.
        * @enum {string|null}
@@ -5561,6 +5819,10 @@ export interface components {
        * @enum {string|null}
        */
       granularity: "day" | "week" | "month" | null;
+      methods: ("현금" | "카드" | "계좌이체" | "기타")[];
+      productKinds: ("시간권" | "기간권" | "정액권")[];
+      operatorIds: components["schemas"]["Id"][];
+      processingBranchIds: components["schemas"]["Id"][];
     };
     /** @description 부분 구간 표시(M9-D04, FR-AGG-09). */
     AggregationPartial: {
@@ -5592,6 +5854,7 @@ export interface components {
       dataStatus: components["schemas"]["DataStatus"];
       partial: components["schemas"]["AggregationPartial"];
       metrics: components["schemas"]["MetricRef"][];
+      conditionNotes: components["schemas"]["ConditionNote"][];
     };
     /** @description 매출 지표 묶음(원 정수·건). 정의는 x-metric-definitions. */
     RevenueAmounts: {
@@ -6201,31 +6464,6 @@ export interface components {
         nextAction?: string;
       } | null;
     };
-    /**
-     * @deprecated
-     * @description 폐지 예정. 첫 AI 화면이 쓰던 옛 형식. rows는 지점별 매출이며 매출 질문일 때 요청자가 sales:read를 가진 지점만 채운다(#182). 새 화면은 envelope·viewSpec만 쓴다
-     */
-    AiLegacyExecution: {
-      id?: string;
-      status?: string;
-      asOf?: string;
-      /** Format: date */
-      start?: string;
-      /** Format: date */
-      end?: string;
-      currency?: string;
-      timeZone?: string;
-      /** @enum {string} */
-      refundBasis?: "processed" | "original";
-      viewSpec?: Record<string, never>;
-      rows?: {
-        branchId?: string;
-        branch?: string;
-        approved?: number;
-        refunds?: number;
-        net?: number;
-      }[];
-    } | null;
     AiQueryResponse: {
       requestId: string;
       executionId?: string | null;
@@ -6269,7 +6507,6 @@ export interface components {
       }[];
       /** @description 진단용 판정 정보 */
       securityGate?: Record<string, never>;
-      legacyExecution?: components["schemas"]["AiLegacyExecution"];
     };
     AiCancelResult: {
       ok: boolean;
@@ -6277,82 +6514,342 @@ export interface components {
       /** @enum {string} */
       status: "CANCELED";
     };
-    /** @description 저장된 실행을 지금 다시 실행한 결과. 옛 형식 필드(rows, viewSpec, start, end 등)는 폐지 예정 */
-    AiExecution: components["schemas"]["AiLegacyExecution"] & {
+    /** @description 저장된 실행을 지금 다시 실행한 결과. 결과는 저장본이 아니다(M10-D12) */
+    AiExecution: {
       id: string;
       requestId?: string;
       conversationId?: string;
+      status: string;
       question?: string;
       pocCode?: string | null;
       analysisId?: string;
       intentDomain?: string;
       resultCategory?: string | null;
+      /**
+       * @description 저장된 질문의 환불 기준 조건
+       * @enum {string}
+       */
+      refundBasis?: "processed" | "original";
       envelope: components["schemas"]["AiResultEnvelope"];
       querySpec?: components["schemas"]["AiQuerySpec"] | null;
     };
-    /** @description 지점 휴무일(Asia/Seoul 하루 전체, M13-D05). */
-    BranchClosure: {
+    /**
+     * @description DB REQUESTED=신청, APPROVED=승인, REJECTED=반려, CANCELLED=취소.
+     * @enum {string}
+     */
+    RequestStatus: "신청" | "승인" | "반려" | "취소";
+    /** @description 승인 또는 반려한 사람과 시각(decided_by, decided_at). */
+    RequestDecision: {
+      by: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      at: string;
+    };
+    /** @description 승인 취소의 사람·시각은 복원 원장(휴가) 또는 복원 SWAPPED 이력(대체근무)에서 읽는다. 승인자는 덮어쓰지 않는다. */
+    RequestCancellation: {
+      /** @enum {string} */
+      kind: "신청 취소" | "승인 취소";
+      by: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      at: string;
+    };
+    /** @description 휴가 부여. 잔여량은 부여별로 관리한다(M12-D06). */
+    LeaveGrant: {
       id: components["schemas"]["Id"];
       version: components["schemas"]["Version"];
-      branchId: components["schemas"]["Id"];
+      employee: components["schemas"]["ActorSummary"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
       /** Format: date */
-      date: string;
-      note: string | null;
-      createdBy: components["schemas"]["ActorSummary"];
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      remainingDays: number;
+      /** @description validThrough < 오늘(Asia/Seoul) */
+      expired: boolean;
+      reason: string;
+      grantedBy: components["schemas"]["ActorSummary"];
       /** Format: date-time */
       createdAt: string;
+      /** @description 원부여 지점의 MANAGER 이상. 화면 안내용 */
+      canAdjust: boolean;
+    };
+    /** @description leave_balance_events 한 행. 불변 원장. */
+    LeaveBalanceEvent: {
+      /**
+       * @description DB GRANT, ADJUST, USE, RESTORE
+       * @enum {string}
+       */
+      type: "부여" | "보정" | "사용" | "복원";
+      deltaDays: number;
+      leaveRequestId: components["schemas"]["Id"] | null;
+      reason: string | null;
+      actor: components["schemas"]["ActorSummary"];
       /** Format: date-time */
-      updatedAt: string;
-      canEdit: boolean;
-      /** @description 편집 권한이 있고 date > 오늘(Asia/Seoul)이면 true. */
-      canDelete: boolean;
+      createdAt: string;
     };
-    /** @description date 오름차순. 페이지 없음(최대 367행). */
-    BranchClosureList: {
-      branchId: components["schemas"]["Id"];
-      /** Format: date */
-      from: string;
-      /** Format: date */
-      to: string;
-      items: components["schemas"]["BranchClosure"][];
-    };
-    /** @description 오늘(Asia/Seoul) ~ 366일 뒤. 아니면 422 CLOSURE_DATE_INVALID. */
-    BranchClosureCreate: {
-      /** Format: date */
-      date: string;
-      note?: string;
-    };
-    /** @description 안내 문구만 바꾼다. 날짜는 바꿀 수 없다. */
-    BranchClosureUpdate: {
-      version: components["schemas"]["Version"];
-      note: string | null;
-    };
-    /** @description 등록 결과와 경고. affectedReservations는 시작 시각 순 최대 100건. */
-    BranchClosureCreated: {
-      closure: components["schemas"]["BranchClosure"];
-      affectedReservations: components["schemas"]["AffectedReservation"][];
-      affectedReservationCount: number;
-    };
-    /** @description 홈 휴무 안내(오늘부터 7일 뒤까지). */
-    HomeClosureItem: {
-      branchId: components["schemas"]["Id"];
-      branchName: string;
-      /** Format: date */
-      date: string;
-      note: string | null;
-      today: boolean;
-    };
-    /** @description 휴무일에 시작하는 기존 예약. 자동 취소하지 않는다(M13-D01). 고객 정보는 담지 않는다. */
-    AffectedReservation: {
+    /** @description 휴가 부여 상세. 잔여량 원장을 더한다. */
+    LeaveGrantDetail: {
       id: components["schemas"]["Id"];
-      roomId: components["schemas"]["Id"];
-      roomName: string;
+      version: components["schemas"]["Version"];
+      employee: components["schemas"]["ActorSummary"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
+      /** Format: date */
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      remainingDays: number;
+      /** @description validThrough < 오늘(Asia/Seoul) */
+      expired: boolean;
+      reason: string;
+      grantedBy: components["schemas"]["ActorSummary"];
       /** Format: date-time */
-      startAt: string;
+      createdAt: string;
+      /** @description 원부여 지점의 MANAGER 이상. 화면 안내용 */
+      canAdjust: boolean;
+      /** @description 시간순 */
+      events: components["schemas"]["LeaveBalanceEvent"][];
+    };
+    LeaveGrantPage: {
+      items: components["schemas"]["LeaveGrant"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description validThrough ≥ validFrom. 위반은 422 LEAVE_GRANT_INVALID. */
+    LeaveGrantCreate: {
+      employeeId: components["schemas"]["Id"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
+      /** Format: date */
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      reason: string;
+    };
+    /** @description remaining_days만 증감한다. 결과가 음수면 409 LEAVE_BALANCE_INSUFFICIENT. */
+    LeaveGrantAdjust: {
+      version: components["schemas"]["Version"];
+      /** @description 0이 아닌 0.5 단위 증감 */
+      deltaDays: number;
+      reason: string;
+    };
+    LeaveBalanceGrant: {
+      grantId: components["schemas"]["Id"];
+      originBranchId: components["schemas"]["Id"];
+      grantYear: number;
+      /** Format: date */
+      validFrom: string;
+      /** Format: date */
+      validThrough: string;
+      grantedDays: number;
+      remainingDays: number;
+      expired: boolean;
+    };
+    /** @description 직원 단위 잔여량(M12-D02). 사유·부여자·원장은 부여 상세에서만 본다. */
+    LeaveBalance: {
+      employee: components["schemas"]["ActorSummary"];
       /** Format: date-time */
-      endAt: string;
+      asOf: string;
+      /** @description 만료되지 않은 부여의 잔여 합 */
+      totalRemainingDays: number;
+      /** @description validThrough 오름차순, 같으면 grantId */
+      grants: components["schemas"]["LeaveBalanceGrant"][];
+    };
+    /** @description leave_allocations 한 행. 승인 취소로 복원되면 restored=true. */
+    LeaveAllocation: {
+      grantId: components["schemas"]["Id"];
+      days: number;
+      restored: boolean;
+    };
+    /** @description 휴가 신청. can* 필드는 화면 안내용이고 서버는 쓰기마다 다시 검사한다. */
+    LeaveRequest: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["RequestStatus"];
+      employee: components["schemas"]["ActorSummary"];
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      startsOn: string;
+      /** Format: date */
+      endsOn: string;
+      requestedDays: number;
+      reason: string;
+      decision: components["schemas"]["RequestDecision"] | null;
+      cancellation: components["schemas"]["RequestCancellation"] | null;
+      allocations: components["schemas"]["LeaveAllocation"][];
+      /** Format: date-time */
+      createdAt: string;
+      canApprove: boolean;
+      canReject: boolean;
+      canCancel: boolean;
+      canCancelApproval: boolean;
+    };
+    LeaveRequestPage: {
+      items: components["schemas"]["LeaveRequest"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 신청자는 세션 사용자다. 같은 연도, 0.5 단위, 달력 일수 이하(M12-D06). 위반은 422 LEAVE_PERIOD_INVALID. */
+    LeaveRequestCreate: {
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      startsOn: string;
+      /** Format: date */
+      endsOn: string;
+      requestedDays: number;
+      reason: string;
+    };
+    /**
+     * @description DB CLOCK=출퇴근, BREAK=휴게.
+     * @enum {string}
+     */
+    AttendanceCorrectionKind: "출퇴근" | "휴게";
+    /** @description 종류에 맞지 않는 필드는 null이다. */
+    AttendanceCorrectionValues: {
+      /** Format: date-time */
+      clockInAt: string | null;
+      /** Format: date-time */
+      clockOutAt: string | null;
+      /** Format: date-time */
+      breakStartedAt: string | null;
+      /** Format: date-time */
+      breakEndedAt: string | null;
+    };
+    /** @description 근태 정정. 원본(before)·정정(after)·승인자를 보존한다(FR-CORR-04). 승인된 정정은 취소하지 않는다(M12-D08). */
+    AttendanceCorrection: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["RequestStatus"];
+      kind: components["schemas"]["AttendanceCorrectionKind"];
+      attendanceRecordId: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      employee: components["schemas"]["ActorSummary"];
+      breakId: components["schemas"]["Id"] | null;
+      before: components["schemas"]["AttendanceCorrectionValues"];
+      after: components["schemas"]["AttendanceCorrectionValues"];
+      reason: string;
+      decision: components["schemas"]["AttendanceCorrectionDecision"] | null;
+      cancellation: components["schemas"]["RequestCancellation"] | null;
+      /** Format: date-time */
+      createdAt: string;
+      canApprove: boolean;
+      canReject: boolean;
+      canCancel: boolean;
+    };
+    AttendanceCorrectionPage: {
+      items: components["schemas"]["AttendanceCorrection"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description kind=출퇴근이면 clockInAt·clockOutAt 필수, kind=휴게이면 breakId·breakStartedAt·breakEndedAt 필수. 다른 종류의 필드는 422 VALIDATION_FAILED. 초 미만은 0이어야 한다. */
+    AttendanceCorrectionCreate: {
+      kind: components["schemas"]["AttendanceCorrectionKind"];
+      /** Format: date-time */
+      clockInAt?: string;
+      /** Format: date-time */
+      clockOutAt?: string;
+      breakId?: components["schemas"]["Id"];
+      /** Format: date-time */
+      breakStartedAt?: string;
+      /** Format: date-time */
+      breakEndedAt?: string;
+      reason: string;
+    };
+    /** @description 근태 정정 반려. 사유는 필수이며 audit_events에 남는다(2026-11-09 사용자 결정, #107). 휴가·대체근무 반려는 사유를 받지 않는다. */
+    AttendanceCorrectionReject: {
+      version: components["schemas"]["Version"];
+      reason: string;
+    };
+    /** @description 정정의 승인 또는 반려를 한 사람과 시각(decided_by, decided_at). reason은 반려 사유(audit_events)이고 승인이면 null이다. */
+    AttendanceCorrectionDecision: {
+      by: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      at: string;
+      reason: string | null;
+    };
+    /** @description 정정 뒤 구간과 다른 근태의 교집합. 요청자가 볼 수 없는 지점의 근태는 visible=false, attendanceRecordId=null이고 겹친 구간을 합친다. */
+    AttendanceConflict: {
+      visible: boolean;
       /** @enum {string} */
-      status: "확정" | "이용 중";
+      label: "근태" | "다른 지점 근태";
+      /** Format: date-time */
+      overlapStartsAt: string;
+      /** Format: date-time */
+      overlapEndsAt: string;
+      attendanceRecordId: components["schemas"]["Id"] | null;
+    };
+    /** @description 대체근무 신청. shiftVersion은 근무의 현재 version이며 승인 요청에 그대로 보낸다. original*은 신청 상태에서는 근무의 현재 시각, 승인 뒤에는 승인 SWAPPED의 바뀌기 전 시각이다. */
+    ShiftSwap: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      status: components["schemas"]["RequestStatus"];
+      shiftId: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      requester: components["schemas"]["ActorSummary"];
+      replacement: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      originalStartsAt: string;
+      /** Format: date-time */
+      originalEndsAt: string;
+      /** Format: date-time */
+      proposedStartsAt: string;
+      /** Format: date-time */
+      proposedEndsAt: string;
+      shiftVersion: components["schemas"]["Version"];
+      reason: string;
+      decision: components["schemas"]["RequestDecision"] | null;
+      cancellation: components["schemas"]["RequestCancellation"] | null;
+      /** Format: date-time */
+      createdAt: string;
+      canApprove: boolean;
+      canReject: boolean;
+      canCancel: boolean;
+      canCancelApproval: boolean;
+    };
+    ShiftSwapPage: {
+      items: components["schemas"]["ShiftSwap"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 제안 시각은 M8-D03 시각 규칙을 따른다. 예정 휴게 분은 원래 근무 값을 쓴다. */
+    ShiftSwapCreate: {
+      replacementEmployeeId: components["schemas"]["Id"];
+      /** Format: date-time */
+      proposedStartsAt: string;
+      /** Format: date-time */
+      proposedEndsAt: string;
+      reason: string;
+    };
+    /** @description version은 대체근무 신청, shiftVersion은 근무의 version. 근무가 바뀌었으면 409 SHIFT_VERSION_CONFLICT. */
+    ShiftSwapApprove: {
+      version: components["schemas"]["Version"];
+      shiftVersion: components["schemas"]["Version"];
+    };
+    /** @description M12 신청 명령의 409. ApiError 필드에 code별 대상 정보를 더한다: conflicts(LEAVE_SHIFT_CONFLICT·SHIFT_CONFLICT), attendanceConflicts(CORRECTION_OVERLAP), breakIds(CORRECTION_BREAK_OUTSIDE), requiredDays·availableDays(LEAVE_BALANCE_INSUFFICIENT), overlappingRequestIds(LEAVE_OVERLAP), pendingCorrectionId(CORRECTION_PENDING), pendingSwapId(SWAP_PENDING), shiftId·latestVersion·reloadUrl(SHIFT_VERSION_CONFLICT), shiftId·latestVersion·approvedVersion·reloadUrl(SWAP_RESTORE_CONFLICT). INVALID_STATE·VERSION_CONFLICT는 latestVersion·reloadUrl을 담는다. */
+    WorkforceRequestConflictError: {
+      code: string;
+      message: string;
+      requestId: string;
+      fieldErrors?: {
+        [key: string]: string;
+      };
+      latestVersion?: components["schemas"]["Version"];
+      reloadUrl?: string;
+      /** @description LEAVE_SHIFT_CONFLICT, SHIFT_CONFLICT */
+      conflicts?: components["schemas"]["ShiftConflict"][];
+      /** @description CORRECTION_OVERLAP */
+      attendanceConflicts?: components["schemas"]["AttendanceConflict"][];
+      /** @description CORRECTION_BREAK_OUTSIDE */
+      breakIds?: components["schemas"]["Id"][];
+      /** @description LEAVE_BALANCE_INSUFFICIENT */
+      requiredDays?: number;
+      /** @description LEAVE_BALANCE_INSUFFICIENT */
+      availableDays?: number;
+      /** @description LEAVE_OVERLAP */
+      overlappingRequestIds?: components["schemas"]["Id"][];
+      pendingCorrectionId?: components["schemas"]["Id"];
+      pendingSwapId?: components["schemas"]["Id"];
+      shiftId?: components["schemas"]["Id"];
+      approvedVersion?: components["schemas"]["Version"];
     };
     /** @description M13 409 본문. ApiError 필드에 code별 대상 정보를 더한다. 해당 없는 필드는 담지 않는다. */
     OperationsConflictError: {
@@ -6389,6 +6886,312 @@ export interface components {
       mergedIntoCustomerId?: components["schemas"]["Id"] | null;
       /** @description CLOSING_EXISTS */
       closingId?: components["schemas"]["Id"] | null;
+    };
+    /** @description 지점 휴무일(Asia/Seoul 하루 전체, M13-D05). */
+    BranchClosure: {
+      id: components["schemas"]["Id"];
+      version: components["schemas"]["Version"];
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      date: string;
+      note: string | null;
+      createdBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      canEdit: boolean;
+      /** @description 편집 권한이 있고 date > 오늘(Asia/Seoul)이면 true. */
+      canDelete: boolean;
+    };
+    /** @description 오늘(Asia/Seoul) ~ 366일 뒤. 아니면 422 CLOSURE_DATE_INVALID. */
+    BranchClosureCreate: {
+      /** Format: date */
+      date: string;
+      note?: string;
+    };
+    /** @description 안내 문구만 바꾼다. 날짜는 바꿀 수 없다. */
+    BranchClosureUpdate: {
+      version: components["schemas"]["Version"];
+      note: string | null;
+    };
+    /** @description 휴무일에 시작하는 기존 예약. 자동 취소하지 않는다(M13-D01). 고객 정보는 담지 않는다. */
+    AffectedReservation: {
+      id: components["schemas"]["Id"];
+      roomId: components["schemas"]["Id"];
+      roomName: string;
+      /** Format: date-time */
+      startAt: string;
+      /** Format: date-time */
+      endAt: string;
+      /** @enum {string} */
+      status: "확정" | "이용 중";
+    };
+    /** @description 등록 결과와 경고. affectedReservations는 시작 시각 순 최대 100건. */
+    BranchClosureCreated: {
+      closure: components["schemas"]["BranchClosure"];
+      affectedReservations: components["schemas"]["AffectedReservation"][];
+      affectedReservationCount: number;
+    };
+    /** @description date 오름차순. 페이지 없음(최대 367행). */
+    BranchClosureList: {
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      items: components["schemas"]["BranchClosure"][];
+    };
+    /** @description 홈 휴무 안내(오늘부터 7일 뒤까지). */
+    HomeClosureItem: {
+      branchId: components["schemas"]["Id"];
+      branchName: string;
+      /** Format: date */
+      date: string;
+      note: string | null;
+      today: boolean;
+    };
+    DuplicateCustomer: {
+      id: components["schemas"]["Id"];
+      memberNo: string;
+      name: string;
+      /** @enum {string} */
+      status: "정상" | "이용 제한" | "비활성";
+      registeredBranchId: components["schemas"]["Id"] | null;
+      /** Format: date-time */
+      registeredAt: string;
+      paymentCount: number;
+      /** Format: date-time */
+      lastActivityAt: string | null;
+    };
+    /** @description 같은 숫자 연락처의 병합되지 않은 고객 묶음(M13-D13). 고객은 등록 시각 순. */
+    CustomerDuplicateGroup: {
+      phone: string;
+      customers: components["schemas"]["DuplicateCustomer"][];
+    };
+    CustomerDuplicatePage: {
+      items: components["schemas"]["CustomerDuplicateGroup"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 경로의 고객이 남고 absorbedCustomerId가 흡수된다. 되돌리지 않는다(M13-D03). */
+    CustomerMerge: {
+      version: components["schemas"]["Version"];
+      absorbedCustomerId: components["schemas"]["Id"];
+      absorbedVersion: components["schemas"]["Version"];
+      reason: string;
+    };
+    CustomerMergeRecord: {
+      id: components["schemas"]["Id"];
+      target: components["schemas"]["CustomerSummary"];
+      absorbed: components["schemas"]["CustomerSummary"];
+      /** @description 연쇄 병합으로 옮겨진 경우 원래 대상이던 중간 고객. */
+      via: components["schemas"]["CustomerSummary"] | null;
+      mergedBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      mergedAt: string;
+      reason: string;
+    };
+    /** @description 최신순. 페이지 없음. */
+    CustomerMergeList: {
+      items: components["schemas"]["CustomerMergeRecord"][];
+    };
+    /** @description M9 공통 집계와 같은 정의의 하루 수치. */
+    ClosingAmounts: {
+      approvedAmountKrw: number;
+      refundAmountKrw: number;
+      netAmountKrw: number;
+      approvedPaymentCount: number;
+      refundCount: number;
+    };
+    /** @description 결제 수단별 소계. 환불은 원결제 수단. */
+    ClosingMethodAmounts: {
+      /** @enum {string} */
+      method: "현금" | "카드" | "계좌이체" | "기타";
+      approvedAmountKrw: number;
+      refundAmountKrw: number;
+      netAmountKrw: number;
+      approvedPaymentCount: number;
+      refundCount: number;
+    };
+    ClosingPurposeAmounts: {
+      /** @enum {string} */
+      purpose: "이용권" | "스터디룸" | "사물함";
+      approvedAmountKrw: number;
+      refundAmountKrw: number;
+      netAmountKrw: number;
+      approvedPaymentCount: number;
+      refundCount: number;
+    };
+    ClosingBasisSnapshot: {
+      totals: components["schemas"]["ClosingAmounts"];
+      byPurpose: components["schemas"]["ClosingPurposeAmounts"][];
+      byMethod: components["schemas"]["ClosingMethodAmounts"][];
+    };
+    /** @description 마감 때 저장한 두 환불 기준의 수치(M13-D08·D11). 처리일 기준은 마감 뒤 바뀌지 않는다. */
+    ClosingSnapshot: {
+      processedDate: components["schemas"]["ClosingBasisSnapshot"];
+      paymentDate: components["schemas"]["ClosingBasisSnapshot"];
+    };
+    /** @description 마감된 날 승인된 결제의 이후 환불(M13-D04·D11). 환불 트랜잭션이 남긴다. */
+    DailyClosingAdjustment: {
+      id: components["schemas"]["Id"];
+      refundId: components["schemas"]["Id"];
+      paymentId: components["schemas"]["Id"];
+      amountKrw: number;
+      /** @description 환불 사유. 원결제 지점 payments:read가 없으면 null. */
+      reason: string | null;
+      processedBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      processedAt: string;
+    };
+    /** @description businessDate < 오늘(Asia/Seoul). 아니면 422 CLOSING_DATE_OPEN. */
+    DailyClosingCreate: {
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      businessDate: string;
+      note?: string;
+    };
+    /** @description difference = current.paymentDate − snapshot.paymentDate.totals, Σ(adjustments.amountKrw) = difference.netAmountKrw. */
+    DailyClosing: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      businessDate: string;
+      note: string | null;
+      closedBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      closedAt: string;
+      snapshot: components["schemas"]["ClosingSnapshot"];
+      /** @description 조회 시각에 다시 계산한 원결제일 기준 수치. */
+      current: {
+        paymentDate: components["schemas"]["ClosingAmounts"];
+        /** Format: date-time */
+        asOf: string;
+      };
+      difference: components["schemas"]["ClosingAmounts"];
+      adjustments: components["schemas"]["DailyClosingAdjustment"][];
+      /** @enum {string} */
+      timeZone: "Asia/Seoul";
+      /** @enum {string} */
+      currency: "KRW";
+    };
+    DailyClosingSummary: {
+      id: components["schemas"]["Id"];
+      branchId: components["schemas"]["Id"];
+      /** Format: date */
+      businessDate: string;
+      closedBy: components["schemas"]["ActorSummary"];
+      /** Format: date-time */
+      closedAt: string;
+      processedDate: components["schemas"]["ClosingAmounts"];
+      adjustmentCount: number;
+    };
+    /** @description businessDate 내림차순, 같으면 branchId 오름차순. */
+    DailyClosingPage: {
+      items: components["schemas"]["DailyClosingSummary"][];
+      meta: components["schemas"]["PageMeta"];
+    };
+    /** @description 통계 의미가 바뀌는 조건의 화면 안내(FR-AGG-15). */
+    ConditionNote: {
+      /** @enum {string} */
+      code:
+        | "PASS_ONLY"
+        | "REFUND_PROCESSING_BRANCH"
+        | "OPERATOR_BY_ENTRY"
+        | "REFUND_BY_PAYMENT_METHOD"
+        | "USAGE_NOT_REVENUE";
+      message: string;
+    };
+    /** @description 결제 목록에 적용한 조건 전체. 지정하지 않은 배열은 빈 배열(FR-PAY-13). */
+    PaymentFilter: {
+      branchIds: components["schemas"]["Id"][];
+      /** @enum {string|null} */
+      status: "승인" | "실패" | "환불" | null;
+      /** Format: date-time */
+      from: string | null;
+      /** Format: date-time */
+      to: string | null;
+      customerId: components["schemas"]["Id"] | null;
+      methods: ("현금" | "카드" | "계좌이체" | "기타")[];
+      productKinds: ("시간권" | "기간권" | "정액권")[];
+      categoryCode: string | null;
+      operatorIds: components["schemas"]["Id"][];
+      processingBranchIds: components["schemas"]["Id"][];
+    };
+    PaymentStatusTotal: {
+      count: number;
+      amountKrw: number;
+    };
+    /** @description 페이지가 아니라 조건 전체의 상태별 건수·금액 합. */
+    PaymentListSummary: {
+      approved: components["schemas"]["PaymentStatusTotal"];
+      failed: components["schemas"]["PaymentStatusTotal"];
+      refunded: components["schemas"]["PaymentStatusTotal"];
+    };
+    /** @description pass.usage_session_count, pass.usage_minutes, pass.usage_credit_krw. */
+    PassUsageAmounts: {
+      sessionCount: number;
+      usedMinutes: number;
+      usedCreditKrw: number;
+    };
+    PassUsageSaleBranch: {
+      saleBranchId: components["schemas"]["Id"] | null;
+      visible: boolean;
+      /** @description 보이지 않는 판매 지점을 합친 항목은 "다른 지점", 보이는 판매 지점은 null. */
+      label: string | null;
+      sessionCount: number;
+      usedMinutes: number;
+      usedCreditKrw: number;
+    };
+    PassUsageBranch: {
+      branchId: components["schemas"]["Id"];
+      sessionCount: number;
+      usedMinutes: number;
+      usedCreditKrw: number;
+      bySaleBranch: components["schemas"]["PassUsageSaleBranch"][];
+    };
+    /** @description 이용 지점별 이용권 사용량(M13-D12). 매출이 아니다. */
+    PassUsageByBranch: {
+      aggregation: components["schemas"]["AggregationMeta"];
+      totals: components["schemas"]["PassUsageAmounts"];
+      items: components["schemas"]["PassUsageBranch"][];
+    };
+    SeatOccupancyBucket: {
+      /** @description hour는 Asia/Seoul "YYYY-MM-DD HH:00", day는 "YYYY-MM-DD". */
+      label: string;
+      /** Format: date-time */
+      bucketStart: string;
+      /** Format: date-time */
+      bucketEnd: string;
+      /** Format: date-time */
+      start: string;
+      /** Format: date-time */
+      end: string;
+      partial: boolean;
+      seatCount: number;
+      occupiedSeatMinutes: number;
+      capacitySeatMinutes: number;
+      occupancy: components["schemas"]["Ratio"];
+    };
+    /** @description 점유한 좌석·분 ÷ (좌석 수 × 구간 분)(M13-D09). 각 값은 seat_sessions로 다시 계산할 수 있다. */
+    SeatOccupancyTrend: {
+      branchId: components["schemas"]["Id"];
+      /** @enum {string} */
+      granularity: "hour" | "day";
+      /** Format: date-time */
+      from: string;
+      /** Format: date-time */
+      to: string;
+      /** Format: date-time */
+      asOf: string;
+      /** @enum {string} */
+      timeZone: "Asia/Seoul";
+      totals: {
+        occupiedSeatMinutes: number;
+        capacitySeatMinutes: number;
+        occupancy: components["schemas"]["Ratio"];
+      };
+      items: components["schemas"]["SeatOccupancyBucket"][];
     };
   };
   responses: {
@@ -6494,6 +7297,14 @@ export interface components {
     PassProductId: components["schemas"]["Id"];
     /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
     PassCategoryCode: string;
+    /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+    PaymentMethods: ("현금" | "카드" | "계좌이체" | "기타")[];
+    /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+    ProductKinds: ("시간권" | "기간권" | "정액권")[];
+    /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+    OperatorIds: components["schemas"]["Id"][];
+    /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+    ProcessingBranchIds: components["schemas"]["Id"][];
     /** @description 시작 날짜(포함, Asia/Seoul). to와 함께 보내거나 함께 생략한다. */
     ClosureFrom: string;
     /** @description 종료 날짜(포함, Asia/Seoul). 기간은 최대 366일이고 넘으면 422 PERIOD_TOO_LONG. */
@@ -8055,126 +8866,6 @@ export interface operations {
       500: components["responses"]["Error500"];
     };
   };
-  listCustomerDuplicates: {
-    parameters: {
-      query?: {
-        page?: components["parameters"]["Page"];
-        pageSize?: components["parameters"]["PageSize"];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
-      200: {
-        headers: {
-          "X-Request-ID"?: string;
-          /** @description no-store */
-          "Cache-Control"?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CustomerDuplicatePage"];
-        };
-      };
-      401: components["responses"]["Error401"];
-      403: components["responses"]["Error403"];
-      404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
-      422: components["responses"]["Error422"];
-      429: components["responses"]["Error429"];
-      500: components["responses"]["Error500"];
-    };
-  };
-  mergeCustomer: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
-        "X-CSRF-Token": components["parameters"]["Csrf"];
-      };
-      path: {
-        id: components["schemas"]["Id"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["CustomerMerge"];
-      };
-    };
-    responses: {
-      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
-      200: {
-        headers: {
-          "X-Request-ID"?: string;
-          /** @description no-store */
-          "Cache-Control"?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Customer"];
-        };
-      };
-      401: components["responses"]["Error401"];
-      403: components["responses"]["Error403"];
-      404: components["responses"]["Error404"];
-      /** @description 상태·버전·중복 요청과 M13 규칙 충돌. code별 대상 정보는 OperationsConflictError 참조. */
-      409: {
-        headers: {
-          "X-Request-ID"?: string;
-          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
-          "Retry-After"?: number;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiError"] & {
-            mergedIntoCustomerId?: string | null;
-          };
-        };
-      };
-      422: components["responses"]["Error422"];
-      429: components["responses"]["Error429"];
-      500: components["responses"]["Error500"];
-    };
-  };
-  listCustomerMerges: {
-    parameters: {
-      query?: {
-        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
-        scope?: components["parameters"]["Scope"];
-      };
-      header?: never;
-      path: {
-        id: components["schemas"]["Id"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
-      200: {
-        headers: {
-          "X-Request-ID"?: string;
-          /** @description no-store */
-          "Cache-Control"?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CustomerMergeList"];
-        };
-      };
-      401: components["responses"]["Error401"];
-      403: components["responses"]["Error403"];
-      404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
-      422: components["responses"]["Error422"];
-      429: components["responses"]["Error429"];
-      500: components["responses"]["Error500"];
-    };
-  };
   createCustomer: {
     parameters: {
       query?: {
@@ -8297,9 +8988,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["ApiError"] & {
-            mergedIntoCustomerId?: string | null;
-          };
+          "application/json": components["schemas"]["OperationsConflictError"];
         };
       };
       422: components["responses"]["Error422"];
@@ -8352,9 +9041,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["ApiError"] & {
-            mergedIntoCustomerId?: string | null;
-          };
+          "application/json": components["schemas"]["OperationsConflictError"];
         };
       };
       422: components["responses"]["Error422"];
@@ -8377,6 +9064,16 @@ export interface operations {
         from?: string;
         to?: string;
         customerId?: components["schemas"]["Id"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
       };
       header?: never;
       path?: never;
@@ -8995,7 +9692,18 @@ export interface operations {
       401: components["responses"]["Error401"];
       403: components["responses"]["Error403"];
       404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
+      /** @description 상태·중복 요청 충돌. 병합된 고객의 CUSTOMER_NOT_ACTIVE는 mergedIntoCustomerId를 담는다(OperationsConflictError). */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
@@ -11884,7 +12592,18 @@ export interface operations {
       401: components["responses"]["Error401"];
       403: components["responses"]["Error403"];
       404: components["responses"]["Error404"];
-      409: components["responses"]["Error409"];
+      /** @description 상태·중복 요청 충돌. 병합된 고객의 CUSTOMER_NOT_ACTIVE는 mergedIntoCustomerId를 담는다(OperationsConflictError). */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
@@ -12614,6 +13333,16 @@ export interface operations {
         refundBasis?: components["parameters"]["RefundBasis"];
         /** @description 결제 용도(payments.purpose) 필터. 생략하면 세 용도 모두(M9-D03). */
         purpose?: components["parameters"]["SalesPurpose"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
       };
       header?: never;
       path?: never;
@@ -12663,6 +13392,16 @@ export interface operations {
           | "requested";
         /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
         direction?: components["parameters"]["Direction"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
       };
       header?: never;
       path?: never;
@@ -12710,6 +13449,16 @@ export interface operations {
         pageSize?: components["parameters"]["PageSize"];
         /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
         direction?: components["parameters"]["Direction"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
       };
       header?: never;
       path?: never;
@@ -12753,6 +13502,14 @@ export interface operations {
         productId?: components["parameters"]["PassProductId"];
         /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
         categoryCode?: components["parameters"]["PassCategoryCode"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
       };
       header?: never;
       path?: never;
@@ -12798,6 +13555,14 @@ export interface operations {
         categoryCode?: components["parameters"]["PassCategoryCode"];
         page?: components["parameters"]["Page"];
         pageSize?: components["parameters"]["PageSize"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
       };
       header?: never;
       path?: never;
@@ -12845,6 +13610,14 @@ export interface operations {
         productId?: components["parameters"]["PassProductId"];
         /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
         categoryCode?: components["parameters"]["PassCategoryCode"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
       };
       header?: never;
       path?: never;
@@ -13298,6 +14071,1180 @@ export interface operations {
       };
     };
   };
+  listLeaveGrants: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 조회 범위와 교집합. 일반 직원이 다른 직원 ID를 넣으면 빈 목록 */
+        employeeId?: components["schemas"]["Id"];
+        /** @description true면 본인 것만 */
+        mine?: boolean;
+        /** @description 부여 연도 */
+        grantYear?: number;
+        /** @description 만료된 부여 포함 */
+        includeExpired?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveGrantPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createLeaveGrant: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LeaveGrantCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveGrant"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getLeaveGrant: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveGrantDetail"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  adjustLeaveGrant: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LeaveGrantAdjust"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveGrantDetail"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getMyLeaveBalance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveBalance"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getEmployeeLeaveBalance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        employeeId: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveBalance"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listLeaveRequests: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 조회 범위와 교집합. 일반 직원이 다른 직원 ID를 넣으면 빈 목록 */
+        employeeId?: components["schemas"]["Id"];
+        /** @description true면 본인 것만 */
+        mine?: boolean;
+        /** @description 생략하면 전체 */
+        status?: components["schemas"]["RequestStatus"];
+        /** @description 휴가 기간과 겹침(Asia/Seoul) */
+        from?: string;
+        /** @description 휴가 기간과 겹침(Asia/Seoul) */
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveRequestPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createLeaveRequest: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LeaveRequestCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveRequest"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getLeaveRequest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveRequest"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  approveLeaveRequest: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveRequest"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  rejectLeaveRequest: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveRequest"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelLeaveRequest: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveRequest"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelLeaveApproval: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LeaveRequest"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listAttendanceCorrections: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 조회 범위와 교집합. 일반 직원이 다른 직원 ID를 넣으면 빈 목록 */
+        employeeId?: components["schemas"]["Id"];
+        /** @description true면 본인 것만 */
+        mine?: boolean;
+        /** @description 생략하면 전체 */
+        status?: components["schemas"]["RequestStatus"];
+        /** @description 근태 ID */
+        attendanceRecordId?: components["schemas"]["Id"];
+        /** @description workDate ≥ from (Asia/Seoul) */
+        from?: string;
+        /** @description workDate ≤ to (Asia/Seoul) */
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceCorrectionPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createAttendanceCorrection: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AttendanceCorrectionCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceCorrection"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getAttendanceCorrection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceCorrection"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  approveAttendanceCorrection: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceCorrection"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  rejectAttendanceCorrection: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AttendanceCorrectionReject"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceCorrection"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelAttendanceCorrection: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttendanceCorrection"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listShiftSwaps: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+        /** @description 조회 범위와 교집합. 일반 직원이 다른 직원 ID를 넣으면 빈 목록 */
+        employeeId?: components["schemas"]["Id"];
+        /** @description true면 본인 것만 */
+        mine?: boolean;
+        /** @description 생략하면 전체 */
+        status?: components["schemas"]["RequestStatus"];
+        /** @description proposedStartsAt의 날짜 ≥ from (Asia/Seoul) */
+        from?: string;
+        /** @description proposedStartsAt의 날짜 ≤ to (Asia/Seoul) */
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftSwapPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createShiftSwap: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShiftSwapCreate"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftSwap"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getShiftSwap: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftSwap"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  approveShiftSwap: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShiftSwapApprove"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftSwap"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  rejectShiftSwap: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftSwap"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelShiftSwap: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftSwap"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  cancelShiftSwapApproval: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VersionCommand"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShiftSwap"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 신청 규칙 충돌. code별 대상 정보는 WorkforceRequestConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkforceRequestConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
   listBranchClosures: {
     parameters: {
       query?: {
@@ -13479,6 +15426,327 @@ export interface operations {
           "application/json": components["schemas"]["OperationsConflictError"];
         };
       };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listCustomerDuplicates: {
+    parameters: {
+      query?: {
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CustomerDuplicatePage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  mergeCustomer: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CustomerMerge"];
+      };
+    };
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Customer"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 M13 규칙 충돌. code별 대상 정보는 OperationsConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listCustomerMerges: {
+    parameters: {
+      query?: {
+        /** @description all은 허용 지점의 합집합. path/body의 구체적 지점과 교차 검사. 접근 불가 ID는 403. */
+        scope?: components["parameters"]["Scope"];
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CustomerMergeList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  listDailyClosings: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 시작 날짜(포함, Asia/Seoul). to와 함께 보내거나 함께 생략한다. */
+        from?: components["parameters"]["ClosureFrom"];
+        /** @description 종료 날짜(포함, Asia/Seoul). 기간은 최대 366일이고 넘으면 422 PERIOD_TOO_LONG. */
+        to?: components["parameters"]["ClosureTo"];
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DailyClosingPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  createDailyClosing: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+        /** @description 등록 중복 방지. 같은 키·입력은 저장된 결과, 다른 입력은 409. 기본 24시간 보존 제안. */
+        "Idempotency-Key": components["parameters"]["Idempotency"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DailyClosingCreate"];
+      };
+    };
+    responses: {
+      /** @description 생성됨. 같은 Idempotency-Key·같은 입력은 처음 결과를 재생한다. */
+      201: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DailyClosing"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      /** @description 상태·버전·중복 요청과 M13 규칙 충돌. code별 대상 정보는 OperationsConflictError 참조. */
+      409: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description 다시 시도할 때까지 초. 409는 REQUEST_IN_PROGRESS인 경우에만 포함. */
+          "Retry-After"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OperationsConflictError"];
+        };
+      };
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getDailyClosing: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DailyClosing"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getPassUsageByBranch: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 이용권 상품(passes.product_id) 필터. 판매 당시 이름이 다른 행도 모두 포함한다. */
+        productId?: components["parameters"]["PassProductId"];
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PassUsageByBranch"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getSeatOccupancyTrend: {
+    parameters: {
+      query: {
+        /** @description 지점. */
+        branchId: components["schemas"]["Id"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 구간 단위. 기본 hour. */
+        granularity?: "hour" | "day";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 정상 처리. 세부 의미는 operation 설명 참조. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeatOccupancyTrend"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];

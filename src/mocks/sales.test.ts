@@ -14,6 +14,7 @@ vi.mock("../shared/api/client", async (original) => ({
 }));
 import { salesHandlers } from "./sales";
 import { paymentHandlers, salesProductSnapshot } from "./payments";
+import { dailyClosingHandlers } from "./daily-closings";
 import { roomHandlers } from "./rooms";
 import { lockerHandlers } from "./lockers";
 import { store } from "./store";
@@ -26,6 +27,7 @@ import {
 const server = setupServer(
   ...salesHandlers,
   ...paymentHandlers,
+  ...dailyClosingHandlers,
   ...roomHandlers,
   ...lockerHandlers,
 );
@@ -41,13 +43,18 @@ afterEach(() => {
   server.resetHandlers();
   vi.restoreAllMocks();
 });
-const request = (path: string, method = "GET", body?: object) =>
+const request = (
+  path: string,
+  method = "GET",
+  body?: object,
+  key = crypto.randomUUID(),
+) =>
   fetch(new URL(`/api${path}`, window.location.origin), {
     method,
     headers: {
       "Content-Type": "application/json",
       "X-CSRF-Token": "openstudy-mock-csrf",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": key,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -64,6 +71,125 @@ const purchase = async () => {
   expect(result.status).toBe(201);
   return result.json();
 };
+
+it("matches payment summary to the approved revenue card for the same approval window", async () => {
+  store.db.payments = [];
+  const p = await purchase();
+  await purchase();
+  const refund = await request(`/payments/${p.id}/refund`, "POST", {
+    reason: "전액 환불",
+  });
+  expect(refund.status).toBe(200);
+  const methods = new URLSearchParams({
+    methods: "카드",
+    productKinds: "시간권",
+    operatorIds: p.createdBy.id,
+  });
+  const list = await (
+    await request(`/payments?scope=gangnam&pageSize=1&${range}&${methods}`)
+  ).json();
+  const sales = await salesApi.revenue({
+    branchIds: ["gangnam"],
+    from: "2026-10-31T15:00:00Z",
+    to: "2026-11-30T15:00:00Z",
+    methods: ["카드"],
+    productKinds: ["시간권"],
+    operatorIds: [p.createdBy.id],
+  });
+  expect(list.items).toHaveLength(1);
+  expect(list.filter).toMatchObject({
+    methods: ["카드"],
+    productKinds: ["시간권"],
+    operatorIds: [p.createdBy.id],
+  });
+  expect(
+    list.summary.approved.amountKrw + list.summary.refunded.amountKrw,
+  ).toBe(240000);
+  expect(sales.totals.approvedAmountKrw).toBe(240000);
+  expect(sales.aggregation.conditionNotes.map(({ code }) => code)).toEqual(
+    expect.arrayContaining([
+      "PASS_ONLY",
+      "OPERATOR_BY_ENTRY",
+      "REFUND_BY_PAYMENT_METHOD",
+    ]),
+  );
+});
+
+it("replays a closing key and records later refunds in closing detail", async () => {
+  store.db.payments = [];
+  vi.mocked(store.now).mockReturnValue("2026-11-09T03:00:00.000Z");
+  const payment = await purchase();
+  vi.mocked(store.now).mockReturnValue("2026-11-10T03:00:00.000Z");
+  const input = { branchId: "gangnam", businessDate: "2026-11-09" };
+  const key = crypto.randomUUID();
+  const response = await request("/daily-closings", "POST", input, key);
+  expect(response.status).toBe(201);
+  const closing = await response.json();
+  expect(closing.snapshot.paymentDate.totals.netAmountKrw).toBe(120000);
+  expect((await request("/daily-closings", "POST", input)).status).toBe(409);
+  vi.mocked(store.now).mockReturnValue("2026-11-10T04:00:00.000Z");
+  const refund = await request(`/payments/${payment.id}/refund`, "POST", {
+    reason: "마감 후 전액 환불",
+  });
+  expect(refund.status).toBe(200);
+  const detail = await (await request(`/daily-closings/${closing.id}`)).json();
+  expect(detail).toMatchObject({
+    snapshot: closing.snapshot,
+    difference: { netAmountKrw: -120000 },
+    current: { paymentDate: { netAmountKrw: 0 } },
+    adjustments: [
+      {
+        reason: "마감 후 전액 환불",
+        amountKrw: -120000,
+        processedBy: { id: payment.createdBy.id },
+      },
+    ],
+  });
+  expect(
+    await (await request("/daily-closings", "POST", input, key)).json(),
+  ).toEqual(closing);
+  expect(
+    await (await request("/daily-closings?branchIds=gangnam")).json(),
+  ).toMatchObject({
+    items: [{ id: closing.id, adjustmentCount: 1 }],
+  });
+});
+
+it("aggregates seat use by usage branch and keeps the sale branch separate", async () => {
+  const seed = store.db.usage.find((row) =>
+    store.db.passes.some((p) => p.id === row.passId && p.kind === "시간권"),
+  )!;
+  const pass = store.db.passes.find((p) => p.id === seed.passId)!;
+  store.db.usage = [
+    {
+      ...seed,
+      branchId: pass.branchId === "gangnam" ? "seongsu" : "gangnam",
+      startedAt: "2026-11-09T00:00:00Z",
+      endedAt: "2026-11-09T01:00:00Z",
+      status: "완료",
+      charged: 60,
+    },
+  ];
+  const usageBranchId = store.db.usage[0].branchId;
+  const response = await request(
+    `/sales/passes/usage?branchIds=${usageBranchId}&${range}`,
+  );
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    totals: { sessionCount: 1, usedMinutes: 60, usedCreditKrw: 0 },
+    aggregation: {
+      sourceRowCount: 2,
+      condition: { branchIds: [usageBranchId], refundBasis: null },
+      conditionNotes: [{ code: "USAGE_NOT_REVENUE" }],
+    },
+    items: [
+      {
+        branchId: usageBranchId,
+        bySaleBranch: [{ saleBranchId: pass.branchId, visible: true }],
+      },
+    ],
+  });
+});
 
 it("keeps revenue, branch comparison and paged ledger over the same approved/refund source", async () => {
   store.db.payments = [];

@@ -149,28 +149,36 @@ export function salesProductSnapshot(row: PaymentRow) {
     kind: saved.terms.kind,
   };
 }
-function paymentView(actor: Employee, row: PaymentRow): Payment {
+export function paymentView(actor: Employee, row: PaymentRow): Payment {
   if (row.canonical) return structuredClone(row.canonical);
-  const saved = metadata(row, state()),
+  const saved = row.productId ? metadata(row, state()) : null,
+    reservation = row.reservationId
+      ? store.db.reservations.find((r) => r.id === row.reservationId)?.canonical
+      : undefined,
     pass = store.db.passes.find((p) => p.paymentId === row.id);
+  const createdBy = saved?.actor ??
+    reservation?.createdBy ?? { id: "owner", name: "김서연" };
   return {
     id: row.id,
     version: row.version,
     mock: true,
-    purpose: "이용권",
-    roomReservationId: null,
+    purpose: row.reservationId ? "스터디룸" : "이용권",
+    roomReservationId: row.reservationId || null,
     lockerAssignmentId: null,
     branchId: row.branchId,
     customer: customerSummary(row.memberId),
-    productId: row.productId,
-    productName: saved.productName,
-    method: saved.method,
+    productId: row.productId || null,
+    productName: saved?.productName ?? null,
+    method:
+      saved?.method ??
+      row.roomPaymentMethod ??
+      (row.method === "Mock 현금" ? "현금" : "카드"),
     amountKrw: row.amount,
     status: row.status,
-    approvedAt: row.approvedAt || null,
+    approvedAt: row.status === "실패" ? null : row.approvedAt || null,
     failedAt: row.status === "실패" ? row.createdAt : null,
     createdAt: row.createdAt,
-    createdBy: saved.actor,
+    createdBy,
     passId: pass?.id ?? null,
     canRefund: !!pass && refundable(actor, pass),
     refund: row.refundAt
@@ -180,7 +188,8 @@ function paymentView(actor: Employee, row: PaymentRow): Payment {
           reason: row.reason,
           refundedAt: row.refundAt,
           processingBranchId: row.refundBranchId,
-          processedBy: saved.refundActor ?? saved.actor,
+          processedBy:
+            saved?.refundActor ?? reservation?.cancelledBy ?? createdBy,
         }
       : null,
   };
@@ -351,10 +360,43 @@ export const paymentHandlers = [
     paymentResponse(({ request }, actor) => {
       const selected = branches(actor, request, true),
         q = new URL(request.url).searchParams,
-        status = q.get("status"),
+        status = q.has("status")
+          ? z.enum(["승인", "실패", "환불"]).parse(q.get("status"))
+          : null,
         from = q.get("from"),
         to = q.get("to");
-      if (status) z.enum(["승인", "실패", "환불"]).parse(status);
+      const methods = z
+        .array(z.enum(["현금", "카드", "계좌이체", "기타"]))
+        .parse(q.getAll("methods"));
+      const productKinds = z
+        .array(z.enum(["시간권", "기간권", "정액권"]))
+        .parse(q.getAll("productKinds"));
+      const categoryCode = q.get("categoryCode");
+      const operatorIds = q.getAll("operatorIds");
+      const processingBranchIds = q.getAll("processingBranchIds");
+      for (const values of [
+        methods,
+        productKinds,
+        operatorIds,
+        processingBranchIds,
+      ]) {
+        assert(
+          values.every(Boolean) && new Set(values).size === values.length,
+          "필터 값을 확인해 주세요.",
+          422,
+          "VALIDATION_FAILED",
+        );
+      }
+      assert(
+        processingBranchIds.every(
+          (branchId) =>
+            store.db.branches.some((b) => b.id === branchId) &&
+            can(actor, branchId),
+        ),
+        "지점에 접근할 수 없습니다.",
+        403,
+        "FORBIDDEN",
+      );
       for (const date of [from, to])
         if (date) z.iso.datetime({ offset: true }).parse(date);
       assert(
@@ -369,8 +411,7 @@ export const paymentHandlers = [
           : store.db.payments
               .filter(
                 (p) =>
-                  (!!p.productId || !!p.canonical) &&
-                  !p.reservationId &&
+                  (!!p.productId || !!p.canonical || !!p.reservationId) &&
                   selected.includes(p.branchId) &&
                   (!status || p.status === status) &&
                   (!q.get("customerId") ||
@@ -378,14 +419,60 @@ export const paymentHandlers = [
                   (!from || Date.parse(p.createdAt) >= Date.parse(from)) &&
                   (!to || Date.parse(p.createdAt) < Date.parse(to)),
               )
+              .filter((p) => {
+                const payment = paymentView(actor, p);
+                const snapshot =
+                  payment.purpose === "이용권" ? salesProductSnapshot(p) : null;
+                return (
+                  (!methods.length || methods.includes(payment.method)) &&
+                  (!productKinds.length ||
+                    (!!snapshot && productKinds.includes(snapshot.kind))) &&
+                  (!categoryCode || snapshot?.categoryCode === categoryCode) &&
+                  (!operatorIds.length ||
+                    operatorIds.includes(payment.createdBy.id)) &&
+                  (!processingBranchIds.length ||
+                    payment.status !== "환불" ||
+                    (!!payment.refund &&
+                      processingBranchIds.includes(
+                        payment.refund.processingBranchId,
+                      )))
+                );
+              })
               .map((p) => paymentView(actor, p));
-      return page(
+      const total = (value: Payment["status"]) => {
+        const matching = rows.filter((row) => row.status === value);
+        return {
+          count: matching.length,
+          amountKrw: matching.reduce((sum, row) => sum + row.amountKrw, 0),
+        };
+      };
+      const result = page(
         request,
         sorted(request, rows, {
           createdAt: (p) => p.createdAt,
           amountKrw: (p) => p.amountKrw,
         }),
       );
+      return {
+        ...result,
+        filter: {
+          branchIds: selected,
+          status,
+          from,
+          to,
+          customerId: q.get("customerId"),
+          methods,
+          productKinds,
+          categoryCode,
+          operatorIds,
+          processingBranchIds,
+        },
+        summary: {
+          approved: total("승인"),
+          failed: total("실패"),
+          refunded: total("환불"),
+        },
+      };
     }),
   ),
   http.get(
@@ -395,8 +482,7 @@ export const paymentHandlers = [
         row = store.db.payments.find(
           (p) =>
             p.id === params.id &&
-            (!!p.productId || !!p.canonical) &&
-            !p.reservationId &&
+            (!!p.productId || !!p.canonical || !!p.reservationId) &&
             selected.includes(p.branchId),
         );
       assert(row, "결제를 찾을 수 없습니다.", 404, "NOT_FOUND");

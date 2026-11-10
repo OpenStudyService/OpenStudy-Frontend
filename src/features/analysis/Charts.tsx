@@ -115,7 +115,7 @@ export function SalesTrendChart({
   label,
   format,
 }: {
-  rows: { label: string; value: number }[];
+  rows: { label: string; value: number | null }[];
   label: string;
   format: (value: number) => string;
 }) {
@@ -139,7 +139,7 @@ export function SalesTrendChart({
             name={label}
             stroke="var(--primary)"
             strokeWidth={3}
-            dot={rows.length === 1}
+            dot={rows.filter((row) => row.value !== null).length === 1}
             isAnimationActive={false}
           />
         </LineChart>

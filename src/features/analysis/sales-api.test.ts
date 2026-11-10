@@ -38,9 +38,14 @@ function fixture() {
         purpose: null,
         productId: null,
         categoryCode: null,
+        methods: [],
+        productKinds: [],
+        operatorIds: [],
+        processingBranchIds: [],
         granularity: null,
       },
       defaultPeriod: false,
+      conditionNotes: [],
       timeZone: "Asia/Seoul",
       currency: "KRW",
       asOf: "2026-12-01T00:00:00Z",
@@ -192,7 +197,10 @@ describe("canonical sales adapter", () => {
     };
     request.mockResolvedValue(ledger);
     expect((await salesApi.ledger(condition)).items[0].amountKrw).toBe(-3000);
-    request.mockResolvedValue({ ...ledger, items: [{ ...entry, amountKrw: -4000 }] });
+    request.mockResolvedValue({
+      ...ledger,
+      items: [{ ...entry, amountKrw: -4000 }],
+    });
     await expect(salesApi.ledger(condition)).rejects.toThrow();
     request.mockResolvedValue({
       ...ledger,

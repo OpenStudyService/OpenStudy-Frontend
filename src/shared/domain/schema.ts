@@ -198,6 +198,7 @@ export const schemas = {
   }),
   payments: base.extend({
     canonical: z.custom<components["schemas"]["Payment"]>().optional(),
+    roomPaymentMethod: z.enum(["현금", "카드", "계좌이체", "기타"]).optional(),
     memberId: str,
     productId: z.string(),
     reservationId: z.string(),

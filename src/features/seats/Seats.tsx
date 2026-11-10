@@ -1,7 +1,7 @@
 import { CustomerMergeErrorLink } from "../customers/CustomerMergeErrorLink";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -45,6 +45,11 @@ import type {
 
 const uncertain = (error: Error) =>
   !(error instanceof ApiError) || error.status === 0 || error.status >= 500;
+const OccupancyTrend = lazy(() =>
+  import("./OccupancyTrend").then(({ OccupancyTrend }) => ({
+    default: OccupancyTrend,
+  })),
+);
 
 export function Seats({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp();
@@ -103,6 +108,7 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
     retry: false,
   });
   const detail = params.get("detail") || "";
+  const showTrend = params.get("seatTrend") === "true";
   const update = (key: string, value: string) =>
     setParams((p) => {
       if (value) p.set(key, value);
@@ -181,6 +187,12 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
               </Field>
               <Button onClick={() => void board.refetch()}>
                 현황 새로고침
+              </Button>
+              <Button
+                aria-expanded={showTrend}
+                onClick={() => update("seatTrend", showTrend ? "" : "true")}
+              >
+                좌석 점유 추이
               </Button>
               {canWriteSeats(session.user, branchId) && (
                 <Button
@@ -268,6 +280,16 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
           )
         )}
       </div>
+      {selectedBranch && showTrend && (
+        <Suspense fallback={<State loading />}>
+          <OccupancyTrend
+            key={selectedBranch.id}
+            branchId={selectedBranch.id}
+            branchName={selectedBranch.name}
+            userId={session.user.id}
+          />
+        </Suspense>
+      )}
       {branchId && detail && (
         <SeatPanel
           key={`${branchId}:${detail}`}

@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ApiError } from "../../shared/api/client";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
-import { can } from "../../shared/domain/schema";
+import { admin, can } from "../../shared/domain/schema";
 import {
   formatDateTime,
   formatBusinessDate,
@@ -21,6 +21,13 @@ import type {
   TrendGranularity,
 } from "./sales-api";
 import { SalesChart, SalesTrendChart } from "./Charts";
+import { DailyClosings } from "./DailyClosings";
+import { PassUsage } from "./PassUsage";
+import {
+  AdvancedFilters,
+  AppliedAdvancedFilters,
+  readAdvancedFilters,
+} from "../payments/AdvancedFilters";
 
 type Meta = RevenueSummary["aggregation"];
 type Amounts = RevenueSummary["totals"];
@@ -32,6 +39,9 @@ export function Sales() {
 function SalesWorkspace() {
   const { session, scope } = useApp();
   const [params, setParams] = useSearchParams();
+  const [showClosings, setShowClosings] = useState(false);
+  const [showPassUsage, setShowPassUsage] = useState(false);
+  const advanced = readAdvancedFilters(params);
   const branches = session.branches.filter(
     (b) =>
       (scope === "all" || scope === b.id) &&
@@ -86,6 +96,17 @@ function SalesWorkspace() {
           : {}),
       refundBasis: basis as SalesCondition["refundBasis"],
       ...(purpose ? { purpose: purpose as SalesCondition["purpose"] } : {}),
+      ...(advanced.categoryCode ? { categoryCode: advanced.categoryCode } : {}),
+      ...(advanced.methods.length ? { methods: advanced.methods } : {}),
+      ...(advanced.productKinds.length
+        ? { productKinds: advanced.productKinds }
+        : {}),
+      ...(advanced.operatorIds.length
+        ? { operatorIds: advanced.operatorIds }
+        : {}),
+      ...(advanced.processingBranchIds.length
+        ? { processingBranchIds: advanced.processingBranchIds }
+        : {}),
     };
   } catch (error) {
     invalid =
@@ -221,7 +242,49 @@ function SalesWorkspace() {
           새로고침
         </Button>
       </Heading>
+      <Button
+        aria-expanded={showClosings}
+        onClick={() => setShowClosings(!showClosings)}
+      >
+        일별 마감
+      </Button>
+      {showClosings && (
+        <DailyClosings
+          userId={session.user.id}
+          branches={branches}
+          writable={branches
+            .filter((b) => admin(session.user, b.id))
+            .map((b) => b.id)}
+        />
+      )}
+      <Button
+        aria-expanded={showPassUsage}
+        onClick={() => setShowPassUsage(!showPassUsage)}
+      >
+        이용 지점별 이용권 사용량
+      </Button>
+      {showPassUsage && enabled && (
+        <PassUsage
+          userId={session.user.id}
+          branches={session.branches}
+          condition={condition}
+        />
+      )}
       <section className="card mb-5" aria-label="매출 조회 조건">
+        <AdvancedFilters
+          values={advanced}
+          branches={session.branches.filter((b) => can(session.user, b.id))}
+          change={(key, values) =>
+            setParams((previous) => {
+              const next = new URLSearchParams(previous);
+              next.delete(key);
+              values.forEach((value) => next.append(key, value));
+              next.delete("ledgerPage");
+              next.delete("productPage");
+              return next;
+            })
+          }
+        />
         <div className="filters">
           <label className="field">
             시작일
@@ -901,6 +964,10 @@ function AggregationMeta({
   const c = meta.condition;
   return (
     <div className="help border-t border-line p-5">
+      <AppliedAdvancedFilters values={c} />
+      {meta.conditionNotes.map(({ code, message }) => (
+        <p key={code}>{message}</p>
+      ))}
       <p>
         적용 기간: {formatDateTime(c.from)} 이상 ~ {formatDateTime(c.to)} 미만
         {meta.defaultPeriod ? " · 이번 달 기본 기간" : ""}

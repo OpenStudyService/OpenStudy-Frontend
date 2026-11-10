@@ -31,6 +31,30 @@ afterAll(() => {
 });
 
 type Session = components["schemas"]["SeatSession"];
+
+it("returns zero and unavailable seat occupancy as separate ratio states", async () => {
+  vi.spyOn(store, "now").mockReturnValue("2026-11-10T01:00:00.000Z");
+  store.db.usage = [];
+  const result = await request("/seats/occupancy-trend?branchId=gangnam");
+  expect(result.status).toBe(200);
+  const trend =
+    (await result.json()) as components["schemas"]["SeatOccupancyTrend"];
+  expect(trend.items).toHaveLength(24);
+  expect(trend.items[0].occupancy).toMatchObject({
+    state: "value",
+    percent: 0,
+  });
+  expect(trend.items.at(-1)?.occupancy).toMatchObject({
+    state: "notApplicable",
+    percent: null,
+  });
+  expect(trend.totals.occupancy.state).toBe("value");
+  const daily = await (
+    await request("/seats/occupancy-trend?branchId=gangnam&granularity=day")
+  ).json();
+  expect(daily.items).toHaveLength(1);
+  expect(daily.items[0]).toMatchObject({ label: "2026-11-10", partial: true });
+});
 async function request(
   path: string,
   method = "GET",
