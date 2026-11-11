@@ -95,19 +95,9 @@ export function ContextSummary({ context }: { context?: AiContext | null }) {
   );
 }
 
-export function AppliedConditions({
-  conditions,
-  editable,
-  disabled,
-  onRefine,
-}: {
-  conditions: AiConditions;
-  editable?: AiEditableFilters | null;
-  disabled: boolean;
-  onRefine?: (body: AiRefinement) => Promise<void>;
-}) {
+export function useAiConditionEntries(conditions?: AiConditions | null) {
   const { session, lookups } = useApp();
-  const [editing, setEditing] = useState(false);
+  if (!conditions) return [];
   const productNames = new Map(
     lookups?.products.map(({ id, name }) => [id, name]),
   );
@@ -138,14 +128,33 @@ export function AppliedConditions({
           ? "사용"
           : "사용 안 함",
   };
+  return Object.entries(values).map(
+    ([key, value]) =>
+      [CONDITION_NAMES[key as keyof typeof values], value] as const,
+  );
+}
+
+export function AppliedConditions({
+  conditions,
+  editable,
+  disabled,
+  onRefine,
+}: {
+  conditions: AiConditions;
+  editable?: AiEditableFilters | null;
+  disabled: boolean;
+  onRefine?: (body: AiRefinement) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const entries = useAiConditionEntries(conditions);
   return (
     <div className="grid gap-2">
       <h4 className="text-xs font-semibold">적용 조건</h4>
       <dl className="grid gap-x-5 gap-y-1 text-xs sm:grid-cols-2">
-        {(Object.keys(values) as (keyof typeof values)[]).map((key) => (
-          <div key={key} className="flex flex-wrap gap-x-2">
-            <dt className="text-muted">{CONDITION_NAMES[key]}</dt>
-            <dd>{values[key]}</dd>
+        {entries.map(([label, value]) => (
+          <div key={label} className="flex flex-wrap gap-x-2">
+            <dt className="text-muted">{label}</dt>
+            <dd>{value}</dd>
           </div>
         ))}
       </dl>

@@ -21,6 +21,8 @@ import type {
   TrendGranularity,
 } from "./sales-api";
 import { SalesChart, SalesTrendChart } from "./Charts";
+import { SalesCsvExport } from "./ExportButton";
+import { SalesChartExport } from "./SalesChartExport";
 import { DailyClosings } from "./DailyClosings";
 import { PassUsage } from "./PassUsage";
 import {
@@ -130,14 +132,18 @@ function SalesWorkspace() {
     enabled,
     retry: false,
   });
+  const comparisonOptions = {
+    sort: sort as BranchSort,
+    direction: direction as "asc" | "desc",
+  };
+  const ledgerOptions = {
+    entryType: entryType ? (entryType as "승인" | "환불") : undefined,
+    direction: ledgerDirection as "asc" | "desc",
+  };
   const comparison = useQuery({
     queryKey: [...key, "branches", sort, direction],
     queryFn: ({ signal }) =>
-      salesApi.branches(
-        condition,
-        { sort: sort as BranchSort, direction: direction as "asc" | "desc" },
-        signal,
-      ),
+      salesApi.branches(condition, comparisonOptions, signal),
     enabled,
     retry: false,
   });
@@ -149,8 +155,7 @@ function SalesWorkspace() {
         {
           page,
           pageSize: 20,
-          entryType: entryType ? (entryType as "승인" | "환불") : undefined,
-          direction: ledgerDirection as "asc" | "desc",
+          ...ledgerOptions,
         },
         signal,
       ),
@@ -408,8 +413,13 @@ function SalesWorkspace() {
                 <>
                   <AmountCards amounts={revenue.data.totals} />
                   <section className="card mt-5">
-                    <header className="card-header">
+                    <header className="card-header flex-wrap">
                       <h2>용도별 매출</h2>
+                      <SalesCsvExport
+                        report="revenue"
+                        condition={condition}
+                        total={revenue.data.aggregation.rowCount}
+                      />
                     </header>
                     <AmountsTable
                       rows={revenue.data.byPurpose.map((r) => ({
@@ -428,8 +438,16 @@ function SalesWorkspace() {
             )}
           </section>
           <section className="card mb-5" aria-label="지점별 매출 비교">
-            <header className="card-header">
+            <header className="card-header flex-wrap">
               <h2>지점별 순매출</h2>
+              {comparison.data && !hasBlockingReadError(comparison) && (
+                <SalesCsvExport
+                  report="revenue-branches"
+                  condition={condition}
+                  options={comparisonOptions}
+                  total={comparison.data.aggregation.rowCount}
+                />
+              )}
               <div className="flex flex-wrap gap-2">
                 <label className="field">
                   지점 정렬
@@ -468,15 +486,26 @@ function SalesWorkspace() {
                 <>
                   {comparison.data.aggregation.dataStatus === "hasData" && (
                     <div className="p-5">
-                      <SalesChart
-                        rows={comparison.data.items.slice(0, 20).map((r) => ({
-                          branchId: r.branchId,
-                          branch: r.branchName,
-                          approved: r.approvedAmountKrw,
-                          refunds: r.refundAmountKrw,
-                          net: r.netAmountKrw,
-                        }))}
-                      />
+                      <SalesChartExport
+                        title="지점별 순매출"
+                        unit="원"
+                        meta={comparison.data.aggregation}
+                        branches={session.branches}
+                        order={branchChartOrder(
+                          comparisonOptions.sort,
+                          comparisonOptions.direction,
+                        )}
+                      >
+                        <SalesChart
+                          rows={comparison.data.items.slice(0, 20).map((r) => ({
+                            branchId: r.branchId,
+                            branch: r.branchName,
+                            approved: r.approvedAmountKrw,
+                            refunds: r.refundAmountKrw,
+                            net: r.netAmountKrw,
+                          }))}
+                        />
+                      </SalesChartExport>
                       {comparison.data.items.length > 20 && (
                         <p className="help">
                           차트는 정렬 순서의 첫 20개 지점입니다. 전체 지점은
@@ -505,7 +534,16 @@ function SalesWorkspace() {
           </section>
           {passApplicable ? (
             <>
-              <SalesSection title="이용권 판매량" read={volume}>
+              <SalesSection
+                title="이용권 판매량"
+                read={volume}
+                exportAction={() => (
+                  <SalesCsvExport
+                    report="passes-volume"
+                    condition={condition}
+                  />
+                )}
+              >
                 {({ totals, aggregation }) => (
                   <>
                     <MetricCards
@@ -525,7 +563,17 @@ function SalesWorkspace() {
                   </>
                 )}
               </SalesSection>
-              <SalesSection title="상품 판매 순위" read={products}>
+              <SalesSection
+                title="상품 판매 순위"
+                read={products}
+                exportAction={(data) => (
+                  <SalesCsvExport
+                    report="passes-products"
+                    condition={condition}
+                    total={data.meta.total}
+                  />
+                )}
+              >
                 {({ items, meta, aggregation }) => (
                   <>
                     {items.length ? (
@@ -635,21 +683,53 @@ function SalesWorkspace() {
               <option value="month">월별</option>
             </select>
           </label>
-          <SalesSection title="매출 추세" read={trend}>
+          <SalesSection
+            title="매출 추세"
+            read={trend}
+            exportAction={(data) => (
+              <SalesCsvExport
+                report="trend"
+                title="매출 추세"
+                condition={condition}
+                options={{ measure: "revenue", granularity }}
+                total={data.aggregation.rowCount}
+              />
+            )}
+          >
             {(data) => (
               <TrendResults trend={data} branches={session.branches} />
             )}
           </SalesSection>
           {passApplicable && (
-            <SalesSection title="이용권 판매량 추세" read={passTrend}>
+            <SalesSection
+              title="이용권 판매량 추세"
+              read={passTrend}
+              exportAction={(data) => (
+                <SalesCsvExport
+                  report="trend"
+                  title="이용권 판매량 추세"
+                  condition={condition}
+                  options={{ measure: "passes", granularity }}
+                  total={data.aggregation.rowCount}
+                />
+              )}
+            >
               {(data) => (
                 <TrendResults trend={data} branches={session.branches} />
               )}
             </SalesSection>
           )}
           <section className="card mb-5" aria-label="매출 최소 원장">
-            <header className="card-header">
+            <header className="card-header flex-wrap">
               <h2>최소 원장</h2>
+              {ledger.data && !hasBlockingReadError(ledger) && (
+                <SalesCsvExport
+                  report="ledger"
+                  condition={condition}
+                  options={ledgerOptions}
+                  total={ledger.data.meta.total}
+                />
+              )}
               <div className="flex flex-wrap gap-2">
                 <label className="field">
                   원장 항목
@@ -800,6 +880,7 @@ function SalesSection<T>({
   title,
   read,
   children,
+  exportAction,
 }: {
   title: string;
   read: {
@@ -809,11 +890,13 @@ function SalesSection<T>({
     refetch: () => Promise<unknown>;
   };
   children: (data: T) => ReactNode;
+  exportAction: (data: T) => ReactNode;
 }) {
   return (
     <section className="card mb-5" aria-label={title}>
-      <header className="card-header">
+      <header className="card-header flex-wrap">
         <h2>{title}</h2>
+        {read.data && !hasBlockingReadError(read) && exportAction(read.data)}
       </header>
       {read.isPending ? (
         <State loading />
@@ -825,6 +908,19 @@ function SalesSection<T>({
     </section>
   );
 }
+function branchChartOrder(sort: BranchSort, direction: "asc" | "desc") {
+  const label = {
+    netAmount: "순매출",
+    approvedAmount: "승인액",
+    refundAmount: "환불액",
+    branchId: "지점 번호",
+    requested: "선택 순서",
+  }[sort];
+  return sort === "requested"
+    ? label
+    : `${label} ${direction === "asc" ? "오름차순" : "내림차순"}`;
+}
+
 function TrendResults({
   trend,
   branches,
@@ -849,7 +945,14 @@ function TrendResults({
         <State title="조회 조건에 맞는 추세 데이터가 없어요" />
       ) : (
         <div className="p-5">
-          <SalesTrendChart rows={rows} label={label} format={format} />
+          <SalesChartExport
+            title={revenue ? "매출 추세" : "이용권 판매량 추세"}
+            unit={revenue ? "원" : "개"}
+            meta={trend.aggregation}
+            branches={branches}
+          >
+            <SalesTrendChart rows={rows} label={label} format={format} />
+          </SalesChartExport>
         </div>
       )}
       <div className="data-scroll max-h-80" tabIndex={0}>

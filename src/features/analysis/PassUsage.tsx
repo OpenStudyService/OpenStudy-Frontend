@@ -10,7 +10,8 @@ import {
 } from "../../shared/domain/format";
 import { ErrorState, State } from "../../shared/ui/primitives";
 import { AppliedAdvancedFilters } from "../payments/AdvancedFilters";
-import type { SalesCondition } from "./sales-api";
+import { passUsageCondition, type SalesCondition } from "./sales-api";
+import { SalesCsvExport } from "./ExportButton";
 
 type Schemas = components["schemas"];
 export function PassUsage({
@@ -22,8 +23,7 @@ export function PassUsage({
   branches: { id: string; name: string }[];
   condition: SalesCondition;
 }) {
-  const { branchIds, from, to, productKinds, categoryCode } = condition;
-  const filters = { branchIds, from, to, productKinds, categoryCode };
+  const filters = passUsageCondition(condition);
   const read = useQuery({
     queryKey: ["data", userId, "sales", "pass-usage", filters],
     queryFn: ({ signal }) =>
@@ -51,7 +51,17 @@ export function PassUsage({
   }
   return (
     <section className="card p-5 mb-5" aria-label="이용 지점별 이용권 사용량">
-      <h2>이용 지점별 이용권 사용량</h2>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2>이용 지점별 이용권 사용량</h2>
+        <SalesCsvExport
+          report="passes-usage"
+          condition={condition}
+          total={items.reduce(
+            (total, item) => total + item.bySaleBranch.length,
+            0,
+          )}
+        />
+      </div>
       <p className="help">
         이용 지점 {aggregation.condition.branchIds.map(branchName).join(", ")} ·{" "}
         {formatDateTime(aggregation.condition.from)} ~{" "}

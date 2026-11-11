@@ -115,6 +115,42 @@ it("matches payment summary to the approved revenue card for the same approval w
   );
 });
 
+it("returns the first 1,000 ordered ledger rows with a BOM and truncation metadata", async () => {
+  store.db.payments = [];
+  await purchase();
+  const payment = store.db.payments[0];
+  store.db.payments = Array.from({ length: 1_001 }, (_, index) => ({
+    ...payment,
+    id: `bulk-${String(index).padStart(4, "0")}`,
+  }));
+  const path = `/sales/exports/ledger?${query}&direction=asc`;
+  const response = await request(path);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Content-Type")).toBe("text/csv; charset=UTF-8");
+  expect(response.headers.get("Content-Disposition")).toMatch(
+    /filename\*=UTF-8''/,
+  );
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  const text = new TextDecoder().decode(bytes);
+  expect(text).toContain('행 수,"1,000 / 전체 1,001"');
+  expect(text).toContain('잘림,"예 (최대 1,000행)"');
+  const rows = text.trimEnd().split("\r\n\r\n")[1].split("\r\n").slice(1);
+  expect(rows).toHaveLength(1_000);
+  expect(rows[0]).toContain("bulk-0000");
+  expect(rows.at(-1)).toContain("bulk-0999");
+
+  for (const field of ["page", "pageSize"]) {
+    expect((await request(`${path}&${field}=1`)).status).toBe(422);
+  }
+  const unknown = await request("/sales/exports/not-a-report");
+  expect(unknown.status).toBe(404);
+  expect(await unknown.json()).toMatchObject({ code: "EXPORT_REPORT_UNKNOWN" });
+  store.scenario = "forbidden";
+  expect((await request(path)).status).toBe(403);
+});
+
 it("replays a closing key and records later refunds in closing detail", async () => {
   store.db.payments = [];
   vi.mocked(store.now).mockReturnValue("2026-11-09T03:00:00.000Z");
