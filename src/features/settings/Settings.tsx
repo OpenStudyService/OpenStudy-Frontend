@@ -8,6 +8,7 @@ import { admin } from "../../shared/domain/schema";
 import { useUi } from "../../app/store";
 import { ThemePicker } from "../auth/Login";
 import { Button, FieldError, Heading } from "../../shared/ui/primitives";
+import { PasswordForm } from "../auth/PasswordForm";
 import { ProfileForm } from "./ProfileForm";
 import { ResourceGroup } from "../records/ResourcePage";
 import { BranchManagement } from "../organization/Organization";
@@ -71,6 +72,28 @@ export function Settings() {
           </div>
         </section>
         <ProfileForm key={session.user.id} />
+        <section className="card mb-5">
+          <header className="card-header">
+            <h2>비밀번호 변경</h2>
+          </header>
+          <div className="max-w-lg p-5">
+            <PasswordForm
+              key={session.user.id}
+              change
+              submit={async (newPassword, currentPassword) => {
+                await api("/me/password", {
+                  method: "POST",
+                  body: { currentPassword, newPassword },
+                });
+                useUi
+                  .getState()
+                  .toast(
+                    "비밀번호를 변경했어요. 다른 기기에서는 다시 로그인해 주세요.",
+                  );
+              }}
+            />
+          </div>
+        </section>
         <section className="card mb-5 p-5">
           <h2>알림 범위</h2>
           <p className="help mt-3">

@@ -59,7 +59,10 @@ export function Login() {
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
   });
-  if (session.data)
+  const passwordResetComplete =
+    (location.state as { passwordResetComplete?: boolean } | null)
+      ?.passwordResetComplete === true;
+  if (session.data && !passwordResetComplete)
     return (
       <Navigate
         to={
@@ -166,6 +169,11 @@ export function Login() {
             <br />
             직원 계정으로 로그인해 주세요.
           </p>
+          {passwordResetComplete && (
+            <p className="help mb-4" role="status">
+              비밀번호를 재설정했어요. 새 비밀번호로 로그인해 주세요.
+            </p>
+          )}
           <form
             className="form-grid"
             onSubmit={form.handleSubmit(login)}

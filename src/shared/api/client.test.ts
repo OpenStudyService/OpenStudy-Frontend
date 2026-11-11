@@ -194,3 +194,20 @@ it("aborts concurrent private requests on 401, including callers without a signa
   await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   await expect(api("/lookups?scope=new")).resolves.toEqual({ ok: true });
 });
+
+it("lets the browser set the multipart boundary and attaches CSRF", async () => {
+  const file = new File(["photo"], "photo.png", { type: "image/png" });
+  const body = new FormData();
+  body.append("file", file);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ token: "csrf-token" }))
+    .mockResolvedValueOnce(Response.json({}));
+  vi.stubGlobal("fetch", fetchMock);
+  await api("/me/avatar", { method: "PUT", body });
+  const [, request] = fetchMock.mock.calls[1];
+  expect(request.body).toBe(body);
+  const headers = new Headers(request.headers);
+  expect(headers.get("Content-Type")).toBeNull();
+  expect(headers.get("X-CSRF-Token")).toBe("csrf-token");
+});

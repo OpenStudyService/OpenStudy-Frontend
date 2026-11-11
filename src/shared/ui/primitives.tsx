@@ -22,7 +22,25 @@ export function Badge({ children }: { children: ReactNode }) {
         : "neutral";
   return <span className={`badge ${tone}`}>{children}</span>;
 }
-export function Avatar({ name, size = "" }: { name: string; size?: string }) {
+export function Avatar({
+  name,
+  size = "",
+  src,
+}: {
+  name: string;
+  size?: string;
+  src?: string;
+}) {
+  const [failed, setFailed] = useState<string>();
+  if (src && src !== failed)
+    return (
+      <img
+        className={`avatar object-cover ${size}`}
+        src={src}
+        alt={`${name} 프로필`}
+        onError={() => setFailed(src)}
+      />
+    );
   return (
     <span className={`avatar ${size}`} aria-hidden="true">
       {name?.slice(0, 1) || "나"}

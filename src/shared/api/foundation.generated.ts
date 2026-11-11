@@ -3451,6 +3451,190 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/me/password": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 본인 비밀번호 변경
+     * @description 기존 비밀번호를 확인하고 바꾼다. 현재 세션은 유지하고 같은 직원의 다른 세션을 모두 지운다(M14-D02). 기존 비밀번호 불일치는 로그인 계정 기준 제한에 집계한다. 계정 version은 바꾸지 않는다. 비밀번호·해시·토큰·세션 ID·CSRF 토큰은 응답·감사·로그에 남기지 않는다.
+     */
+    post: operations["changeMyPassword"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/employees/{id}/password-reset": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 관리자 비밀번호 초기화(재설정 링크 발송)
+     * @description 기존 비밀번호를 즉시 무효로 하고(M14-D11), 대상의 모든 세션을 지우고(M14-D02), 이전 재설정 토큰을 무효로 한 뒤 발송 작업을 예약한다. 토큰은 claim 때 만들고 해시만 저장하며 1시간 뒤 만료된다(M14-D05). 지점 권한·소속·상태·version은 바꾸지 않는다. 비밀번호·해시·토큰·세션 ID·CSRF 토큰은 응답·감사·로그에 남기지 않는다.
+     */
+    post: operations["requestPasswordReset"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/password-resets/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 재설정 링크 확인
+     * @description 토큰은 링크의 fragment에서 읽어 본문으로 보낸다. 틀림·만료·사용됨·대체됨은 같은 422 PASSWORD_RESET_LINK_INVALID다. 로그인과 같은 접속 출처 기준 제한을 적용한다.
+     */
+    post: operations["previewPasswordReset"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/password-resets/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 재설정 링크로 새 비밀번호 설정
+     * @description 토큰을 잠금 후 다시 검증하고, 비밀번호를 바꾸고, 토큰을 소비하고, 대상의 로그인 계정 기준 제한 기록을 지운다. 세션은 발급하지 않으며 요청자의 세션도 바꾸지 않는다. 대상이 활성이 아니면 422 PASSWORD_RESET_LINK_INVALID다. 비밀번호·해시·토큰·세션 ID·CSRF 토큰은 응답·감사·로그에 남기지 않는다.
+     */
+    post: operations["completePasswordReset"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/employees/{id}/login-unlock": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 로그인 잠금 해제
+     * @description 대상 이메일의 로그인 계정 기준 제한 기록을 지운다(M14-D06). 접속 출처 기준은 지우지 않는다. 대상 상태는 보지 않는다. 제한기는 인스턴스 메모리라 다중 인스턴스에서는 요청을 받은 인스턴스만 반영된다.
+     */
+    post: operations["unlockEmployeeLogin"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/avatar": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * 본인 프로필 사진 업로드·교체
+     * @description multipart/form-data의 file 하나. 5MB 초과는 AVATAR_TOO_LARGE, 시그니처가 JPG·PNG·WebP가 아니면 AVATAR_TYPE_UNSUPPORTED다(M14-D10). 새 키로 저장하고 이전 파일은 커밋 뒤 지운다. 계정 version을 1 올리며 요청에 version을 받지 않는다. 응답 user.avatar는 새 앱 경유 경로다.
+     */
+    put: operations["uploadMyAvatar"];
+    post?: never;
+    /**
+     * 본인 프로필 사진 삭제
+     * @description 사진이 없어도 200이다. 계정 version을 1 올린다. 파일은 커밋 뒤 지운다.
+     */
+    delete: operations["deleteMyAvatar"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/employees/{id}/avatar": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 프로필 사진 조회(앱 경유)
+     * @description 저장한 바이트를 그대로 돌려준다. 볼 수 없거나 사진이 없거나 대상이 없으면 모두 404다. Cache-Control: private, max-age=86400, X-Content-Type-Options: nosniff. 서명 URL은 쓰지 않는다(M14-D13).
+     */
+    get: operations["getEmployeeAvatar"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/audit-events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 감사 로그 검색
+     * @description OWNER 전용(M14-D04). 기간이 없으면 최근 7일, 92일 초과는 422 PERIOD_TOO_LONG이다(M14-D12). 표에 없는 query와 entityType 없는 entityId는 422다. 최신순. 목록에는 전후 값이 없다.
+     */
+    get: operations["searchAuditEvents"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/audit-events/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 감사 로그 상세
+     * @description 전후 값·작업자·시각·요청 ID. 전후 값은 조회 시 한 번 더 가린다. 같은 요청의 다른 기록은 GET /audit-events?requestId=로 찾는다.
+     */
+    get: operations["getAuditEvent"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3599,6 +3783,7 @@ export interface components {
       /** @enum {string} */
       status: "활성" | "승인 대기" | "이용 제한" | "비활성";
       nickname: string;
+      /** @description 앱 경유 조회 경로 /api/employees/{id}/avatar?v=<사진 식별자>. 사진이 없으면 빈 문자열. 저장소 키는 담지 않는다(M14-D13). */
       avatar: string;
       owner: boolean;
       memberships: components["schemas"]["Membership"][];
@@ -4087,6 +4272,7 @@ export interface components {
       /** @enum {string} */
       status: "활성" | "승인 대기" | "이용 제한" | "비활성";
       nickname: string;
+      /** @description 앱 경유 조회 경로 /api/employees/{id}/avatar?v=<사진 식별자>. 사진이 없으면 빈 문자열. 저장소 키는 담지 않는다(M14-D13). */
       avatar: string;
       owner: boolean;
       memberships: components["schemas"]["SessionMembership"][];
@@ -7193,6 +7379,105 @@ export interface components {
       };
       items: components["schemas"]["SeatOccupancyBucket"][];
     };
+    PasswordChange: {
+      /** @description UTF-8 72바이트 이하. */
+      currentPassword: string;
+      /** @description 8자 이상, UTF-8 72바이트 이하. 공백을 제거하지 않는다. */
+      newPassword: string;
+    };
+    /** @description 재설정 링크·토큰은 담지 않는다. */
+    PasswordResetRequested: {
+      employeeId: components["schemas"]["Id"];
+      /** Format: date-time */
+      requestedAt: string;
+      /**
+       * @description 발송 작업을 예약했다는 뜻이다. 발송 결과는 이 응답으로 알 수 없다.
+       * @enum {string}
+       */
+      delivery: "PENDING";
+    };
+    PasswordResetPreviewRequest: {
+      token: string;
+    };
+    PasswordResetPreview: {
+      /** Format: date-time */
+      expiresAt: string;
+      /** @description 이메일 앞 두 글자와 도메인만. 예: ab***@example.com */
+      emailHint: string;
+    };
+    PasswordResetComplete: {
+      token: string;
+      /** @description 8자 이상, UTF-8 72바이트 이하. 공백을 제거하지 않는다. */
+      newPassword: string;
+    };
+    LoginUnlockResult: {
+      employeeId: components["schemas"]["Id"];
+      /** @description 해제 시점에 이 인스턴스에 계정 기준 제한 기록이 있었는지. */
+      wasLocked: boolean;
+    };
+    AvatarUpload: {
+      /**
+       * Format: binary
+       * @description JPG·PNG·WebP, 5,242,880바이트 이하. 형식은 파일 시그니처로 판별한다(M14-D10).
+       */
+      file: string;
+    };
+    AuditEventRef: {
+      id: components["schemas"]["Id"];
+      name: string;
+    };
+    AuditEventListItem: {
+      id: components["schemas"]["Id"];
+      /** Format: date-time */
+      occurredAt: string;
+      action: string;
+      /** @enum {string} */
+      result: "SUCCESS" | "DENIED" | "FAILED";
+      entityType: string;
+      entityId: components["schemas"]["Id"] | null;
+      reason: string | null;
+      requestId: string | null;
+      actor: components["schemas"]["AuditEventRef"] | null;
+      branch: components["schemas"]["AuditEventRef"] | null;
+      /** @description before 또는 after가 있는지. */
+      hasChanges: boolean;
+    };
+    AuditEventDetail: {
+      id: components["schemas"]["Id"];
+      /** Format: date-time */
+      occurredAt: string;
+      action: string;
+      /** @enum {string} */
+      result: "SUCCESS" | "DENIED" | "FAILED";
+      entityType: string;
+      entityId: components["schemas"]["Id"] | null;
+      reason: string | null;
+      requestId: string | null;
+      actor: components["schemas"]["AuditEventRef"] | null;
+      branch: components["schemas"]["AuditEventRef"] | null;
+      /** @description before 또는 after가 있는지. */
+      hasChanges: boolean;
+      /** @description 조회 시 다시 가린 전후 값. 키 이름에 password·token·secret·hash·csrf·session·credential이 들어가면 "***", phone·contact가 들어간 문자열은 끝 네 자리만 남긴다. */
+      before: {
+        [key: string]: unknown;
+      } | null;
+      /** @description 조회 시 다시 가린 전후 값. 키 이름에 password·token·secret·hash·csrf·session·credential이 들어가면 "***", phone·contact가 들어간 문자열은 끝 네 자리만 남긴다. */
+      after: {
+        [key: string]: unknown;
+      } | null;
+    };
+    /** @description 적용한 기간(Asia/Seoul, 양 끝 포함). */
+    AuditPeriod: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+    };
+    AuditEventPage: {
+      items: components["schemas"]["AuditEventListItem"][];
+      meta: components["schemas"]["PageMeta"];
+      period: components["schemas"]["AuditPeriod"];
+    };
   };
   responses: {
     /** @description 유효한 세션/자격증명 없음 */
@@ -7309,6 +7594,10 @@ export interface components {
     ClosureFrom: string;
     /** @description 종료 날짜(포함, Asia/Seoul). 기간은 최대 366일이고 넘으면 422 PERIOD_TOO_LONG. */
     ClosureTo: string;
+    /** @description 시작 날짜(Asia/Seoul, 포함). 생략 규칙은 account-collab-api.md 기간 규칙(M14-D12). */
+    AuditFrom: string;
+    /** @description 끝 날짜(Asia/Seoul, 포함). 기간은 92일 이하. */
+    AuditTo: string;
   };
   requestBodies: never;
   headers: never;
@@ -15741,6 +16030,375 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SeatOccupancyTrend"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  changeMyPassword: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PasswordChange"];
+      };
+    };
+    responses: {
+      /** @description 변경됨. 본문 없음. */
+      204: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  requestPasswordReset: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 발송 작업을 예약했다. */
+      202: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PasswordResetRequested"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  previewPasswordReset: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PasswordResetPreviewRequest"];
+      };
+    };
+    responses: {
+      /** @description 유효한 링크. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PasswordResetPreview"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  completePasswordReset: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PasswordResetComplete"];
+      };
+    };
+    responses: {
+      /** @description 설정됨. 본문 없음. */
+      204: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  unlockEmployeeLogin: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 해제함. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoginUnlockResult"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  uploadMyAvatar: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["AvatarUpload"];
+      };
+    };
+    responses: {
+      /** @description 저장됨. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CurrentUser"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  deleteMyAvatar: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 삭제됨. user.avatar는 빈 문자열. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CurrentUser"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getEmployeeAvatar: {
+    parameters: {
+      query?: {
+        /** @description 캐시 구분용 사진 식별자. 서버는 판정에 쓰지 않는다. */
+        v?: string;
+      };
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 사진 파일. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description private, max-age=86400 */
+          "Cache-Control"?: string;
+          /** @description nosniff */
+          "X-Content-Type-Options"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "image/jpeg": string;
+          "image/png": string;
+          "image/webp": string;
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  searchAuditEvents: {
+    parameters: {
+      query?: {
+        /** @description 시작 날짜(Asia/Seoul, 포함). 생략 규칙은 account-collab-api.md 기간 규칙(M14-D12). */
+        from?: components["parameters"]["AuditFrom"];
+        /** @description 끝 날짜(Asia/Seoul, 포함). 기간은 92일 이하. */
+        to?: components["parameters"]["AuditTo"];
+        /** @description 대상 유형. 정확히 일치. */
+        entityType?: string;
+        /** @description 대상 ID. entityType과 함께만. */
+        entityId?: components["schemas"]["Id"];
+        /** @description 행위. 정확히 일치. */
+        action?: string;
+        /** @description 작업자. */
+        actorEmployeeId?: components["schemas"]["Id"];
+        /** @description 지점. */
+        branchId?: components["schemas"]["Id"];
+        /** @description 결과. */
+        result?: "SUCCESS" | "DENIED" | "FAILED";
+        /** @description 같은 요청의 기록. */
+        requestId?: string;
+        page?: components["parameters"]["Page"];
+        pageSize?: components["parameters"]["PageSize"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 검색 결과. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AuditEventPage"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  getAuditEvent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["schemas"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 상세. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AuditEventDetail"];
         };
       };
       401: components["responses"]["Error401"];

@@ -5,6 +5,7 @@ import {
   useRouteError,
 } from "react-router";
 import { UnsavedChangesBoundary } from "../shared/ui/leaveGuard";
+import { PasswordReset } from "../features/auth/PasswordReset";
 import { Layout } from "./Layout";
 import { Home } from "../features/home/Home";
 import {
@@ -43,6 +44,11 @@ export const router = createBrowserRouter([
   {
     path: "/invitations/accept",
     element: <InvitationAccept />,
+    errorElement: <RouteError />,
+  },
+  {
+    path: "/password-reset",
+    element: <PasswordReset />,
     errorElement: <RouteError />,
   },
   {

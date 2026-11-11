@@ -1,3 +1,14 @@
+import {
+  changePassword,
+  completePasswordReset,
+  deleteAvatar,
+  mockLoginAllowed,
+  previewPasswordReset,
+  readAvatar,
+  requestPasswordReset,
+  unlockLogin,
+  uploadAvatar,
+} from "./account-security";
 import { homeSummary } from "./home";
 import { salesHandlers } from "./sales";
 import { dailyClosingHandlers } from "./daily-closings";
@@ -349,6 +360,19 @@ function ownAiConversation(id: string) {
   );
   return c!;
 }
+function publicReset(run: (body: Record<string, unknown>) => unknown) {
+  return response(async (a) => {
+    assert(
+      a.request.headers.get("X-CSRF-Token") === csrf,
+      "CSRF 토큰이 올바르지 않습니다.",
+      403,
+      "CSRF_INVALID",
+    );
+    await scenario();
+    return run(await json(a));
+  }, false);
+}
+
 export const handlers = [
   // Match before generic resource handlers so demo follows the disabled server routes.
   http.all(
@@ -365,6 +389,41 @@ export const handlers = [
   ...customerHistoryHandlers,
   ...collaborationHandlers,
   ...invitationHandlers,
+  http.post(
+    "/api/me/password",
+    response(async (a) => changePassword(await json(a))),
+  ),
+  http.post(
+    "/api/employees/:id/password-reset",
+    response((a) => requestPasswordReset(String(a.params.id))),
+  ),
+  http.post(
+    "/api/employees/:id/login-unlock",
+    response((a) => unlockLogin(String(a.params.id))),
+  ),
+  http.post("/api/password-resets/preview", publicReset(previewPasswordReset)),
+  http.post(
+    "/api/password-resets/complete",
+    publicReset(completePasswordReset),
+  ),
+  http.put(
+    "/api/me/avatar",
+    response(async ({ request }) => {
+      await uploadAvatar(request);
+      return current();
+    }),
+  ),
+  http.delete(
+    "/api/me/avatar",
+    response(() => {
+      deleteAvatar();
+      return current();
+    }),
+  ),
+  http.get(
+    "/api/employees/:id/avatar",
+    response((a) => readAvatar(String(a.params.id))),
+  ),
   ...organizationHandlers,
   ...productHandlers,
   ...customerHandlers,
@@ -396,6 +455,12 @@ export const handlers = [
       const user = store.db.employees.find((e) => e.email === email);
       assert(
         user,
+        "이메일 또는 비밀번호를 확인해 주세요.",
+        401,
+        "INVALID_CREDENTIALS",
+      );
+      assert(
+        mockLoginAllowed(user.id, p.password),
         "이메일 또는 비밀번호를 확인해 주세요.",
         401,
         "INVALID_CREDENTIALS",
