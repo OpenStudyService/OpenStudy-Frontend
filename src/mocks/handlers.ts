@@ -9,6 +9,7 @@ import {
   unlockLogin,
   uploadAvatar,
 } from "./account-security";
+import { getAuditEvent, searchAuditEvents } from "./audit";
 import { homeSummary } from "./home";
 import { salesHandlers } from "./sales";
 import { dailyClosingHandlers } from "./daily-closings";
@@ -378,6 +379,22 @@ export const handlers = [
   http.all(
     /\/api\/(?:channels|chat)(?:\/|$)/,
     () => new HttpResponse(null, { status: 404 }),
+  ),
+  http.get(
+    "/api/audit-events",
+    response(({ request }) =>
+      HttpResponse.json(searchAuditEvents(request), {
+        headers: { "Cache-Control": "no-store" },
+      }),
+    ),
+  ),
+  http.get(
+    "/api/audit-events/:id",
+    response(({ params }) =>
+      HttpResponse.json(getAuditEvent(String(params.id)), {
+        headers: { "Cache-Control": "no-store" },
+      }),
+    ),
   ),
   ...salesHandlers,
   ...dailyClosingHandlers,

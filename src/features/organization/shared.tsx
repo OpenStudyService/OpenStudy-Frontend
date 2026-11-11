@@ -134,10 +134,12 @@ export function useListSearch(prefix: string) {
 }
 export function Pager({
   page,
+  pageSize = 20,
   total,
   onChange,
 }: {
   page: number;
+  pageSize?: number;
   total: number;
   onChange: (n: number) => void;
 }) {
@@ -155,7 +157,7 @@ export function Pager({
       </span>
       <Button
         type="button"
-        disabled={page * 20 >= total}
+        disabled={page * pageSize >= total}
         onClick={() => onChange(page + 1)}
       >
         다음
