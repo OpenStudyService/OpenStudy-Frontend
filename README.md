@@ -35,7 +35,7 @@ npm run dev
 | `npm run api:foundation`   | 인접 `openstudy-backend`의 정본 foundation OpenAPI에서 기반 API 타입 생성 |
 | `npm run api:generate`     | Zod·폼 정의 → OpenAPI → TypeScript 타입 재생성                            |
 
-두 모드는 로그인과 앱 상단에 **실제 API 연결** / **데모 데이터**로 구분합니다. `--mode`와 `VITE_API_MODE`가 서로 다르면 빌드를 거부합니다. live 결과에는 MSW 워커와 소스맵을 만들지 않으며, 청크의 모듈 출처를 담은 `build-provenance.json`과 모든 산출물 내용을 검사합니다. 정식 API의 **Mock 결제·실제 금전 이동 없음** 안내와 `mockOutcome`은 live에서도 유지합니다.
+로그인 화면에는 데모 모드일 때 **데모 데이터**를 표시합니다. 앱 상단에는 **실제 API 연결** / **데모 데이터**로 두 모드를 구분합니다. `--mode`와 `VITE_API_MODE`가 서로 다르면 빌드를 거부합니다. live 결과에는 MSW 워커와 소스맵을 만들지 않으며, 청크의 모듈 출처를 담은 `build-provenance.json`과 모든 산출물 내용을 검사합니다. 정식 API의 **Mock 결제·실제 금전 이동 없음** 안내와 `mockOutcome`은 live에서도 유지합니다.
 
 데모 빌드는 `npm run preview -- --outDir dist-demo`로 미리 봅니다. `test:builds`의 HTTP 응답 fixture 검증은 실제 Backend·DB 연동 검증과 구분합니다.
 

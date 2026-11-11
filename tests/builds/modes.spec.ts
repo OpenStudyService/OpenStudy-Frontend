@@ -156,7 +156,7 @@ test("live build surfaces real API failures without activating MSW or demo login
   await expect(
     page.getByRole("button", { name: "사장님으로 체험" }),
   ).toHaveCount(0);
-  await expect(page.getByText("실제 API 연결", { exact: true })).toBeVisible();
+  await expect(page.getByText("실제 API 연결", { exact: true })).toHaveCount(0);
   await expectNoMockRuntime(page, loaded);
 });
 
@@ -348,7 +348,7 @@ self.addEventListener("fetch", (event) => {
     ).toHaveCount(0);
     await expect(
       page.getByText("실제 API 연결", { exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     expect(
       await page.evaluate(() => navigator.serviceWorker.controller),
     ).toBeNull();
