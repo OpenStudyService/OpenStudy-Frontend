@@ -1347,7 +1347,12 @@ export function ResourceGroup({
 }: {
   title: string;
   description: string;
-  tabs: { resource: Resource; label: string; admin?: boolean }[];
+  tabs: {
+    resource: Resource;
+    label: string;
+    admin?: boolean;
+    content?: ReactNode;
+  }[];
   intro?: ReactNode;
 }) {
   const { session, scope } = useApp(),
@@ -1396,11 +1401,13 @@ export function ResourceGroup({
           ))}
         </Tabs.List>
         <Tabs.Content value={selected.resource}>
-          <ResourcePage
-            key={selected.resource}
-            resource={selected.resource}
-            embedded
-          />
+          {selected.content ?? (
+            <ResourcePage
+              key={selected.resource}
+              resource={selected.resource}
+              embedded
+            />
+          )}
         </Tabs.Content>
       </Tabs.Root>
     </div>

@@ -2760,7 +2760,7 @@ export interface paths {
     };
     /**
      * AI 실행 다시 조회
-     * @description 저장된 실행을 원래 지점 범위로, 현재 권한을 다시 확인해 다시 실행한다. 결과는 저장본이 아니다(M10-D12). 권한이 없어졌으면 403, 실행된 질문이 아니면 422 NOT_EXECUTABLE, 카탈로그에서 빠진 분석은 422 ANALYSIS_UNAVAILABLE.
+     * @description 저장된 실행을 원래 지점 범위로, 현재 권한을 다시 확인해 다시 실행한다. 결과는 저장본이 아니다(M10-D12). 권한이 없어졌으면 403, 실행된 질문이 아니면 422 NOT_EXECUTABLE, 카탈로그에서 빠진 분석은 422 ANALYSIS_UNAVAILABLE. 페이지·정렬·상세: 요청마다 저장된 조건을 현재 권한·상한으로 다시 실행한다. 모델을 부르지 않고 세션·시간 제한은 없다(M15-D04, 2026-11-11 변경). query가 하나도 없으면 결과 전체를 그대로 돌려준다(#125).
      */
     get: operations["getAiExecution"];
     put?: never;
@@ -3627,6 +3627,86 @@ export interface paths {
      * @description 전후 값·작업자·시각·요청 ID. 전후 값은 조회 시 한 번 더 가린다. 같은 요청의 다른 기록은 GET /audit-events?requestId=로 찾는다.
      */
     get: operations["getAuditEvent"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/executions/{executionId}/refinements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * 해석 필터 수정 재실행
+     * @description 기간·지점·상품만 바꿔 같은 등록 분석을 다시 실행하고 같은 대화에 새 실행(origin REFINEMENT)으로 남긴다. 모델을 호출하지 않는다. 고칠 수 있는 조건은 분석마다 다르다(editableFilters). 권한 밖 지점의 이름·수치는 응답에 담지 않는다.
+     */
+    post: operations["refineAiExecution"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/recent-queries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 최근 질의
+     * @description 본인 질문 중 30일 안의 최신 20건(질문 시각 내림차순). 지운 대화와 필터 수정 실행은 빠진다. 재실행은 executionId로 GET /ai/executions/{executionId}를 부르며 현재 권한으로 다시 검증한다. query는 받지 않는다.
+     */
+    get: operations["listAiRecentQueries"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ai/executions/{executionId}/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 자연어 분석 결과 CSV 내보내기
+     * @description 저장된 조건을 현재 권한으로 다시 실행해 CSV로 내려준다. 승인 절차 없이 감사(entity_type ai-execution, action EXPORTED)에 남긴다(M15-D09). 형식은 analysis-reuse-api.md "CSV 내보내기".
+     */
+    get: operations["exportAiExecution"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sales/exports/{report}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * 정형 집계 CSV 내보내기
+     * @description report에 해당하는 화면 API(GET /sales/revenue 등)와 같은 query·권한·검증으로 계산해 CSV로 내려준다. 페이지 query는 받지 않는다. 승인 절차 없이 감사(entity_type sales-report, action EXPORTED)에 남긴다(M15-D09).
+     */
+    get: operations["exportSalesReport"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6483,6 +6563,10 @@ export interface components {
       /** Format: date-time */
       askedAt: string;
       response: components["schemas"]["AiQueryResponse"];
+      /** @enum {string} */
+      origin: "QUESTION" | "REFINEMENT";
+      /** @description 필터 수정이면 원래 실행 ID. */
+      sourceExecutionId: string | null;
     };
     /** @description turns[].response.status: COMPLETED(재실행, behavior REOPEN), CLARIFICATION·REFUSED(당시 실행되지 않았거나 지금 실행할 수 없음). REFUSED면 errorCode가 사유 코드(ANALYSIS_UNAVAILABLE, REOPEN_NOT_EXECUTABLE, 권한 판정 코드)이고 envelope는 null */
     AiReopenedConversation: {
@@ -6718,6 +6802,12 @@ export interface components {
       refundBasis?: "processed" | "original";
       envelope: components["schemas"]["AiResultEnvelope"];
       querySpec?: components["schemas"]["AiQuerySpec"] | null;
+      conditions: components["schemas"]["AiConditions"] | null;
+      editableFilters: components["schemas"]["AiEditableFilters"] | null;
+      /** @enum {string} */
+      origin: "QUESTION" | "REFINEMENT";
+      /** @description 필터 수정이면 원래 실행 ID. */
+      sourceExecutionId: string | null;
     };
     /**
      * @description DB REQUESTED=신청, APPROVED=승인, REJECTED=반려, CANCELLED=취소.
@@ -7477,6 +7567,85 @@ export interface components {
       items: components["schemas"]["AuditEventListItem"][];
       meta: components["schemas"]["PageMeta"];
       period: components["schemas"]["AuditPeriod"];
+    };
+    /** @description Asia/Seoul 날짜, 양 끝 포함. */
+    AiPeriod: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+    };
+    /** @description 실행 하나가 계산된 조건(analysis-reuse-api.md "분석 조건"). */
+    AiConditions: {
+      analysisId: string;
+      /** @description 기간이 없는 분석(실시간)은 null. */
+      period: components["schemas"]["AiPeriod"] | null;
+      /** @enum {string|null} */
+      periodSource: "DEFAULT" | "EDITED" | null;
+      branchIds: components["schemas"]["Id"][];
+      /** @description 빈 목록은 전체. */
+      productIds: components["schemas"]["Id"][];
+      /** @enum {string|null} */
+      refundBasis: "processed" | "original" | null;
+      zeroFill: boolean | null;
+    };
+    /** @description 그 분석에서 고칠 수 있는 조건(M15-D05, 2026-11-11 사용자 결정). */
+    AiEditableFilters: {
+      /** @description null이면 기간을 고칠 수 없다. */
+      period: {
+        maxDays: number;
+      } | null;
+      branches: {
+        single: boolean;
+      };
+      products: boolean;
+    };
+    /** @description 후속 질문이 이어받은 조건과 바뀐 조건(M15-D06). */
+    AiContext: {
+      basedOnExecutionId: string | null;
+      inherited: (
+        | "ANALYSIS"
+        | "PERIOD"
+        | "BRANCHES"
+        | "PRODUCTS"
+        | "REFUND_BASIS"
+        | "ZERO_FILL"
+      )[];
+      changed: (
+        | "ANALYSIS"
+        | "PERIOD"
+        | "BRANCHES"
+        | "PRODUCTS"
+        | "REFUND_BASIS"
+        | "ZERO_FILL"
+      )[];
+      reset: boolean;
+      /** @enum {string|null} */
+      resetReason:
+        "NO_PRIOR_RESULT" | "SCOPE_CHANGED" | "PERMISSION_LOST" | null;
+    };
+    /** @description 기간·지점·상품 중 하나 이상(M15-D05). 없는 조건은 원래 실행의 값. */
+    AiRefinement: {
+      period?: components["schemas"]["AiPeriod"];
+      branchIds?: components["schemas"]["Id"][];
+      productIds?: components["schemas"]["Id"][];
+      clientRequestKey?: string;
+    };
+    AiRecentQuery: {
+      requestId: string;
+      executionId: string | null;
+      conversationId: string;
+      conversationTitle: string;
+      question: string;
+      status: string;
+      analysisId: string | null;
+      /** Format: date-time */
+      askedAt: string;
+      rerunnable: boolean;
+    };
+    /** @description 본인 질문 중 30일 안의 최신 20건(M15-D01). */
+    AiRecentQueryList: {
+      items: components["schemas"]["AiRecentQuery"][];
     };
   };
   responses: {
@@ -14321,7 +14490,15 @@ export interface operations {
   };
   getAiExecution: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description 없으면 첫 데이터셋. */
+        datasetId?: string;
+        page?: number;
+        size?: number;
+        /** @description 그 데이터셋의 열 별칭. */
+        sort?: string;
+        direction?: "asc" | "desc";
+      };
       header?: never;
       path: {
         /** @description 실행 ID 또는 요청 ID */
@@ -16109,6 +16286,16 @@ export interface operations {
       422: components["responses"]["Error422"];
       429: components["responses"]["Error429"];
       500: components["responses"]["Error500"];
+      /** @description 재설정 메일 발송이 꺼져 있다(PASSWORD_RESET_MAIL_DISABLED). 아무것도 바뀌지 않는다. */
+      503: {
+        headers: {
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"];
+        };
+      };
     };
   };
   previewPasswordReset: {
@@ -16399,6 +16586,213 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AuditEventDetail"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+    };
+  };
+  refineAiExecution: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description GET /auth/csrf에서 발급. login/logout/accept 후 토큰 재발급. */
+        "X-CSRF-Token": components["parameters"]["Csrf"];
+      };
+      path: {
+        executionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AiRefinement"];
+      };
+    };
+    responses: {
+      /** @description 다시 실행한 결과(status COMPLETED). */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiQueryResponse"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+      /** @description 카탈로그가 준비되지 않음(AI_NOT_READY). */
+      503: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"];
+        };
+      };
+    };
+  };
+  listAiRecentQueries: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 최근 질의. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AiRecentQueryList"];
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+      /** @description 카탈로그가 준비되지 않음(AI_NOT_READY). */
+      503: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"];
+        };
+      };
+    };
+  };
+  exportAiExecution: {
+    parameters: {
+      query?: {
+        /** @description 없으면 첫 데이터셋. */
+        datasetId?: string;
+      };
+      header?: never;
+      path: {
+        executionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description CSV 파일. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          /** @description attachment; filename*=UTF-8''<이름>_<YYYYMMDD-HHmm>.csv */
+          "Content-Disposition"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
+        };
+      };
+      401: components["responses"]["Error401"];
+      403: components["responses"]["Error403"];
+      404: components["responses"]["Error404"];
+      409: components["responses"]["Error409"];
+      422: components["responses"]["Error422"];
+      429: components["responses"]["Error429"];
+      500: components["responses"]["Error500"];
+      /** @description 카탈로그가 준비되지 않음(AI_NOT_READY). */
+      503: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiError"];
+        };
+      };
+    };
+  };
+  exportSalesReport: {
+    parameters: {
+      query?: {
+        /** @description 집계할 지점(branchIds=1&branchIds=2). 생략하면 요청자에게 sales:read가 있는 모든 지점이다. 지정한 지점 중 하나라도 sales:read가 없거나 없는 지점이면 403이며 조용히 제외하지 않는다(M9-D07). 중복은 422. */
+        branchIds?: components["parameters"]["AggregationBranchIds"];
+        /** @description 집계 시작(포함). 시간대 오프셋 필수. to와 함께 보내거나 함께 생략한다. 생략하면 이번 달 1일 0시(Asia/Seoul). */
+        from?: components["parameters"]["AggregationFrom"];
+        /** @description 집계 종료(제외). 시간대 오프셋 필수. from보다 늦어야 하고 from과의 차이가 366일 이하. 생략하면 내일 0시(Asia/Seoul). */
+        to?: components["parameters"]["AggregationTo"];
+        /** @description 환불을 어느 구간에서 차감할지. processedDate=환불 처리 시각(기본, M9-D02), paymentDate=원결제 승인 시각. */
+        refundBasis?: components["parameters"]["RefundBasis"];
+        /** @description 결제 용도(payments.purpose) 필터. 생략하면 세 용도 모두(M9-D03). */
+        purpose?: components["parameters"]["SalesPurpose"];
+        /** @description 승인 또는 환불 항목만. 이 필터를 쓰면 totals는 그 항목만의 합이다. */
+        entryType?: "승인" | "환불";
+        /** @description 판매 당시 분류 코드(passes.snapshot_category_code) 필터. 정확 일치. */
+        categoryCode?: components["parameters"]["PassCategoryCode"];
+        /** @description 결제 수단 필터(반복). 승인은 결제 수단, 환불은 원결제 수단으로 거른다(M13-D10). 중복은 422. */
+        methods?: components["parameters"]["PaymentMethods"];
+        /** @description 상품 유형 필터(반복). 이용권 결제만 남고 이용권 외 용도는 빠진다. purpose가 이용권이 아니면 422(M13-D10). */
+        productKinds?: components["parameters"]["ProductKinds"];
+        /** @description 처리자 필터(반복). 승인은 결제 처리자(payments.created_by), 환불은 환불 처리자(refunds.processed_by)(M13-D10). */
+        operatorIds?: components["parameters"]["OperatorIds"];
+        /** @description 환불 처리 지점 필터(반복). 환불 항목에만 적용하고 승인 항목은 그대로 둔다. 볼 수 없는 지점이면 403(M13-D10). */
+        processingBranchIds?: components["parameters"]["ProcessingBranchIds"];
+      };
+      header?: never;
+      path: {
+        /** @description revenue→/sales/revenue, revenue-branches→/sales/revenue/branches, ledger→/sales/ledger, trend→/sales/trend, passes-volume→/sales/passes/volume, passes-products→/sales/passes/products, passes-usage→/sales/passes/usage */
+        report:
+          | "revenue"
+          | "revenue-branches"
+          | "ledger"
+          | "trend"
+          | "passes-volume"
+          | "passes-products"
+          | "passes-usage";
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description CSV 파일. */
+      200: {
+        headers: {
+          "X-Request-ID"?: string;
+          /** @description no-store */
+          "Cache-Control"?: string;
+          /** @description attachment; filename*=UTF-8''<이름>_<YYYYMMDD-HHmm>.csv */
+          "Content-Disposition"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "text/csv": string;
         };
       };
       401: components["responses"]["Error401"];

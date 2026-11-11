@@ -65,6 +65,13 @@ export function inScope(user: Employee, row: Entity, scope = "all") {
 }
 export function checkRead(store: MockStore, resource: Resource, scope: string) {
   const user = store.activeUser();
+  if (resource === "audit")
+    assert(
+      user.owner,
+      "OWNER만 변경 이력을 조회할 수 있습니다.",
+      403,
+      "FORBIDDEN",
+    );
   assert(
     can(user, scope),
     "이 지점에 접근할 권한이 없습니다.",

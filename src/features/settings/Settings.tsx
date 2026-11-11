@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { abortPrivateRequests, api, MOCK } from "../../shared/api/client";
 import { useApp } from "../../app/context";
 import type { CurrentUser } from "../../shared/domain/schema";
 import { admin } from "../../shared/domain/schema";
 import { useUi } from "../../app/store";
 import { ThemePicker } from "../auth/Login";
-import { Button, FieldError, Heading } from "../../shared/ui/primitives";
+import { Button, FieldError, Heading, State } from "../../shared/ui/primitives";
 import { PasswordForm } from "../auth/PasswordForm";
+import { AuditLog } from "./AuditLog";
 import { ProfileForm } from "./ProfileForm";
 import { ResourceGroup } from "../records/ResourcePage";
 import { BranchManagement } from "../organization/Organization";
 export function Settings() {
+  const [params] = useSearchParams();
   const { session, scope } = useApp(),
     theme = useUi((s) => s.theme),
     setTheme = useUi((s) => s.setTheme);
@@ -104,15 +106,32 @@ export function Settings() {
         {MOCK && <DemoControls />}
         <BranchManagement key={`${session.user.id}:${scope}`} />
       </div>
-      {admin(session.user, scope) && (
-        <ResourceGroup
-          title="공간·운영 환경"
-          description="담당 지점의 공간과 변경 이력을 관리해요."
-          tabs={[
-            { resource: "rooms", label: "스터디룸" },
-            { resource: "audit", label: "변경 이력", admin: true },
-          ]}
-        />
+      {!session.user.owner && params.get("tab") === "audit" ? (
+        <div className="page">
+          <State
+            title="변경 이력을 볼 권한이 없어요"
+            message="OWNER만 변경 이력을 조회할 수 있습니다."
+          />
+        </div>
+      ) : (
+        admin(session.user, scope) && (
+          <ResourceGroup
+            title="공간·운영 환경"
+            description="담당 지점의 공간과 변경 이력을 관리해요."
+            tabs={[
+              { resource: "rooms", label: "스터디룸" },
+              ...(session.user.owner
+                ? [
+                    {
+                      resource: "audit" as const,
+                      label: "변경 이력",
+                      content: <AuditLog />,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        )
       )}
     </div>
   );
