@@ -204,6 +204,12 @@ it("asks with the current scope and shows the answer with its sales totals", asy
   expect(screen.getByText("이번 달 매출")).toBeInTheDocument();
   expect(screen.getAllByText("25,000원")[0]).toBeInTheDocument();
   expect(screen.getByRole("group", { name: "결과 보기" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "branchSales CSV 다운로드" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "salesTotals CSV 다운로드" }),
+  ).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "표로 보기" }));
   expect(
     screen.getByRole("button", { name: "표로 보기", pressed: true }),
@@ -230,6 +236,9 @@ it("explains a refused question without showing any result", async () => {
   expect(
     screen.queryByRole("group", { name: "결과 보기" }),
   ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /CSV 다운로드|PNG 저장/ }),
+  ).not.toBeInTheDocument();
 });
 
 it("resends a clarification choice with its option id", async () => {
@@ -247,6 +256,9 @@ it("resends a clarification choice with its option id", async () => {
     .mockResolvedValueOnce(response({}));
   show();
   const user = await ask("좌석 혼잡도");
+  expect(
+    screen.queryByRole("button", { name: /CSV 다운로드|PNG 저장/ }),
+  ).not.toBeInTheDocument();
   await user.click(
     await screen.findByRole("button", {
       name: "강남점",
@@ -485,6 +497,9 @@ it("announces truncation and clears old results on a scope change and on session
   const rerender = show();
   await ask("매출");
   expect(await screen.findByText(/최대 1000행/)).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "branchSales CSV 다운로드" }),
+  ).toHaveAccessibleDescription("CSV에는 앞의 1,000행만 담겨요.");
   mocks.context.scope = "all";
   rerender();
   expect(screen.queryByText("순매출")).toBeNull();

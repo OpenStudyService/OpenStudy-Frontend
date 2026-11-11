@@ -11,6 +11,8 @@ import {
   YAxis,
 } from "recharts";
 import { won } from "../../shared/domain/schema";
+import { formatDateTime } from "../../shared/domain/format";
+import { ChartExport } from "./ChartExport";
 import {
   normalizeComponentType,
   toViewMode,
@@ -342,10 +344,14 @@ function ComponentView({
   component,
   dataset,
   scope,
+  exportConditions,
+  asOf,
 }: {
   component: ViewSpecComponentDto;
   dataset: TypedDatasetDto;
   scope: string;
+  exportConditions?: string[];
+  asOf?: string | null;
 }) {
   const type = component.componentRef.id;
   const fields = boundFields(component, dataset);
@@ -438,27 +444,45 @@ function ComponentView({
               )
               .join(", ")}
           </p>
-          <ResponsiveContainer width="100%" height={220}>
-            <Chart data={displayed} accessibilityLayer>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="category" />
-              <YAxis />
-              <Tooltip />
-              {type === "LINE_CHART" ? (
-                <Line
-                  dataKey="value"
-                  name={metric.alias}
-                  stroke="var(--primary)"
-                />
-              ) : (
-                <Bar
-                  dataKey="value"
-                  name={metric.alias}
-                  fill="var(--primary)"
-                />
-              )}
-            </Chart>
-          </ResponsiveContainer>
+          <ChartExport
+            metadata={
+              exportConditions && asOf
+                ? {
+                    title,
+                    conditions: exportConditions,
+                    unit:
+                      metric.unit === "KRW"
+                        ? "원 (KRW)"
+                        : metric.unit || "단위 없음",
+                    asOf: `${formatDateTime(asOf)} · Asia/Seoul`,
+                  }
+                : undefined
+            }
+          >
+            <ResponsiveContainer width="100%" height={220}>
+              <Chart data={displayed} accessibilityLayer>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="category" />
+                <YAxis />
+                <Tooltip />
+                {type === "LINE_CHART" ? (
+                  <Line
+                    dataKey="value"
+                    name={metric.alias}
+                    stroke="var(--primary)"
+                    isAnimationActive={false}
+                  />
+                ) : (
+                  <Bar
+                    dataKey="value"
+                    name={metric.alias}
+                    fill="var(--primary)"
+                    isAnimationActive={false}
+                  />
+                )}
+              </Chart>
+            </ResponsiveContainer>
+          </ChartExport>
           {ordered.length > 20 && (
             <p className="help">
               차트에 20개 항목을 표시해요. 전체 조회 행은 표에서 볼 수 있어요.
@@ -542,10 +566,12 @@ export function ViewSpecRenderer({
   parsed,
   activeView,
   scope = "all",
+  exportConditions,
 }: {
   parsed: ParsedAiResult;
   activeView?: string;
   scope?: string;
+  exportConditions?: string[];
 }) {
   const spec = parsed.viewSpec;
   const components =
@@ -610,6 +636,8 @@ export function ViewSpecRenderer({
             component={component}
             dataset={dataset}
             scope={scope}
+            exportConditions={exportConditions}
+            asOf={dataset.asOf ?? parsed.asOf}
           />
         )}
       </section>

@@ -548,6 +548,23 @@ export const handlers = [
       ),
     ),
   ),
+  http.get(
+    "/api/ai/executions/:executionId/export",
+    response(async (a) => {
+      const actor = store.activeUser().id;
+      if (store.scenario === "slow") await delay(2200);
+      assert(
+        store.activeUser().id === actor,
+        "계정이 변경됐습니다.",
+        403,
+        "AI_PERMISSION_DENIED",
+      );
+      return mockAi.export(
+        String(a.params.executionId),
+        new URL(a.request.url).searchParams.get("datasetId"),
+      );
+    }),
+  ),
   http.post(
     "/api/ai/executions/:executionId/refinements",
     response(async (a) =>
@@ -595,31 +612,6 @@ export const handlers = [
         pinned: Boolean(p.pinned),
         archived: false,
         createdAt: AS_OF,
-      };
-    }),
-  ),
-  http.get(
-    "/api/ai/approvals",
-    response(() => []),
-  ),
-  http.post(
-    "/api/ai/approvals",
-    response(async (a) => {
-      const p = await json(a);
-      return {
-        id: "apr-mock-1",
-        executionId: String(p.executionId || "exec-mock-1"),
-        datasetId: String(p.datasetId || "branchSales"),
-        requesterEmployeeId: 1,
-        approverEmployeeId: null,
-        scope: "all",
-        reason: String(p.reason || "CSV 반출 요청"),
-        decisionNote: null,
-        rowCount: 3,
-        status: "PENDING",
-        requestedAt: AS_OF,
-        decidedAt: null,
-        expiresAt: AS_OF,
       };
     }),
   ),

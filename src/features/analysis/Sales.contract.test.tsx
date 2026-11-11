@@ -81,6 +81,71 @@ function show(search: string) {
   );
 }
 const september = "?from=2026-09-01&to=2026-10-01";
+
+it("exports each report with its screen query and the server filename", async () => {
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(() => {});
+  const OriginalURL = URL;
+  vi.stubGlobal(
+    "URL",
+    class extends OriginalURL {
+      static createObjectURL = vi.fn().mockReturnValue("blob:csv");
+      static revokeObjectURL = vi.fn();
+    },
+  );
+  try {
+    show(
+      `${september}&branchIds=gangnam&branchIds=seongsu&refundBasis=paymentDate&methods=카드&methods=현금&productKinds=시간권&sort=branchId&direction=asc&entryType=환불&ledgerDirection=asc&ledgerPage=2&productPage=2&granularity=week`,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "이용 지점별 이용권 사용량" }),
+    );
+    const reports = [
+      ["매출 요약", "revenue", "revenue"],
+      ["지점별 매출 비교", "revenue-branches", "revenue/branches"],
+      ["매출 원장", "ledger", "ledger"],
+      ["이용권 판매량", "passes-volume", "passes/volume"],
+      ["이용권 상품별 판매", "passes-products", "passes/products"],
+      ["이용권 사용 현황", "passes-usage", "passes/usage"],
+      ["매출 추세", "trend", "trend", "revenue"],
+      ["이용권 판매량 추세", "trend", "trend", "passes"],
+    ];
+    for (const [title, report, screenPath, measure] of reports) {
+      const button = await screen.findByRole("button", {
+        name: `${title} CSV 다운로드`,
+      });
+      await userEvent.click(button);
+      await waitFor(() => expect(button).toBeEnabled());
+      const exported = requests.find(
+        (url) =>
+          url.pathname === `/api/sales/exports/${report}` &&
+          (!measure || url.searchParams.get("measure") === measure),
+      );
+      const read = requests.find(
+        (url) =>
+          url.pathname === `/api/sales/${screenPath}` &&
+          (!measure || url.searchParams.get("measure") === measure),
+      );
+      expect(exported).toBeDefined();
+      expect(read).toBeDefined();
+      const readQuery = new OriginalURL(read!.href).searchParams;
+      readQuery.delete("page");
+      readQuery.delete("pageSize");
+      readQuery.sort();
+      const exportQuery = exported!.searchParams;
+      exportQuery.sort();
+      expect([...exportQuery]).toEqual([...readQuery]);
+    }
+    expect(click).toHaveBeenCalledTimes(reports.length);
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toMatch(
+      /^매출 요약_\d{8}-\d{4}\.csv$/,
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 const region = (name: string) => within(screen.getByRole("region", { name }));
 
 it("displays validated response metadata with all cards, tables and charts", async () => {

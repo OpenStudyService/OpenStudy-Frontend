@@ -14,6 +14,7 @@ import { handlers } from "../../mocks/handlers";
 import { store } from "../../mocks/store";
 import { Ai } from "./Ai";
 import { aiReuse } from "./ai-reuse-api";
+import { exportAiDataset } from "./export-api";
 import { aiConversations, executeAiQuery, parseAiResult } from "./domainlens";
 
 vi.mock("../../app/context", () => ({
@@ -93,6 +94,57 @@ it("uses only the canonical AI routes for questions and saved conversations", as
   client.clear();
 });
 
+it("returns the requested AI dataset as CSV and checks ownership, limits and availability", async () => {
+  store.reset();
+  store.scenario = "normal";
+  store.persona = "owner";
+  const result = await executeAiQuery({
+    question: "이번 달 지점별 매출을 비교해줘",
+    scope: "all",
+    clientRequestKey: "ai-export-test",
+  });
+  const id = result.executionId!;
+  expect(id).toBeTruthy();
+  try {
+    const csv = await exportAiDataset(id, "branchSales");
+    expect(csv.disposition).toContain("filename*=UTF-8''");
+    const bytes = new Uint8Array(await csv.blob.arrayBuffer());
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const body = new TextDecoder().decode(bytes);
+    expect(body).toContain("데이터셋 branchSales");
+    expect(body).toContain("net_krw(KRW)");
+    expect((await exportAiDataset(id)).disposition).toContain(
+      "filename*=UTF-8''",
+    );
+    await expect(exportAiDataset(id, "unknown")).rejects.toMatchObject({
+      status: 422,
+    });
+    store.persona = store.db.employees.find(
+      (employee) => employee.id !== "owner" && employee.status === "활성",
+    )!.id;
+    await expect(exportAiDataset(id)).rejects.toMatchObject({
+      status: 404,
+      detail: { code: "NOT_FOUND" },
+    });
+    store.persona = "owner";
+    for (const [scenario, status, code] of [
+      ["forbidden", 403, "AI_PERMISSION_DENIED"],
+      ["rate-limited", 429, "RATE_LIMITED"],
+      ["error", 503, "AI_NOT_READY"],
+    ] as const) {
+      store.scenario = scenario;
+      await expect(exportAiDataset(id)).rejects.toMatchObject({
+        status,
+        detail: { code },
+      });
+    }
+  } finally {
+    store.persona = "owner";
+    store.scenario = "normal";
+    await aiConversations.remove(result.conversationId!);
+  }
+});
+
 it("saves changed conditions in the same conversation and runs recent questions through the correct routes", async () => {
   store.reset();
   store.persona = "owner";
@@ -115,6 +167,12 @@ it("saves changed conditions in the same conversation and runs recent questions 
 
   await ask("이번 달 지점별 매출을 비교해줘");
   const edit = await screen.findByRole("button", { name: "조건 변경" });
+  expect(
+    screen.getByRole("button", { name: "지점별 매출 CSV 다운로드" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "지점별 매출 PNG 저장" }),
+  ).toBeVisible();
   expect(screen.queryByText("유지")).not.toBeInTheDocument();
   await user.click(edit);
   await user.click(

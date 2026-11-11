@@ -231,6 +231,9 @@ it("does not fetch for an inactive owner", () => {
     screen.getByRole("heading", { name: "매출 조회 권한이 필요해요" }),
   ).toBeVisible();
   expect(mocks.revenue).not.toHaveBeenCalled();
+  expect(
+    screen.queryByRole("button", { name: /CSV 다운로드|PNG 저장/ }),
+  ).not.toBeInTheDocument();
 });
 it("keeps branch, purpose and refund conditions in URL and resets ledger page on filter changes", async () => {
   show("?branchIds=1&ledgerPage=3");
@@ -248,6 +251,27 @@ it("keeps branch, purpose and refund conditions in URL and resets ledger page on
     purpose: "사물함",
   });
 });
+it("warns before downloading ledger and product reports using their total row counts", async () => {
+  mocks.ledger.mockResolvedValue({
+    ...ledger,
+    meta: { ...ledger.meta, total: 1_001 },
+  });
+  mocks.products.mockResolvedValue({
+    aggregation,
+    items: [],
+    meta: { page: 1, pageSize: 20, total: 1_002 },
+  });
+  show();
+  expect(
+    await screen.findByRole("button", { name: "매출 원장 CSV 다운로드" }),
+  ).toHaveAccessibleDescription("CSV에는 앞의 1,000행만 담겨요.");
+  expect(
+    await screen.findByRole("button", {
+      name: "이용권 상품별 판매 CSV 다운로드",
+    }),
+  ).toHaveAccessibleDescription("CSV에는 앞의 1,000행만 담겨요.");
+});
+
 it("uses scope as an explicit branch and never displays a private payment link from stale server hints", async () => {
   mocks.context.scope = "1";
   show();

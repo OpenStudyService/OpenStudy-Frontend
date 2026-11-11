@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { api, ApiError, MOCK, queryString } from "../../shared/api/client";
+import {
+  api,
+  apiCsv,
+  ApiError,
+  MOCK,
+  queryString,
+} from "../../shared/api/client";
 import type { AdvancedFilterValues } from "../payments/AdvancedFilters";
 import type { components } from "../../shared/api/foundation.generated";
 
@@ -439,6 +445,53 @@ function params(
   validateSalesCondition(condition);
   return queryString({ ...condition, ...options });
 }
+export const salesExportTitles = {
+  revenue: "매출 요약",
+  "revenue-branches": "지점별 매출 비교",
+  ledger: "매출 원장",
+  trend: "매출 추이",
+  "passes-volume": "이용권 판매량",
+  "passes-products": "이용권 상품별 판매",
+  "passes-usage": "이용권 사용 현황",
+} as const;
+
+export type SalesReport = keyof typeof salesExportTitles;
+export type SalesExportOptions = {
+  sort?: BranchSort;
+  direction?: "asc" | "desc";
+  entryType?: "승인" | "환불";
+  measure?: TrendMeasure;
+  granularity?: TrendGranularity;
+};
+
+function passSalesCondition(condition: SalesCondition) {
+  return { ...condition, purpose: undefined };
+}
+
+export function passUsageCondition(condition: SalesCondition) {
+  const { branchIds, from, to, productKinds, categoryCode } = condition;
+  return { branchIds, from, to, productKinds, categoryCode };
+}
+
+export function exportSalesReport(
+  report: SalesReport,
+  condition: SalesCondition,
+  { sort, direction, entryType, measure, granularity }: SalesExportOptions = {},
+  signal?: AbortSignal,
+) {
+  const query = params(
+    report === "passes-usage"
+      ? passUsageCondition(condition)
+      : report === "passes-volume" ||
+          report === "passes-products" ||
+          (report === "trend" && measure === "passes")
+        ? passSalesCondition(condition)
+        : condition,
+    { sort, direction, entryType, measure, granularity },
+  );
+  return apiCsv(`/sales/exports/${report}${query ? `?${query}` : ""}`, signal);
+}
+
 function parse<T extends { aggregation: AggregationMeta }>(
   schema: z.ZodType<T>,
   value: unknown,
@@ -502,7 +555,7 @@ export const salesApi = {
     return parse(
       volumeSchema,
       await api(
-        `/sales/passes/volume?${params({ ...condition, purpose: undefined })}`,
+        `/sales/passes/volume?${params(passSalesCondition(condition))}`,
         { signal },
       ),
       condition,
@@ -517,7 +570,7 @@ export const salesApi = {
     const result = parse(
       productsSchema,
       await api(
-        `/sales/passes/products?${params({ ...condition, purpose: undefined }, { page, pageSize: 20 })}`,
+        `/sales/passes/products?${params(passSalesCondition(condition), { page, pageSize: 20 })}`,
         { signal },
       ),
       condition,
@@ -537,7 +590,7 @@ export const salesApi = {
     signal?: AbortSignal,
   ) {
     const query =
-      measure === "passes" ? { ...condition, purpose: undefined } : condition;
+      measure === "passes" ? passSalesCondition(condition) : condition;
     const result = parse(
       trendSchema,
       await api(`/sales/trend?${params(query, { measure, granularity })}`, {

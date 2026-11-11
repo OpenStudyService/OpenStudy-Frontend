@@ -108,6 +108,16 @@ export function AdvancedFilters({
   );
 }
 
+export function appliedAdvancedFilterEntries(values: AdvancedFilterValues) {
+  return [
+    ["결제 수단", values.methods.join(", ")],
+    ["상품 유형", values.productKinds.join(", ")],
+    ["상품 분류", values.categoryCode],
+    ["처리자 ID", values.operatorIds.join(", ")],
+    ["환불 처리 지점 ID", values.processingBranchIds.join(", ")],
+  ].filter(([, value]) => value);
+}
+
 export function AppliedAdvancedFilters({
   values,
 }: {
@@ -115,20 +125,12 @@ export function AppliedAdvancedFilters({
 }) {
   return (
     <dl className="help">
-      {[
-        ["결제 수단", values.methods.join(", ")],
-        ["상품 유형", values.productKinds.join(", ")],
-        ["상품 분류", values.categoryCode],
-        ["처리자 ID", values.operatorIds.join(", ")],
-        ["환불 처리 지점 ID", values.processingBranchIds.join(", ")],
-      ]
-        .filter(([, value]) => value)
-        .map(([label, value]) => (
-          <div key={label}>
-            <dt className="inline mr-2">{label}</dt>
-            <dd className="inline">{value}</dd>
-          </div>
-        ))}
+      {appliedAdvancedFilterEntries(values).map(([label, value]) => (
+        <div key={label}>
+          <dt className="inline mr-2">{label}</dt>
+          <dd className="inline">{value}</dd>
+        </div>
+      ))}
     </dl>
   );
 }

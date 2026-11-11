@@ -13,7 +13,7 @@ import {
   State,
 } from "../../shared/ui/primitives";
 import { Icon } from "../../shared/ui/Icon";
-import { ViewSpecRenderer } from "./Charts";
+import { AiChartResults, AiCsvExports } from "./AiExports";
 import { aiReuse } from "./ai-reuse-api";
 import type {
   AiConditions,
@@ -841,6 +841,12 @@ function Answer({
             </div>
           )}
         </header>
+        <AiCsvExports
+          key={executionId}
+          executionId={executionId}
+          parsed={parsed}
+          accessDenied={accessDenied}
+        />
         {(turn.conditions || turn.context) && (
           <div className="grid gap-2 border-b border-line px-4 py-3">
             {turn.conditions && (
@@ -884,10 +890,11 @@ function Answer({
             />
           ) : (
             <>
-              <ViewSpecRenderer
+              <AiChartResults
                 parsed={parsed}
                 activeView={view}
                 scope={scope}
+                conditions={turn.conditions}
               />
             </>
           )}

@@ -5,6 +5,7 @@ import { POC_QUESTIONS } from "../features/analysis/domainlens";
 import { AS_OF, can } from "../shared/domain/schema";
 import { sales } from "./domain";
 import { assert, DomainError, store } from "./store";
+import { mockCsv } from "./export-csv";
 
 type AiSchemas = components["schemas"];
 type MockAiConditions = AiSchemas["AiConditions"];
@@ -692,6 +693,72 @@ export const mockAi = {
       origin: turn.sourceExecutionId ? "REFINEMENT" : "QUESTION",
       sourceExecutionId: turn.sourceExecutionId,
     };
+  },
+  export(id: string, datasetId: string | null) {
+    assert(
+      store.scenario !== "forbidden",
+      "AI 조회 권한이 없습니다.",
+      403,
+      "AI_PERMISSION_DENIED",
+    );
+    assert(
+      store.scenario !== "rate-limited",
+      "잠시 후 다시 시도해 주세요.",
+      429,
+      "RATE_LIMITED",
+    );
+    assert(
+      store.scenario !== "error",
+      "AI 분석을 지금 사용할 수 없습니다.",
+      503,
+      "AI_NOT_READY",
+    );
+    const { turn, conditions } = ownAiExecution(id);
+    const code = POC_QUESTIONS.find(
+      (poc) => poc.analysisId === conditions.analysisId,
+    )?.code;
+    const dataset = mockAiDataset(conditions, code);
+    assert(
+      datasetId === null || datasetId === dataset.id,
+      "결과에 없는 데이터셋입니다.",
+      422,
+      "VALIDATION_FAILED",
+    );
+    const { period, branchIds, productIds, refundBasis, zeroFill } = conditions;
+    return mockCsv({
+      title: `AI 분석 결과 · ${turn.question}`,
+      filename: "AI 분석 결과",
+      asOf: new Date().toISOString(),
+      conditions: [
+        `분석 ${conditions.analysisId}`,
+        `데이터셋 ${dataset.id}`,
+        `기간 ${period ? `${period.from} ~ ${period.to} (Asia/Seoul)` : "실시간"}`,
+        `지점 ${store.db.branches
+          .filter((branch) => branchIds.includes(branch.id))
+          .map((branch) => branch.name)
+          .join(", ")}`,
+        productIds.length ? `상품 ID ${productIds.join(", ")}` : "",
+        refundBasis
+          ? `환불 기준 ${refundBasis === "original" ? "원결제일" : "처리일"}`
+          : "",
+        zeroFill ? "0원 날짜 포함" : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      money: dataset.columns.some(
+        (column) => "unit" in column && column.unit === "KRW",
+      ),
+      columns: dataset.columns.map((column) =>
+        "unit" in column && column.unit
+          ? `${column.alias}(${column.unit})`
+          : column.alias,
+      ),
+      rows: dataset.rows.map((row) =>
+        dataset.columns.map(
+          ({ alias }) => (row as Record<string, unknown>)[alias],
+        ),
+      ),
+    });
   },
   refine(id: string, body: Record<string, unknown>) {
     const { conversation, turn, conditions } = ownAiExecution(id);

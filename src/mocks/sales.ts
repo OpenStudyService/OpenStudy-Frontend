@@ -5,6 +5,12 @@ import { z } from "zod";
 import { can } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
 import { paymentView, salesProductSnapshot } from "./payments";
+import { CSV_ROW_LIMIT } from "../features/analysis/export-api";
+import {
+  salesExportTitles,
+  type SalesReport,
+} from "../features/analysis/sales-api";
+import { mockCsv } from "./export-csv";
 import type { components } from "../shared/api/foundation.generated";
 
 const purposes = ["이용권", "스터디룸", "사물함"] as const;
@@ -100,7 +106,7 @@ function trendBuckets(
   }
   return items;
 }
-function build(request: Request, kind: SalesRead) {
+function build(request: Request, kind: SalesRead, exporting = false) {
   const actor = store.activeUser(),
     q = new URL(request.url).searchParams;
   const selected = q.getAll("branchIds");
@@ -536,12 +542,14 @@ function build(request: Request, kind: SalesRead) {
       .int()
       .min(1)
       .parse(q.get("page") ?? 1),
-    pageSize = z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .parse(q.get("pageSize") ?? 20);
+    pageSize = exporting
+      ? CSV_ROW_LIMIT
+      : z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .parse(q.get("pageSize") ?? 20);
   if (kind === "products") {
     const groups = new Map<
       string,
@@ -598,7 +606,189 @@ function build(request: Request, kind: SalesRead) {
     },
   };
 }
-function handler(kind: SalesRead) {
+const reportReads: Record<SalesReport, SalesRead> = {
+  revenue: "revenue",
+  "revenue-branches": "branches",
+  ledger: "ledger",
+  trend: "trend",
+  "passes-volume": "volume",
+  "passes-products": "products",
+  "passes-usage": "usage",
+};
+
+const amountColumns = [
+  "승인 금액(원)",
+  "환불 금액(원)",
+  "순매출(원)",
+  "승인 결제 수(건)",
+  "환불 수(건)",
+  "데이터 상태",
+];
+const volumeColumns = [
+  "결제 수(건)",
+  "판매 수량(개)",
+  "환불 수량(개)",
+  "순판매 수량(개)",
+  "발급 수(개)",
+  "데이터 상태",
+];
+const amountCells = (v: ReturnType<typeof totals>) => [
+  v.approvedAmountKrw,
+  v.refundAmountKrw,
+  v.netAmountKrw,
+  v.approvedPaymentCount,
+  v.refundCount,
+  v.dataStatus,
+];
+const volumeCells = (v: ReturnType<typeof volume>) => [
+  v.paymentCount,
+  v.soldQuantity,
+  v.refundedQuantity,
+  v.netSoldQuantity,
+  v.issuedCount,
+  v.dataStatus,
+];
+const branchName = (id: string) =>
+  store.db.branches.find((branch) => branch.id === id)?.name ?? id;
+
+function salesCsvData(
+  data: ReturnType<typeof build>,
+  report: SalesReport,
+): { columns: string[]; rows: unknown[][]; money: boolean; total?: number } {
+  if (data.byPurpose)
+    return {
+      columns: ["용도", ...amountColumns],
+      rows: data.byPurpose.map((v) => [v.purpose, ...amountCells(v)]),
+      money: true,
+    };
+  if (data.measure)
+    return {
+      columns: [
+        "구간",
+        ...(data.measure === "passes" ? volumeColumns : amountColumns),
+      ],
+      rows: data.items.map((v) => [
+        v.label,
+        ...(v.passes ? volumeCells(v.passes) : amountCells(v.revenue!)),
+      ]),
+      money: data.measure === "revenue",
+    };
+  if (!data.items && "soldQuantity" in data.totals)
+    return {
+      columns: ["구분", ...volumeColumns],
+      rows: [["합계", ...volumeCells(data.totals)]],
+      money: false,
+    };
+
+  const items = data.items ?? [];
+  if (report === "passes-usage")
+    return {
+      columns: [
+        "사용 지점",
+        "판매 지점",
+        "이용 횟수(건)",
+        "이용 시간(분)",
+        "정액권 사용 금액(원)",
+      ],
+      rows: items.flatMap((v) =>
+        "bySaleBranch" in v
+          ? v.bySaleBranch.map((sale) => [
+              branchName(v.branchId),
+              sale.saleBranchId ? branchName(sale.saleBranchId) : sale.label,
+              sale.sessionCount,
+              sale.usedMinutes,
+              sale.usedCreditKrw,
+            ])
+          : [],
+      ),
+      money: false,
+    };
+  if (data.meta && "soldQuantity" in data.totals)
+    return {
+      columns: ["순위", "상품", "분류", "종류", ...volumeColumns],
+      rows: items.flatMap((v) =>
+        "rank" in v
+          ? [[v.rank, v.productName, v.categoryName, v.kind, ...volumeCells(v)]]
+          : [],
+      ),
+      money: false,
+      total: data.meta.total,
+    };
+  if (data.meta)
+    return {
+      columns: [
+        "구분",
+        "기준 시각",
+        "지점",
+        "처리 지점 ID",
+        "용도",
+        "상품",
+        "분류",
+        "수량(개)",
+        "금액(원)",
+        "결제 ID",
+        "환불 ID",
+      ],
+      rows: items.flatMap((v) =>
+        "entryType" in v
+          ? [
+              [
+                v.entryType,
+                v.basisAt,
+                branchName(v.branchId),
+                v.processingBranchId,
+                v.purpose,
+                v.productName,
+                v.categoryName,
+                v.passQuantity,
+                v.amountKrw,
+                v.paymentId,
+                v.refundId,
+              ],
+            ]
+          : [],
+      ),
+      money: true,
+      total: data.meta.total,
+    };
+  return {
+    columns: ["지점", ...amountColumns],
+    rows: items.flatMap((v) =>
+      "branchName" in v ? [[v.branchName, ...amountCells(v)]] : [],
+    ),
+    money: true,
+  };
+}
+
+function exportReport(request: Request, report: string) {
+  assert(
+    Object.hasOwn(reportReads, report),
+    "내보낼 수 없는 보고서입니다.",
+    404,
+    "EXPORT_REPORT_UNKNOWN",
+  );
+  const key = report as SalesReport;
+  const query = new URL(request.url).searchParams;
+  invalid(
+    !query.has("page") && !query.has("pageSize"),
+    "내보내기는 페이지 없이 전체 결과를 담습니다.",
+  );
+  const data = build(request, reportReads[key], true);
+  const { condition, conditionNotes, asOf } = data.aggregation;
+  const { branchIds, from, to } = condition;
+  return mockCsv({
+    title: salesExportTitles[key],
+    conditions: [
+      `기간 ${from} ~ ${to} (Asia/Seoul)`,
+      `지점 ${branchIds.map(branchName).join(", ")}`,
+      ...conditionNotes.map(({ message }) => message),
+    ].join(" · "),
+    asOf,
+    ...salesCsvData(data, key),
+  });
+}
+
+function handler(kind: SalesRead | "export") {
   return async ({ request }: { request: Request }) => {
     try {
       const actor = store.activeUser().id;
@@ -621,6 +811,10 @@ function handler(kind: SalesRead) {
         403,
         "FORBIDDEN",
       );
+      if (kind === "export") {
+        const report = new URL(request.url).pathname.split("/").at(-1)!;
+        return exportReport(request, report);
+      }
       return HttpResponse.json(build(request, kind), {
         headers: { "Cache-Control": "no-store" },
       });
@@ -645,6 +839,7 @@ function handler(kind: SalesRead) {
   };
 }
 export const salesHandlers = [
+  http.get("/api/sales/exports/:report", handler("export")),
   http.get("/api/sales/revenue", handler("revenue")),
   http.get("/api/sales/revenue/branches", handler("branches")),
   http.get("/api/sales/ledger", handler("ledger")),

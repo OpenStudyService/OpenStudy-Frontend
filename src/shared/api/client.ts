@@ -58,21 +58,20 @@ export async function csrf() {
   csrfPromise = request;
   return request;
 }
-export async function api<T>(
-  path: string,
-  options: {
-    method?: string;
-    body?: unknown;
-    signal?: AbortSignal;
-    key?: string;
-  } = {},
-): Promise<T> {
+type RequestOptions = {
+  method?: string;
+  body?: unknown;
+  signal?: AbortSignal;
+  key?: string;
+};
+
+async function request(path: string, options: RequestOptions, accept: string) {
   const signal = options.signal
     ? AbortSignal.any([privateRequests.signal, options.signal])
     : privateRequests.signal;
   signal.throwIfAborted();
   const method = (options.method || "GET").toUpperCase(),
-    headers: Record<string, string> = { Accept: "application/json" };
+    headers: Record<string, string> = { Accept: accept };
   const multipart = options.body instanceof FormData;
   if (options.body !== undefined && !multipart)
     headers["Content-Type"] = "application/json";
@@ -147,6 +146,14 @@ export async function api<T>(
       response.headers.get("Retry-After") || undefined,
     );
   }
+  return { response, signal };
+}
+
+export async function api<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const { response, signal } = await request(path, options, "application/json");
   const body = response.status === 204 ? "" : await response.text();
   signal.throwIfAborted();
   if (["/auth/login", "/auth/logout", "/invitations/accept"].includes(path)) {
@@ -155,6 +162,25 @@ export async function api<T>(
   }
   return body.trim() ? (JSON.parse(body) as T) : (undefined as T);
 }
+export async function apiCsv(path: string, abortSignal?: AbortSignal) {
+  const { response, signal } = await request(
+    path,
+    { signal: abortSignal },
+    "text/csv, application/json",
+  );
+  if (
+    response.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !==
+    "text/csv"
+  )
+    throw new ApiError(response.status, {
+      code: "INVALID_RESPONSE",
+      message: "CSV 응답을 확인할 수 없어요. 다시 시도해 주세요.",
+    });
+  const blob = await response.blob();
+  signal.throwIfAborted();
+  return { blob, disposition: response.headers.get("Content-Disposition") };
+}
+
 export const queryString = (
   values: Record<string, string | number | readonly string[] | undefined>,
 ) => {
