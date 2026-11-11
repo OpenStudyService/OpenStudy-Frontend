@@ -6777,6 +6777,10 @@ export interface components {
       }[];
       /** @description 진단용 판정 정보 */
       securityGate?: Record<string, never>;
+      conditions?: components["schemas"]["AiConditions"] | null;
+      /** @description 후속 질문 문맥(M15-D06, #126). 질문 결과와 필터 수정 결과에 있다. 확인 질문·거절과 대화를 다시 열 때의 질문은 null이다. */
+      context?: components["schemas"]["AiContext"] | null;
+      editableFilters?: components["schemas"]["AiEditableFilters"] | null;
     };
     AiCancelResult: {
       ok: boolean;
