@@ -183,24 +183,34 @@ function cellText(value: unknown, unit?: string | null) {
     : String(value);
 }
 
-export function DomainDataTable({ dataset }: { dataset: TypedDatasetDto }) {
+type TableSort = { alias: string; desc: boolean };
+
+export function DomainDataTable({
+  dataset,
+  serverSort,
+}: {
+  dataset: TypedDatasetDto;
+  serverSort?: { value?: TableSort; onChange: (sort: TableSort) => void };
+}) {
   const [page, setPage] = useState(0);
-  const [sort, setSort] = useState<{ alias: string; desc: boolean }>();
-  const rows = sort
-    ? [...dataset.rows].sort((a, b) => {
-        const left = a[sort.alias];
-        const right = b[sort.alias];
-        if (left == null || right == null)
-          return Number(left == null) - Number(right == null);
-        const cmp =
-          typeof left === "number" && typeof right === "number"
-            ? left - right
-            : String(left).localeCompare(String(right), "ko", {
-                numeric: true,
-              });
-        return sort.desc ? -cmp : cmp;
-      })
-    : dataset.rows;
+  const [localSort, setLocalSort] = useState<TableSort>();
+  const sort = serverSort ? serverSort.value : localSort;
+  const rows =
+    sort && !serverSort
+      ? [...dataset.rows].sort((a, b) => {
+          const left = a[sort.alias];
+          const right = b[sort.alias];
+          if (left == null || right == null)
+            return Number(left == null) - Number(right == null);
+          const cmp =
+            typeof left === "number" && typeof right === "number"
+              ? left - right
+              : String(left).localeCompare(String(right), "ko", {
+                  numeric: true,
+                });
+          return sort.desc ? -cmp : cmp;
+        })
+      : dataset.rows;
   const pageSize = 50;
   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, pages - 1);
@@ -226,11 +236,18 @@ export function DomainDataTable({ dataset }: { dataset: TypedDatasetDto }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setSort({
+                    const next = {
                       alias: column.alias,
-                      desc: sort?.alias === column.alias && !sort.desc,
-                    });
-                    setPage(0);
+                      desc:
+                        sort?.alias === column.alias
+                          ? !sort.desc
+                          : Boolean(serverSort),
+                    };
+                    if (serverSort) serverSort.onChange(next);
+                    else {
+                      setLocalSort(next);
+                      setPage(0);
+                    }
                   }}
                 >
                   {column.alias}
@@ -242,7 +259,10 @@ export function DomainDataTable({ dataset }: { dataset: TypedDatasetDto }) {
         </thead>
         <tbody>
           {rows
-            .slice(current * pageSize, (current + 1) * pageSize)
+            .slice(
+              serverSort ? 0 : current * pageSize,
+              serverSort ? undefined : (current + 1) * pageSize,
+            )
             .map((row, idx) => (
               <tr key={idx}>
                 {dataset.columns.map((c) => (
@@ -252,7 +272,7 @@ export function DomainDataTable({ dataset }: { dataset: TypedDatasetDto }) {
             ))}
         </tbody>
       </table>
-      {pages > 1 && (
+      {!serverSort && pages > 1 && (
         <div className="flex items-center gap-2">
           <button
             type="button"

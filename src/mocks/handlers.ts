@@ -1,3 +1,4 @@
+import { mockAi } from "./ai";
 import {
   changePassword,
   completePasswordReset,
@@ -190,176 +191,6 @@ function current() {
         ? "APPROVAL_ONLY"
         : "WORKSPACE",
   };
-}
-/** Saved mock AI conversations of this browser session, by employee (#71). Results are rebuilt, never stored. */
-const aiConversationStore = new Map<
-  string,
-  {
-    id: string;
-    employeeId: string;
-    title: string;
-    scope: string;
-    createdAt: string;
-    lastAskedAt: string;
-    questions: { question: string; askedAt: string }[];
-  }
->();
-/** The mock DomainLens answer: every question returns the branch sales comparison of the mock ledger. */
-const aiReplay = new Map<string, ReturnType<typeof mockAiAnswer>>();
-function mockAiAnswer(q: string, s: string, conversationId: string) {
-  const reqId = `req-${crypto.randomUUID().slice(0, 8)}`;
-  const execId = `exec-${crypto.randomUUID().slice(0, 8)}`;
-  const traceId = `trc-${crypto.randomUUID().slice(0, 8)}`;
-  const rows = sales(store, s, "2026-10-01", "2026-10-18", "processed");
-  return {
-    requestId: reqId,
-    executionId: execId,
-    conversationId,
-    traceId,
-    status: "COMPLETED",
-    httpStatus: 200,
-    errorCode: null,
-    resultCategory: "EXECUTED",
-    behavior: "EXECUTE_ANALYSIS",
-    message: null,
-    pocCode: "POC-001",
-    analysisId: "openstudy.sales.branchComparison",
-    intentDomain: "sales",
-    semanticStatus: "CONFIRMED_ADR",
-    querySpec: {
-      id: "qs_openstudy.sales.branchComparison",
-      source: "payment",
-      grain: "payment",
-      mode: "REGISTERED_ANALYSIS",
-      analysisId: "openstudy.sales.branchComparison",
-    },
-    viewSpec: {
-      catalogVersion: "openstudy-ui-1.0.0",
-      components: [
-        {
-          id: "comp_bar",
-          componentRef: { id: "BAR_CHART", version: "1.0.0" },
-          datasetId: "branchSales",
-          bindings: { category: "branch_name", value: "net_krw" },
-          options: {},
-          events: [],
-        },
-      ],
-    },
-    envelope: {
-      requestId: reqId,
-      executionId: execId,
-      status: "COMPLETED",
-      datasets: [
-        {
-          id: "branchSales",
-          columns: [
-            {
-              alias: "branch_id",
-              type: "INTEGER",
-              unit: null,
-              precision: 0,
-            },
-            {
-              alias: "branch_name",
-              type: "STRING",
-              unit: null,
-              precision: null,
-            },
-            {
-              alias: "approved_krw",
-              type: "INTEGER",
-              unit: "KRW",
-              precision: 0,
-            },
-            {
-              alias: "refund_krw",
-              type: "INTEGER",
-              unit: "KRW",
-              precision: 0,
-            },
-            {
-              alias: "net_krw",
-              type: "INTEGER",
-              unit: "KRW",
-              precision: 0,
-            },
-          ],
-          rows: rows.map((r) => ({
-            branch_id: r.branchId,
-            branch_name: r.branch,
-            approved_krw: r.approved,
-            refund_krw: r.refunds,
-            net_krw: r.net,
-          })),
-          totalElements: rows.length,
-          page: 0,
-          size: 50,
-          snapshotAt: AS_OF,
-          asOf: AS_OF,
-        },
-      ],
-      view: {
-        catalogVersion: "openstudy-ui-1.0.0",
-        components: [
-          {
-            id: "comp_bar",
-            componentRef: { id: "BAR_CHART", version: "1.0.0" },
-            datasetId: "branchSales",
-            bindings: { category: "branch_name", value: "net_krw" },
-            options: {},
-            events: [],
-          },
-        ],
-      },
-      warnings: [],
-      errorCode: null,
-      asOf: AS_OF,
-      snapshotVersion: "openstudy-semantic-1.0.0",
-      policyVersion: "openstudy-policy-v1",
-    },
-    summary: {},
-    truncation: {
-      maxRows: 1000,
-      pageSize: 50,
-      maxChartCategories: 20,
-      isTruncated: false,
-      warningCode: null,
-      message: null,
-    },
-    clarificationOptions: [],
-    stages: [
-      {
-        stage: "accepted",
-        label: "질문 접수 및 정규화",
-        status: "COMPLETED",
-        durationMs: 2,
-        detail: q,
-      },
-      {
-        stage: "completed",
-        label: "ViewSpec 바인딩 및 결과 검증",
-        status: "COMPLETED",
-        durationMs: 4,
-        detail: "BAR_CHART",
-      },
-    ],
-    retrievedCandidates: [
-      { id: "payment", kind: "ENTITY", score: 0.942 },
-      { id: "sales.net_sales_krw", kind: "METRIC", score: 0.918 },
-    ],
-    securityGate: { requestedScope: s, outcome: "EXECUTE" },
-  };
-}
-function ownAiConversation(id: string) {
-  const c = aiConversationStore.get(id);
-  assert(
-    c?.employeeId === store.activeUser().id,
-    "AI 대화를 찾을 수 없습니다.",
-    404,
-    "NOT_FOUND",
-  );
-  return c!;
 }
 function publicReset(run: (body: Record<string, unknown>) => unknown) {
   return response(async (a) => {
@@ -702,128 +533,45 @@ export const handlers = [
     "/api/members/:id/history",
     response((a) => customerHistory(store, String(a.params.id))),
   ),
-  http.get(
-    "/api/ai/catalog/readiness",
-    response(() => ({
-      ready: store.scenario !== "ai-unavailable",
-      mode: "mock",
-      version: "openstudy-semantic-1.0.0",
-      asOfKst: AS_OF,
-      reasons:
-        store.scenario === "ai-unavailable"
-          ? ["데모 카탈로그를 준비하고 있어요."]
-          : [],
-      warnings: [],
-    })),
-  ),
+  http.get("/api/ai/catalog/readiness", response(mockAi.readiness)),
   http.post(
     "/api/ai/queries",
-    response(async (a) => {
-      const p = await json(a);
-      const q = String(p.question || "").trim();
-      const s = String(p.scope || "all");
-      const employeeId = store.activeUser().id;
-      if (store.scenario === "ai-unavailable") {
-        return HttpResponse.json(
-          {
-            requestId: crypto.randomUUID(),
-            status: "NOT_READY",
-            httpStatus: 503,
-            errorCode: "AI_NOT_READY",
-          },
-          { status: 503 },
-        );
-      }
-      const key =
-        typeof p.clientRequestKey === "string"
-          ? `${employeeId}:${p.clientRequestKey}`
-          : undefined;
-      const replay = key ? aiReplay.get(key) : undefined;
-      if (replay && aiConversationStore.has(replay.conversationId))
-        return { ...replay, behavior: "REPLAY" };
-      const asked = String(p.conversationId || "");
-      const saved = asked ? aiConversationStore.get(asked) : undefined;
-      assert(
-        !asked || saved?.employeeId === employeeId,
-        "AI 대화를 찾을 수 없습니다.",
-        404,
-        "NOT_FOUND",
-      );
-      const now = new Date().toISOString();
-      const conversation = saved ?? {
-        id: `conv-${crypto.randomUUID().slice(0, 8)}`,
-        employeeId,
-        title: q.slice(0, 40),
-        scope: s,
-        createdAt: now,
-        lastAskedAt: now,
-        questions: [],
-      };
-      conversation.lastAskedAt = now;
-      conversation.questions.push({ question: q, askedAt: now });
-      aiConversationStore.set(conversation.id, conversation);
-      const answer = mockAiAnswer(q, s, conversation.id);
-      if (key) aiReplay.set(key, answer);
-      return answer;
-    }),
+    response(async (a) => mockAi.ask(await json(a))),
   ),
+  http.get("/api/ai/recent-queries", response(mockAi.recent)),
   http.get(
-    "/api/ai/conversations",
-    response(() => {
-      const employeeId = store.activeUser().id;
-      return [...aiConversationStore.values()]
-        .filter((c) => c.employeeId === employeeId)
-        .sort((x, y) => y.lastAskedAt.localeCompare(x.lastAskedAt))
-        .map(({ id, title, scope, createdAt, lastAskedAt }) => ({
-          id,
-          title,
-          scope,
-          createdAt,
-          lastAskedAt,
-        }));
-    }),
+    "/api/ai/executions/:executionId",
+    response((a) =>
+      mockAi.execution(
+        String(a.params.executionId),
+        new URL(a.request.url).searchParams,
+      ),
+    ),
   ),
+  http.post(
+    "/api/ai/executions/:executionId/refinements",
+    response(async (a) =>
+      mockAi.refine(String(a.params.executionId), await json(a)),
+    ),
+  ),
+  http.get("/api/ai/conversations", response(mockAi.list)),
   http.get(
     "/api/ai/conversations/:id",
-    response((a) => {
-      const c = ownAiConversation(String(a.params.id));
-      const s = new URL(a.request.url).searchParams.get("scope") || c.scope;
-      return {
-        id: c.id,
-        title: c.title,
-        scope: s,
-        turns: c.questions.map((t) => ({
-          question: t.question,
-          askedAt: t.askedAt,
-          response: {
-            ...mockAiAnswer(t.question, s, c.id),
-            resultCategory: "REOPENED",
-            message: "저장된 질문을 현재 권한과 기준 시각으로 다시 조회했어요.",
-          },
-        })),
-      };
-    }),
+    response((a) =>
+      mockAi.reopen(
+        String(a.params.id),
+        new URL(a.request.url).searchParams.get("scope"),
+      ),
+    ),
   ),
   http.patch(
     "/api/ai/conversations/:id",
-    response(async (a) => {
-      const c = ownAiConversation(String(a.params.id));
-      const title = String((await json(a)).title || "").trim();
-      assert(
-        title.length > 0 && title.length <= 200,
-        "대화 제목은 1~200자로 입력해 주세요.",
-        422,
-        "VALIDATION_FAILED",
-      );
-      c.title = title;
-      return { id: c.id, title };
-    }),
+    response(async (a) => mockAi.rename(String(a.params.id), await json(a))),
   ),
   http.delete(
     "/api/ai/conversations/:id",
     response((a) => {
-      const c = ownAiConversation(String(a.params.id));
-      aiConversationStore.delete(c.id);
+      mockAi.remove(String(a.params.id));
       return new HttpResponse(null, { status: 204 });
     }),
   ),

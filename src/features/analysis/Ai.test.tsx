@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Ai } from "./Ai";
+import { ApiError } from "../../shared/api/client";
 import type { CurrentUser } from "../../shared/domain/schema";
 import type { AiQueryResponseDto } from "./domainlens";
 
@@ -175,7 +183,13 @@ it("shows a permission notice without ai:read and never asks the engine", () => 
 });
 
 it("asks with the current scope and shows the answer with its sales totals", async () => {
-  mocks.execute.mockResolvedValue(response({ message: "강남점 매출이에요." }));
+  const answer = response({ message: "강남점 매출이에요." });
+  mocks.execute.mockResolvedValue(answer);
+  mocks.api.mockImplementation(async (path: string) =>
+    path.startsWith("/ai/executions/")
+      ? { envelope: answer.envelope }
+      : { ready: true },
+  );
   show();
   await ask("이번 달 매출");
   expect(mocks.execute).toHaveBeenCalledWith(
@@ -190,10 +204,13 @@ it("asks with the current scope and shows the answer with its sales totals", asy
   expect(screen.getByText("이번 달 매출")).toBeInTheDocument();
   expect(screen.getAllByText("25,000원")[0]).toBeInTheDocument();
   expect(screen.getByRole("group", { name: "결과 보기" })).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "표" }));
+  await userEvent.click(screen.getByRole("button", { name: "표로 보기" }));
   expect(
-    screen.getByRole("button", { name: "표", pressed: true }),
+    screen.getByRole("button", { name: "표로 보기", pressed: true }),
   ).toBeInTheDocument();
+  expect(
+    await screen.findByRole("table", { name: "결과 데이터 표" }),
+  ).toBeVisible();
 });
 
 it("explains a refused question without showing any result", async () => {
@@ -347,7 +364,9 @@ it("reopens a saved conversation with each question re-run, and keeps asking in 
   );
   expect(await screen.findByText("다시 조회했어요.")).toBeInTheDocument();
   expect(
-    screen.getByText("저장된 질문의 분석은 현재 제공되지 않아요."),
+    screen.getByText(
+      "저장된 질문의 분석은 현재 제공되지 않아요. 다시 질문해 주세요.",
+    ),
   ).toBeInTheDocument();
   expect(screen.getAllByRole("group", { name: "결과 보기" })).toHaveLength(1);
   await ask("이어서 질문");
@@ -501,4 +520,107 @@ it("blocks duplicate submissions and discards a response received after cancella
   await act(async () => complete(response({})));
   expect(await screen.findByText("질문 대기를 취소했어요.")).toBeVisible();
   expect(screen.queryByText("순매출")).toBeNull();
+});
+
+it.each([
+  ["AI_PERMISSION_DENIED", "AI 분석 조회 권한이 없어요."],
+  ["BRANCH_SCOPE_DENIED", "조회 조건에 접근 권한이 없는 지점이 있어요."],
+  [
+    "SALES_PERMISSION_DENIED",
+    "조회 조건에 매출 조회 권한이 없는 지점이 있어요.",
+  ],
+  ["AUTHORIZATION_SCOPE_CHECK", "현재 권한으로 조회 범위를 확인할 수 없어요."],
+])(
+  "shows the reason for %s and hides denied detail rows",
+  async (code, reason) => {
+    mocks.execute.mockResolvedValue(response({}));
+    mocks.api.mockImplementation(async (path: string) => {
+      if (path.startsWith("/ai/executions/"))
+        throw new ApiError(403, { code, message: "권한 거절" });
+      return { ready: true };
+    });
+    show();
+    const user = await ask("이번 달 매출");
+    await user.click(await screen.findByRole("button", { name: "표로 보기" }));
+    expect(
+      await screen.findByText(
+        `${reason} 조회 범위를 줄여 조건을 변경하거나 다시 질문해 주세요.`,
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "막대" }));
+    expect(screen.getByText("현재 조건으로 결과를 볼 수 없어요")).toBeVisible();
+    expect(screen.queryByText("25,000원")).not.toBeInTheDocument();
+  },
+);
+
+it("shows a reset reason independently of inherited and changed conditions", async () => {
+  mocks.execute.mockResolvedValue(
+    response({
+      context: {
+        basedOnExecutionId: null,
+        inherited: [],
+        changed: [],
+        reset: true,
+        resetReason: "PERMISSION_LOST",
+      },
+    }),
+  );
+  show();
+  await ask("지점별 매출");
+  const answer = await screen.findByRole("region", {
+    name: "지점별 매출 비교 결과",
+  });
+  expect(
+    within(answer).getByText(/이전 결과의 지점 권한이 바뀌어/),
+  ).toBeVisible();
+  expect(within(answer).queryByText("유지")).not.toBeInTheDocument();
+  expect(within(answer).queryByText("변경된 조건")).not.toBeInTheDocument();
+});
+
+it("uses server page metadata and resets the page and sort when switching data kinds", async () => {
+  const answer = response({});
+  const source = answer.envelope!.datasets[0];
+  answer.envelope!.datasets.push({ ...source, id: "comparison" });
+  mocks.execute.mockResolvedValue(answer);
+  mocks.api.mockImplementation(async (path: string) => {
+    if (!path.startsWith("/ai/executions/")) return { ready: true };
+    const query = new URL(path, "http://localhost").searchParams;
+    return {
+      envelope: {
+        ...answer.envelope,
+        asOf: "2026-11-11T09:01:00+09:00",
+        datasets: answer.envelope!.datasets.map((dataset) => ({
+          ...dataset,
+          totalElements: 21,
+          page: Number(query.get("page")),
+          size: Number(query.get("size")),
+        })),
+      },
+    };
+  });
+  show();
+  const user = await ask("이번 달 매출");
+  await user.click(await screen.findByRole("button", { name: "표로 보기" }));
+  await user.click(await screen.findByRole("button", { name: "다음" }));
+  expect(await screen.findByText("2페이지 · 총 21개")).toBeVisible();
+  const table = screen.getByRole("table", { name: "결과 데이터 표" });
+  await user.click(
+    within(table).getByRole("button", { name: "net_krw (KRW)" }),
+  );
+  await waitFor(() =>
+    expect(mocks.api).toHaveBeenCalledWith(
+      "/ai/executions/exec-1?datasetId=branchSales&page=1&size=20&sort=net_krw&direction=desc",
+      expect.anything(),
+    ),
+  );
+  await user.selectOptions(screen.getByLabelText("데이터 종류"), "comparison");
+  await waitFor(() =>
+    expect(mocks.api).toHaveBeenLastCalledWith(
+      "/ai/executions/exec-1?datasetId=comparison&page=1&size=20",
+      expect.anything(),
+    ),
+  );
+  expect(await screen.findByText("1페이지 · 총 21개")).toBeVisible();
+  expect(screen.getByText(/표 기준 시각/)).toHaveTextContent("09:01");
 });
