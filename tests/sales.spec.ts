@@ -43,6 +43,31 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
     const summaryTab = page.getByRole("tab", { name: "요약", selected: true });
     await expect(summaryTab).toHaveClass(/\bactive\b/);
     const filters = page.getByRole("region", { name: "매출 조회 조건" });
+    const tabList = page.getByRole("tablist", { name: "매출 조회 화면" });
+    await expect(tabList.getByRole("tab")).toHaveText([
+      "요약",
+      "판매 분석",
+      "추세",
+      "원장",
+      "일별 마감",
+      "이용권 사용량",
+    ]);
+    const tabListBox = (await tabList.boundingBox())!;
+    const filtersBox = (await filters.boundingBox())!;
+    expect(tabListBox.y + tabListBox.height).toBeLessThanOrEqual(filtersBox.y);
+    expect(
+      await tabList.getByRole("tab").evaluateAll((tabs) =>
+        tabs.every((tab) => {
+          const rect = tab.getBoundingClientRect();
+          return (
+            rect.left >= 0 &&
+            rect.right <= window.innerWidth &&
+            rect.top >= 0 &&
+            rect.bottom <= window.innerHeight
+          );
+        }),
+      ),
+    ).toBe(true);
     await filters.getByLabel("환불 집계 기준").selectOption("paymentDate");
     await filters.getByLabel("결제 용도").selectOption("이용권");
     await summaryTab.focus();
@@ -84,6 +109,38 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
     await expect(
       page.getByText("매출 응답을 확인할 수 없어요", { exact: false }),
     ).toHaveCount(0);
+    const ledgerTab = page.getByRole("tab", { name: "원장" });
+    await ledgerTab.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/[?&]view=daily-closings/);
+    await expect(page.getByLabel("마감 목록 시작일")).toBeVisible();
+    await expect(filters).toHaveCount(0);
+    expect(await hasNoHorizontalOverflow()).toBe(true);
+
+    await page.getByRole("tab", { name: "이용권 사용량" }).click();
+    await expect(page).toHaveURL(/[?&]view=pass-usage/);
+    await page.reload();
+    const usageTab = page.getByRole("tab", {
+      name: "이용권 사용량",
+      selected: true,
+    });
+    await expect(usageTab).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "이용 지점별 이용권 사용량" }),
+    ).toBeVisible();
+    const usageFilters = page.getByRole("region", {
+      name: "이용권 사용량 조회 조건",
+    });
+    await expect(usageFilters.getByLabel("시작일")).toHaveValue("2026-09-01");
+    await expect(usageFilters.getByLabel("상품 유형")).toBeVisible();
+    await expect(page.getByLabel("환불 집계 기준")).toHaveCount(0);
+    expect(await hasNoHorizontalOverflow()).toBe(true);
+
+    await ledgerTab.click();
+    await expect(filters.getByLabel("환불 집계 기준")).toHaveValue(
+      "paymentDate",
+    );
+    await expect(filters.getByLabel("결제 용도")).toHaveValue("이용권");
     const result = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
       .analyze();

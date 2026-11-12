@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ApiError } from "../../shared/api/client";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
@@ -40,6 +40,8 @@ const salesTabs = [
   { value: "sales", label: "판매 분석" },
   { value: "trend", label: "추세" },
   { value: "ledger", label: "원장" },
+  { value: "daily-closings", label: "일별 마감" },
+  { value: "pass-usage", label: "이용권 사용량" },
 ] as const;
 const defaultView = salesTabs[0].value;
 
@@ -50,12 +52,13 @@ export function Sales() {
 function SalesWorkspace() {
   const { session, scope } = useApp();
   const [params, setParams] = useSearchParams();
-  const [showClosings, setShowClosings] = useState(false);
-  const [showPassUsage, setShowPassUsage] = useState(false);
   const requestedView = params.get("view");
   const view =
     salesTabs.find(({ value }) => value === requestedView)?.value ??
     defaultView;
+  const isClosings = view === "daily-closings";
+  const isPassUsage = view === "pass-usage";
+  const isSalesReport = !isClosings && !isPassUsage;
   const advanced = readAdvancedFilters(params);
   const branches = session.branches.filter(
     (b) =>
@@ -83,23 +86,24 @@ function SalesWorkspace() {
     )
       throw new Error("선택한 지점의 매출 조회 권한을 확인해 주세요.");
     if (
-      !["processedDate", "paymentDate"].includes(basis) ||
-      !["", "이용권", "스터디룸", "사물함"].includes(purpose) ||
-      ![
-        "netAmount",
-        "approvedAmount",
-        "refundAmount",
-        "branchId",
-        "requested",
-      ].includes(sort) ||
-      !["asc", "desc"].includes(direction) ||
-      !["asc", "desc"].includes(ledgerDirection) ||
-      !["", "승인", "환불"].includes(entryType) ||
-      !Number.isSafeInteger(page) ||
-      page < 1 ||
-      !Number.isSafeInteger(productPage) ||
-      productPage < 1 ||
-      !["day", "week", "month"].includes(granularity)
+      isSalesReport &&
+      (!["processedDate", "paymentDate"].includes(basis) ||
+        !["", "이용권", "스터디룸", "사물함"].includes(purpose) ||
+        ![
+          "netAmount",
+          "approvedAmount",
+          "refundAmount",
+          "branchId",
+          "requested",
+        ].includes(sort) ||
+        !["asc", "desc"].includes(direction) ||
+        !["asc", "desc"].includes(ledgerDirection) ||
+        !["", "승인", "환불"].includes(entryType) ||
+        !Number.isSafeInteger(page) ||
+        page < 1 ||
+        !Number.isSafeInteger(productPage) ||
+        productPage < 1 ||
+        !["day", "week", "month"].includes(granularity))
     )
       throw new Error("조회 조건을 확인해 주세요.");
     condition = {
@@ -109,18 +113,24 @@ function SalesWorkspace() {
         : scope !== "all"
           ? { branchIds: [scope] }
           : {}),
-      refundBasis: basis as SalesCondition["refundBasis"],
-      ...(purpose ? { purpose: purpose as SalesCondition["purpose"] } : {}),
       ...(advanced.categoryCode ? { categoryCode: advanced.categoryCode } : {}),
-      ...(advanced.methods.length ? { methods: advanced.methods } : {}),
       ...(advanced.productKinds.length
         ? { productKinds: advanced.productKinds }
         : {}),
-      ...(advanced.operatorIds.length
-        ? { operatorIds: advanced.operatorIds }
-        : {}),
-      ...(advanced.processingBranchIds.length
-        ? { processingBranchIds: advanced.processingBranchIds }
+      ...(isSalesReport
+        ? {
+            refundBasis: basis as SalesCondition["refundBasis"],
+            ...(purpose
+              ? { purpose: purpose as SalesCondition["purpose"] }
+              : {}),
+            ...(advanced.methods.length ? { methods: advanced.methods } : {}),
+            ...(advanced.operatorIds.length
+              ? { operatorIds: advanced.operatorIds }
+              : {}),
+            ...(advanced.processingBranchIds.length
+              ? { processingBranchIds: advanced.processingBranchIds }
+              : {}),
+          }
         : {}),
     };
   } catch (error) {
@@ -139,12 +149,13 @@ function SalesWorkspace() {
     JSON.stringify(session.user),
     JSON.stringify(condition),
   ];
-  // The shared condition card displays the server's default dates on every tab.
+  // The shared condition card displays the server's default dates on the sales report tabs.
   const usesDefaultPeriod = !from && !to;
   const revenue = useQuery({
     queryKey: [...key, "revenue"],
     queryFn: ({ signal }) => salesApi.revenue(condition, signal),
-    enabled: enabled && (view === "summary" || usesDefaultPeriod),
+    enabled:
+      enabled && isSalesReport && (view === "summary" || usesDefaultPeriod),
     retry: false,
   });
   const comparisonOptions = {
@@ -234,16 +245,21 @@ function SalesWorkspace() {
       return p;
     });
   }
+  function changeFilters(values: Record<string, string[]>) {
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      for (const [name, entries] of Object.entries(values)) {
+        next.delete(name);
+        entries.forEach((value) => next.append(name, value));
+      }
+      next.delete("ledgerPage");
+      next.delete("productPage");
+      return next;
+    });
+  }
   function changeBranch(id: string, checked: boolean) {
-    setParams((p) => {
-      const next = checked
-        ? [...selected, id]
-        : selected.filter((v) => v !== id);
-      p.delete("branchIds");
-      next.forEach((v) => p.append("branchIds", v));
-      p.delete("ledgerPage");
-      p.delete("productPage");
-      return p;
+    changeFilters({
+      branchIds: checked ? [...selected, id] : selected.filter((v) => v !== id),
     });
   }
   if (!allowed) return <State title="매출 조회 권한이 필요해요" />;
@@ -253,153 +269,13 @@ function SalesWorkspace() {
         title="매출 조회"
         description="원결제 지점의 승인·환불·순매출과 집계 근거를 확인해요. 이용권 소비 차감은 매출에 더하지 않아요."
       />
-      <Button
-        aria-expanded={showClosings}
-        onClick={() => setShowClosings(!showClosings)}
-      >
-        일별 마감
-      </Button>
-      {showClosings && (
-        <DailyClosings
-          userId={session.user.id}
-          branches={branches}
-          writable={branches
-            .filter((b) => admin(session.user, b.id))
-            .map((b) => b.id)}
-        />
-      )}
-      <Button
-        aria-expanded={showPassUsage}
-        onClick={() => setShowPassUsage(!showPassUsage)}
-      >
-        이용 지점별 이용권 사용량
-      </Button>
-      {showPassUsage && enabled && (
-        <PassUsage
-          userId={session.user.id}
-          branches={session.branches}
-          condition={condition}
-        />
-      )}
-      <section className="card mb-5" aria-label="매출 조회 조건">
-        <AdvancedFilters
-          values={advanced}
-          branches={session.branches.filter((b) => can(session.user, b.id))}
-          change={(key, values) =>
-            setParams((previous) => {
-              const next = new URLSearchParams(previous);
-              next.delete(key);
-              values.forEach((value) => next.append(key, value));
-              next.delete("ledgerPage");
-              next.delete("productPage");
-              return next;
-            })
-          }
-        />
-        <div className="filters">
-          <label className="field">
-            시작일
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => change("from", e.target.value)}
-            />
-          </label>
-          <label className="field">
-            종료일 (미포함)
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => change("to", e.target.value)}
-            />
-          </label>
-          <Button
-            onClick={() =>
-              setParams((p) => {
-                p.delete("from");
-                p.delete("to");
-                p.delete("ledgerPage");
-                p.delete("productPage");
-                return p;
-              })
-            }
-          >
-            이번 달 기본 기간
-          </Button>
-          <label className="field">
-            환불 집계 기준
-            <select
-              value={basis}
-              onChange={(e) => change("refundBasis", e.target.value)}
-            >
-              <option value="processedDate">환불 처리일 기준</option>
-              <option value="paymentDate">원결제일 기준</option>
-            </select>
-          </label>
-          <label className="field">
-            결제 용도
-            <select
-              value={purpose}
-              onChange={(e) => change("purpose", e.target.value)}
-            >
-              <option value="">전체 용도</option>
-              {["이용권", "스터디룸", "사물함"].map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {scope === "all" && (
-          <fieldset className="border-t border-line p-5">
-            <legend className="px-2 text-xs">집계 지점</legend>
-            <label className="mr-4 inline-flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={!selected.length}
-                onChange={() =>
-                  setParams((p) => {
-                    p.delete("branchIds");
-                    p.delete("ledgerPage");
-                    p.delete("productPage");
-                    return p;
-                  })
-                }
-              />
-              매출 조회 가능한 전체 지점
-            </label>
-            {branches.map((b) => (
-              <label
-                key={b.id}
-                className="mr-4 inline-flex items-center gap-2 text-xs"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(b.id)}
-                  onChange={(e) => changeBranch(b.id, e.target.checked)}
-                />
-                {b.name}
-              </label>
-            ))}
-          </fieldset>
-        )}
-        {defaultPeriod && !forbidden && (
-          <p className="help px-5" aria-label="적용된 기본 날짜">
-            {formatBusinessDate(defaultPeriod.from)} ~{" "}
-            {formatBusinessDate(defaultPeriod.to)} (종료일 미포함)
-          </p>
-        )}
-        <p className="help px-5 pb-5">
-          기간을 비우면 이번 달 1일부터 내일 0시까지 조회합니다. 직접 입력하는
-          기간은 최대 366일입니다. 날짜는 한국 시간 기준입니다.
-        </p>
-      </section>
       <Tabs.Root
         value={view}
         onValueChange={(value) =>
           change("view", value === defaultView ? "" : value)
         }
       >
-        <Tabs.List className="tabs" aria-label="매출 조회 결과">
+        <Tabs.List className="tabs flex-wrap" aria-label="매출 조회 화면">
           {salesTabs.map(({ value, label }) => (
             <Tabs.Trigger
               key={value}
@@ -410,7 +286,145 @@ function SalesWorkspace() {
             </Tabs.Trigger>
           ))}
         </Tabs.List>
-        {invalid || forbidden ? (
+        {!isClosings && (
+          <section
+            className="card mb-5"
+            aria-label={
+              isPassUsage ? "이용권 사용량 조회 조건" : "매출 조회 조건"
+            }
+          >
+            {isSalesReport && (
+              <AdvancedFilters
+                values={advanced}
+                branches={session.branches.filter((b) =>
+                  can(session.user, b.id),
+                )}
+                change={(key, values) => changeFilters({ [key]: values })}
+              />
+            )}
+            <div className="filters">
+              <label className="field">
+                시작일
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => change("from", e.target.value)}
+                />
+              </label>
+              <label className="field">
+                종료일 (미포함)
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => change("to", e.target.value)}
+                />
+              </label>
+              <Button onClick={() => changeFilters({ from: [], to: [] })}>
+                이번 달 기본 기간
+              </Button>
+              {isPassUsage ? (
+                <>
+                  <label className="field">
+                    상품 유형
+                    <select
+                      multiple
+                      value={advanced.productKinds}
+                      onChange={(e) =>
+                        changeFilters({
+                          productKinds: Array.from(
+                            e.target.selectedOptions,
+                            (option) => option.value,
+                          ),
+                        })
+                      }
+                    >
+                      {["시간권", "기간권", "정액권"].map((kind) => (
+                        <option key={kind}>{kind}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    상품 분류 코드
+                    <input
+                      value={advanced.categoryCode ?? ""}
+                      onChange={(e) =>
+                        changeFilters({
+                          categoryCode: e.target.value ? [e.target.value] : [],
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="field">
+                    환불 집계 기준
+                    <select
+                      value={basis}
+                      onChange={(e) => change("refundBasis", e.target.value)}
+                    >
+                      <option value="processedDate">환불 처리일 기준</option>
+                      <option value="paymentDate">원결제일 기준</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    결제 용도
+                    <select
+                      value={purpose}
+                      onChange={(e) => change("purpose", e.target.value)}
+                    >
+                      <option value="">전체 용도</option>
+                      {["이용권", "스터디룸", "사물함"].map((p) => (
+                        <option key={p}>{p}</option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+            </div>
+            {scope === "all" && (
+              <fieldset className="border-t border-line p-5">
+                <legend className="px-2 text-xs">
+                  {isPassUsage ? "이용 지점" : "집계 지점"}
+                </legend>
+                <label className="mr-4 inline-flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={!selected.length}
+                    onChange={() => changeFilters({ branchIds: [] })}
+                  />
+                  {isPassUsage
+                    ? "조회 가능한 전체 이용 지점"
+                    : "매출 조회 가능한 전체 지점"}
+                </label>
+                {branches.map((b) => (
+                  <label
+                    key={b.id}
+                    className="mr-4 inline-flex items-center gap-2 text-xs"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(b.id)}
+                      onChange={(e) => changeBranch(b.id, e.target.checked)}
+                    />
+                    {b.name}
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {isSalesReport && defaultPeriod && !forbidden && (
+              <p className="help px-5" aria-label="적용된 기본 날짜">
+                {formatBusinessDate(defaultPeriod.from)} ~{" "}
+                {formatBusinessDate(defaultPeriod.to)} (종료일 미포함)
+              </p>
+            )}
+            <p className="help px-5 pb-5">
+              기간을 비우면 이번 달 1일부터 내일 0시까지 조회합니다. 직접
+              입력하는 기간은 최대 366일입니다. 날짜는 한국 시간 기준입니다.
+            </p>
+          </section>
+        )}
+        {!isClosings && (invalid || (isSalesReport && forbidden)) ? (
           <Tabs.Content key={view} value={view}>
             {invalid ? (
               <State
@@ -418,9 +432,19 @@ function SalesWorkspace() {
                 message={invalid}
                 action={
                   <Button
-                    onClick={() =>
-                      setParams(view === defaultView ? {} : { view })
-                    }
+                    onClick={() => {
+                      if (isPassUsage) {
+                        changeFilters({
+                          from: [],
+                          to: [],
+                          branchIds: [],
+                          productKinds: [],
+                          categoryCode: [],
+                        });
+                      } else {
+                        setParams(view === defaultView ? {} : { view });
+                      }
+                    }}
                   >
                     조건 초기화
                   </Button>
@@ -929,6 +953,26 @@ function SalesWorkspace() {
                   )
                 )}
               </section>
+            </Tabs.Content>
+            <Tabs.Content value="daily-closings">
+              {isClosings && (
+                <DailyClosings
+                  userId={session.user.id}
+                  branches={branches}
+                  writable={branches
+                    .filter((b) => admin(session.user, b.id))
+                    .map((b) => b.id)}
+                />
+              )}
+            </Tabs.Content>
+            <Tabs.Content value="pass-usage">
+              {isPassUsage && (
+                <PassUsage
+                  userId={session.user.id}
+                  branches={session.branches}
+                  condition={condition}
+                />
+              )}
             </Tabs.Content>
           </>
         )}

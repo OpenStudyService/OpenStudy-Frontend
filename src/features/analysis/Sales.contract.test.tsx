@@ -99,16 +99,13 @@ it("exports each report with its screen query and the server filename", async ()
     show(
       `${september}&branchIds=gangnam&branchIds=seongsu&refundBasis=paymentDate&methods=카드&methods=현금&productKinds=시간권&sort=branchId&direction=asc&entryType=환불&ledgerDirection=asc&ledgerPage=2&productPage=2&granularity=week`,
     );
-    await userEvent.click(
-      screen.getByRole("button", { name: "이용 지점별 이용권 사용량" }),
-    );
     const reports = [
       ["요약", "매출 요약", "revenue", "revenue"],
       ["요약", "지점별 매출 비교", "revenue-branches", "revenue/branches"],
       ["원장", "매출 원장", "ledger", "ledger"],
       ["판매 분석", "이용권 판매량", "passes-volume", "passes/volume"],
       ["판매 분석", "이용권 상품별 판매", "passes-products", "passes/products"],
-      ["요약", "이용권 사용 현황", "passes-usage", "passes/usage"],
+      ["이용권 사용량", "이용권 사용 현황", "passes-usage", "passes/usage"],
       ["추세", "매출 추세", "trend", "trend", "revenue"],
       ["추세", "이용권 판매량 추세", "trend", "trend", "passes"],
     ];
@@ -238,6 +235,69 @@ it("shows applied advanced filter and server note on the card, ledger and trend"
   ).toBe(true);
 });
 
+it("opens usage by URL and queries only its applicable filters", async () => {
+  show(
+    "?view=pass-usage&branchIds=gangnam&productKinds=시간권&categoryCode=TIME&refundBasis=paymentDate&purpose=사물함&methods=카드&ledgerPage=2",
+  );
+  expect(
+    screen.getByRole("tab", { name: "이용권 사용량", selected: true }),
+  ).toBeVisible();
+  expect(
+    await screen.findByRole("heading", { name: "이용 지점별 이용권 사용량" }),
+  ).toBeVisible();
+  const filters = region("이용권 사용량 조회 조건");
+  expect(filters.getByLabelText("시작일")).toHaveValue("");
+  expect(filters.getByRole("group", { name: "이용 지점" })).toBeVisible();
+  expect(filters.getByLabelText("상품 유형")).toHaveValue(["시간권"]);
+  expect(filters.getByLabelText("상품 분류 코드")).toHaveValue("TIME");
+  expect(filters.queryByText("고급 필터")).not.toBeInTheDocument();
+  expect(filters.queryByLabelText("환불 집계 기준")).not.toBeInTheDocument();
+  expect(filters.queryByLabelText("결제 용도")).not.toBeInTheDocument();
+  expect(requests.map((url) => url.pathname)).toEqual([
+    "/api/sales/passes/usage",
+  ]);
+  const query = new URLSearchParams(requests[0].search);
+  expect(query.getAll("branchIds")).toEqual(["gangnam"]);
+  expect(query.getAll("productKinds")).toEqual(["시간권"]);
+  expect(query.get("categoryCode")).toBe("TIME");
+  for (const key of ["refundBasis", "purpose", "methods", "ledgerPage"])
+    expect(query.has(key)).toBe(false);
+
+  await userEvent.selectOptions(filters.getByLabelText("상품 유형"), [
+    "기간권",
+  ]);
+  await waitFor(() =>
+    expect(requests.at(-1)?.searchParams.getAll("productKinds")).toEqual([
+      "시간권",
+      "기간권",
+    ]),
+  );
+  await selectTab("원장");
+  expect(screen.getByLabelText("환불 집계 기준")).toHaveValue("paymentDate");
+  expect(screen.getByLabelText("결제 용도")).toHaveValue("사물함");
+  expect(screen.getByLabelText("상품 유형")).toHaveValue(["시간권", "기간권"]);
+  expect(screen.getByLabelText("결제 수단")).toHaveValue(["카드"]);
+});
+
+it("shows the sales validation only on the views that use those conditions", async () => {
+  show("?view=pass-usage&from=2026-09-01&refundBasis=invalid");
+  expect(
+    screen.getByRole("heading", { name: "조회 조건을 확인해 주세요" }),
+  ).toBeVisible();
+  expect(requests).toHaveLength(0);
+  await userEvent.click(screen.getByRole("button", { name: "조건 초기화" }));
+  expect(
+    await screen.findByRole("heading", { name: "이용 지점별 이용권 사용량" }),
+  ).toBeVisible();
+  await selectTab("원장");
+  expect(
+    screen.getByRole("heading", { name: "조회 조건을 확인해 주세요" }),
+  ).toBeVisible();
+  expect(
+    requests.every((url) => url.pathname === "/api/sales/passes/usage"),
+  ).toBe(true);
+});
+
 it("renders the amounts and refund actor in closing detail", async () => {
   const approved = store.db.payments.find(
     (p) => p.productId && p.status === "승인",
@@ -261,8 +321,17 @@ it("renders the amounts and refund actor in closing detail", async () => {
   approved.refundBranchId = approved.branchId;
   approved.reason = "조정 사유 테스트";
   vi.mocked(store.now).mockReturnValue("2026-11-10T04:00:00.000Z");
-  show("");
-  await userEvent.click(screen.getByRole("button", { name: "일별 마감" }));
+  requests.length = 0;
+  show("?view=daily-closings&from=2026-11-01&ledgerPage=invalid");
+  expect(
+    screen.getByRole("tab", { name: "일별 마감", selected: true }),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("region", { name: "매출 조회 조건" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "조회 조건을 확인해 주세요" }),
+  ).not.toBeInTheDocument();
   await userEvent.click(
     await screen.findByRole("button", { name: /2026-11-09.*상세/ }),
   );
@@ -281,6 +350,10 @@ it("renders the amounts and refund actor in closing detail", async () => {
   expect(
     detail.getByRole("row", { name: /조정 사유 테스트.*김서연/ }),
   ).toBeVisible();
+  expect(requests.map((url) => url.pathname)).toEqual([
+    "/api/daily-closings",
+    expect.stringMatching(/^\/api\/daily-closings\/[^/]+$/),
+  ]);
 });
 
 it("sends the product page and both trend measures but omits the fixed pass purpose", async () => {
