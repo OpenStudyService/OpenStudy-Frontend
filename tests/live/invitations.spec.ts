@@ -172,6 +172,7 @@ async function acceptNew(page: Page, link: string) {
   await expect(page.getByLabel("새 계정 비밀번호")).toBeVisible();
   await expect(page).toHaveURL(`${baseURL}/invitations/accept`);
   await page.getByLabel("새 계정 비밀번호").fill(password);
+  await page.getByLabel("비밀번호 확인").fill(password);
   await page.evaluate(() =>
     window.dispatchEvent(
       new PopStateEvent("popstate", { state: window.history.state }),
@@ -546,6 +547,7 @@ test("a signed-in user can log out and continue the new-account mail link withou
       .click();
     await expect(recipient.page.getByLabel("새 계정 비밀번호")).toBeVisible();
     await recipient.page.getByLabel("새 계정 비밀번호").fill(password);
+    await recipient.page.getByLabel("비밀번호 확인").fill(password);
     await recipient.page
       .getByRole("button", { name: "초대 수락", exact: true })
       .click();
