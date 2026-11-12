@@ -48,6 +48,7 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
     [previewError, setPreviewError] = useState<Error | null>(null),
     [previewAttempt, setPreviewAttempt] = useState(0),
     [error, setError] = useState<Error | null>(null),
+    [passwordMismatch, setPasswordMismatch] = useState(false),
     [busy, setBusy] = useState(false),
     [accepted, setAccepted] = useState(false);
   useEffect(() => {
@@ -89,11 +90,19 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
       previewError.status >= 500);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget,
-      password = String(new FormData(form).get("password") || "");
-    if (!preview) return;
-    setBusy(true);
+    if (!preview || busy) return;
+    const form = event.currentTarget;
+    const fields = new FormData(form);
+    const password = String(fields.get("password") ?? "");
     setError(null);
+    if (
+      preview.acceptanceMode === "NEW_ACCOUNT" &&
+      password !== fields.get("passwordConfirmation")
+    ) {
+      setPasswordMismatch(true);
+      return;
+    }
+    setBusy(true);
     try {
       if (
         preview.acceptanceMode === "EXISTING_ACCOUNT" &&
@@ -235,8 +244,32 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
                     }
                     required
                     minLength={needsLogin ? 1 : 8}
+                    onChange={() => setPasswordMismatch(false)}
                   />
                 </label>
+              )}
+              {preview.acceptanceMode === "NEW_ACCOUNT" && (
+                <div>
+                  <label className="field">
+                    비밀번호 확인
+                    <input
+                      name="passwordConfirmation"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      aria-invalid={passwordMismatch}
+                      aria-describedby={
+                        passwordMismatch ? "invite-password-confirmation-error" : undefined
+                      }
+                      onChange={() => setPasswordMismatch(false)}
+                    />
+                  </label>
+                  {passwordMismatch && (
+                    <FieldError id="invite-password-confirmation-error">
+                      비밀번호가 일치하지 않습니다.
+                    </FieldError>
+                  )}
+                </div>
               )}
               {preview.acceptanceMode === "EXISTING_ACCOUNT" && (
                 <p className="help">
