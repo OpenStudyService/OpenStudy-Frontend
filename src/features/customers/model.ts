@@ -32,6 +32,8 @@ export interface CustomerFilters {
 }
 export const customerKeys = {
   root: (userId: string, scope: string) => ["data", userId, scope, "customers"],
+  duplicates: (userId: string, page: number) =>
+    [...customerKeys.root(userId, "all"), "duplicates", page],
   detail: (userId: string, scope: string, id: string) => [
     "data",
     userId,

@@ -13,15 +13,17 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import type { AppContext } from "../../app/context";
 import { MockStore } from "../../mocks/store";
 import { ApiError } from "../../shared/api/client";
+import { invalidateReads } from "../../shared/api/invalidateReads";
 import { Customers } from "./Customers";
 import { customerApi } from "./api";
-import type { Customer, CustomerListItem } from "./model";
+import { customerKeys, type Customer, type CustomerListItem } from "./model";
 
 const context = vi.hoisted(() => ({ value: {} as AppContext }));
 vi.mock("../../app/context", () => ({ useApp: () => context.value }));
 vi.mock("./api", () => ({
   customerApi: {
     list: vi.fn(),
+    duplicates: vi.fn(),
     detail: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -84,6 +86,10 @@ beforeEach(() => {
     items: [listItem()],
     meta: { page: 1, pageSize: 20, total: 1 },
   }));
+  vi.mocked(customerApi.duplicates).mockResolvedValue({
+    items: [],
+    meta: { page: 1, pageSize: 20, total: 0 },
+  });
   vi.mocked(customerApi.detail).mockImplementation(async () => ({
     ...current,
   }));
@@ -117,13 +123,13 @@ afterEach(() => {
   clients.length = 0;
   vi.restoreAllMocks();
 });
-function mount(search = "") {
+function mount(search = "", embedded = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   clients.push(client);
   const router = createMemoryRouter(
-    [{ path: "/app/:scope/members", element: <Customers /> }],
+    [{ path: "/app/:scope/members", element: <Customers embedded={embedded} /> }],
     { initialEntries: [`/app/gangnam/members${search}`] },
   );
   return {
@@ -146,6 +152,78 @@ const conflict = () =>
     code: "VERSION_CONFLICT",
     message: "다른 사용자가 수정했습니다.",
   });
+
+const duplicateButtonName = /중복 의심 \d+건/;
+const duplicatesKey = customerKeys.duplicates("owner", 1);
+
+it.each([false, true])(
+  "opens the duplicate panel from the filters using the cached first page (embedded=%s)",
+  async (embedded) => {
+    if (embedded) context.value.session.branches = [];
+    vi.mocked(customerApi.duplicates).mockResolvedValueOnce({
+      items: [{ phone: current.phone, customers: [] }],
+      meta: { page: 1, pageSize: 20, total: 2 },
+    });
+    const { client } = mount("", embedded);
+    const button = await screen.findByRole("button", { name: "중복 의심 2건" });
+    expect(button.closest(".filters")).toContainElement(
+      screen.getByRole("button", { name: "초기화" }),
+    );
+    if (embedded) {
+      expect(screen.queryByRole("button", { name: "회원 등록" })).toBeNull();
+      expect(button.parentElement).toHaveClass("ml-auto");
+    } else {
+      const heading = screen.getByRole("heading", { name: "회원 관리" });
+      expect(heading.closest("header")).not.toContainElement(button);
+      expect(button.nextElementSibling).toBe(
+        screen.getByRole("button", { name: "회원 등록" }),
+      );
+    }
+
+    await userEvent.click(button);
+    const panel = await screen.findByRole("dialog", { name: "중복 고객 확인" });
+    expect(within(panel).getByText(current.phone)).toBeVisible();
+    expect(customerApi.duplicates).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await invalidateReads(client, "owner", "customers");
+    });
+    expect(await within(panel).findByText("중복 의심 고객이 없어요")).toBeVisible();
+    expect(button).not.toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("button", { name: duplicateButtonName })).toBeNull();
+  },
+);
+
+it("hides the duplicate button while loading and when there are no groups", async () => {
+  const { client } = mount();
+  expect(screen.queryByRole("button", { name: duplicateButtonName })).toBeNull();
+  await waitFor(() =>
+    expect(client.getQueryState(duplicatesKey)?.status).toBe("success"),
+  );
+  expect(screen.queryByRole("button", { name: duplicateButtonName })).toBeNull();
+});
+
+it("does not request duplicate groups for a non-owner", async () => {
+  context.value.session.user = { ...context.value.session.user, owner: false };
+  mount();
+  await screen.findByRole("button", { name: "기존 회원" });
+  expect(screen.queryByRole("button", { name: duplicateButtonName })).toBeNull();
+  expect(customerApi.duplicates).not.toHaveBeenCalled();
+});
+
+it("keeps the member list available when the duplicate request fails", async () => {
+  vi.mocked(customerApi.duplicates).mockRejectedValueOnce(
+    new Error("중복 조회 실패"),
+  );
+  const { client } = mount();
+  await waitFor(() =>
+    expect(client.getQueryState(duplicatesKey)?.status).toBe("error"),
+  );
+  expect(await screen.findByRole("button", { name: "기존 회원" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: duplicateButtonName })).toBeNull();
+  expect(screen.queryByText("중복 조회 실패")).toBeNull();
+});
 
 it("shows minimal list information and keeps detail closing separate from URL filters", async () => {
   const { router } = mount(

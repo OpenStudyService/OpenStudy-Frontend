@@ -19,6 +19,7 @@ import { Icon } from "../../shared/ui/Icon";
 import { customerApi } from "./api";
 import {
   canCreateCustomer,
+  customerKeys,
   customerListStatuses,
   parseCustomerFilters,
 } from "./model";
@@ -30,6 +31,16 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
     [params, setParams] = useSearchParams();
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const canMerge = session.user.owner && session.user.status === "활성";
+  const duplicates = useQuery({
+    queryKey: customerKeys.duplicates(session.user.id, 1),
+    queryFn: ({ signal }) => customerApi.duplicates(1, signal),
+    enabled: canMerge,
+    retry: false,
+  });
+  const duplicateTotal =
+    canMerge && duplicates.isSuccess && !duplicates.isFetching
+      ? duplicates.data.meta.total
+      : 0;
   const filters = parseCustomerFilters(params);
   const rows = useQuery({
     queryKey: ["data", session.user.id, scope, "customers", "list", filters],
@@ -75,22 +86,13 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
       return next;
     });
   }
-  const duplicatesAction = canMerge && (
-    <Button onClick={() => setDuplicatesOpen(true)}>중복 고객 확인</Button>
-  );
   return (
     <section className={embedded ? "" : "page"}>
-      {embedded ? (
-        duplicatesAction && (
-          <div className="mb-4 flex justify-end">{duplicatesAction}</div>
-        )
-      ) : (
+      {!embedded && (
         <Heading
           title="회원 관리"
           description="회원 정보와 응대 내용을 확인하고 관리해요."
-        >
-          {duplicatesAction}
-        </Heading>
+        />
       )}
       {MOCK && (
         <p className="help mb-4">
@@ -166,15 +168,20 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
           >
             초기화
           </Button>
-          {creatable && (
-            <Button
-              variant="primary"
-              className="ml-auto"
-              onClick={() => show("new")}
-            >
-              <Icon name="plus" size={16} />
-              회원 등록
-            </Button>
+          {(duplicateTotal > 0 || creatable) && (
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {duplicateTotal > 0 && (
+                <Button variant="quiet" onClick={() => setDuplicatesOpen(true)}>
+                  중복 의심 {duplicateTotal}건
+                </Button>
+              )}
+              {creatable && (
+                <Button variant="primary" onClick={() => show("new")}>
+                  <Icon name="plus" size={16} />
+                  회원 등록
+                </Button>
+              )}
+            </div>
           )}
         </div>
         <p className="px-5 pb-3 text-xs text-muted">
