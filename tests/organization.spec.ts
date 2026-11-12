@@ -12,7 +12,8 @@ test("owner creates a branch with structured overnight hours", async ({
 }) => {
   await login(page);
   await page.goto("/app/all/branches");
-  await page.getByRole("button", { name: "지점 등록", exact: true }).click();
+  const filters = page.locator(".filters");
+  await filters.getByRole("button", { name: "지점 등록", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog
     .getByLabel("지점 이름", { exact: true })
@@ -36,9 +37,35 @@ test("owner creates a branch with structured overnight hours", async ({
     closesMinute: 1560,
   });
   await expect(dialog).not.toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "구조화 운영시간 검증점", exact: true }),
-  ).toBeVisible();
+  const table = page.getByRole("table", { name: "지점 목록" });
+  const branch = table.getByRole("button", {
+    name: "지점 수정: 구조화 운영시간 검증점",
+  });
+  await expect(branch).toBeVisible();
+  await branch.click();
+  await expect(dialog.getByLabel("지점 이름", { exact: true })).toHaveValue(
+    "구조화 운영시간 검증점",
+  );
+  await dialog.getByRole("button", { name: "닫기", exact: true }).click();
+
+  const search = filters.getByRole("searchbox", { name: "지점 검색" });
+  await search.fill("없는 지점 이름");
+  await expect(table.getByText("조건에 맞는 지점이 없어요")).toBeVisible();
+  await expect(page.getByText("총 0건 · 1페이지")).toBeVisible();
+  await filters.getByRole("button", { name: "초기화", exact: true }).click();
+  await expect(search).toHaveValue("");
+  await expect(page).toHaveURL(/\/app\/all\/branches$/);
+  await expect(branch).toBeVisible();
+
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(table).toBeVisible();
+    const viewport = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      contentWidth: document.documentElement.scrollWidth,
+    }));
+    expect(viewport.contentWidth).toBeLessThanOrEqual(viewport.width);
+  }
 });
 
 test("membership editor sends one branch with both versions and preserves email", async ({

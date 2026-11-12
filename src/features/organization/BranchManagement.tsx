@@ -1,31 +1,32 @@
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { admin, can } from "../../shared/domain/schema";
 import { BranchClosures } from "./BranchClosures";
 import { api, queryString } from "../../shared/api/client";
 import { useIdempotency } from "../../shared/api/useIdempotency";
+import { Badge, Button, Heading, Panel } from "../../shared/ui/primitives";
 import {
-  Badge,
-  Button,
-  ErrorState,
-  Heading,
-  Panel,
-  State,
-} from "../../shared/ui/primitives";
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
 import { organizationRead } from "./api";
 import { canManageBranch, defaultHours, hoursError, weekdays } from "./model";
 import type { Branch, BranchInput } from "./model";
 import {
   ContractNotice,
   Field,
-  Pager,
   SaveError,
   useListSearch,
   useOrganizationList,
   useRefreshOrganization,
 } from "./shared";
+
+const PAGE_SIZE = 20;
 
 export function BranchManagement() {
   const { session, scope } = useApp();
@@ -44,66 +45,116 @@ export function BranchManagement() {
 function BranchManagementContent() {
   const { session, scope } = useApp();
   const { page, search, setPage, setSearch } = useListSearch("branch");
+  const [, setParams] = useSearchParams();
   const [selected, setSelected] = useState<Branch | "new" | null>(null);
   const [closureBranch, setClosureBranch] = useState<Branch | null>(null);
   const data = useOrganizationList<"BranchPage">(
-    `/branches?${queryString({ scope, page, pageSize: 20, q: search })}`,
+    `/branches?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search })}`,
   );
   const refresh = useRefreshOrganization();
   return (
-    <section className="card mb-5 p-5">
+    <>
       <Heading
         title="지점 관리"
-        description="7요일 운영시간과 지점 정보를 관리해요."
-      >
-        {session.user.owner && (
-          <Button onClick={() => setSelected("new")}>지점 등록</Button>
-        )}
-      </Heading>
+        description="요일별 운영시간과 지점 정보를 관리해요."
+      />
       <ContractNotice />
-      <Field label="지점 검색">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} />
-      </Field>
-      {data.isPending ? (
-        <State loading />
-      ) : !data.data || hasBlockingReadError(data) ? (
-        <ErrorState error={data.error!} retry={() => void data.refetch()} />
-      ) : (
-        <>
-          {!data.data.items.length && <State title="등록된 지점이 없어요" />}
-          {data.data.items.map((branch) => (
-            <article
-              className="my-3 rounded-xl border border-line p-4"
-              key={branch.id}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3>{branch.name}</h3>
-                  <p className="help">
-                    {branch.code} · {branch.address} · {branch.phone}
-                  </p>
-                  <p className="help">{branch.hours}</p>
+      <ListCard>
+        <ListFilters
+          actions={
+            session.user.owner && (
+              <Button variant="primary" onClick={() => setSelected("new")}>
+                지점 등록
+              </Button>
+            )
+          }
+        >
+          <input
+            type="search"
+            aria-label="지점 검색"
+            placeholder="지점 이름·코드 검색"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <Button
+            variant="quiet"
+            onClick={() =>
+              setParams(
+                (current) => {
+                  const next = new URLSearchParams(current);
+                  next.delete("branchSearch");
+                  next.delete("branchPage");
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+          >
+            초기화
+          </Button>
+        </ListFilters>
+        <ListTable
+          label="지점 목록"
+          columns={["지점명", "주소", "연락처", "운영시간", "상태", "휴무일"]}
+          loading={data.isPending}
+          error={!data.data || hasBlockingReadError(data) ? data.error : null}
+          onRetry={() => void data.refetch()}
+          isEmpty={!data.data?.items.length}
+          empty={{
+            title: search
+              ? "조건에 맞는 지점이 없어요"
+              : "등록된 지점이 없어요",
+          }}
+        >
+          {data.data?.items.map((branch) => {
+            const closureAction = admin(session.user, branch.id)
+              ? "휴무일 관리"
+              : "휴무일 보기";
+            return (
+              <tr key={branch.id}>
+                <td>
+                  {canManageBranch(session.user, branch.id) ? (
+                    <button
+                      className="cell-link"
+                      aria-label={`지점 수정: ${branch.name}`}
+                      onClick={() => setSelected(branch)}
+                    >
+                      {branch.name}
+                    </button>
+                  ) : (
+                    branch.name
+                  )}
+                  <span className="help block">{branch.code}</span>
+                </td>
+                <td>{branch.address}</td>
+                <td>{branch.phone}</td>
+                <td>{branch.hours}</td>
+                <td>
                   <Badge>{branch.status}</Badge>
-                </div>
-                {can(session.user, branch.id) && (
-                  <Button onClick={() => setClosureBranch(branch)}>
-                    {admin(session.user, branch.id)
-                      ? "휴무일 관리"
-                      : "휴무일 보기"}
-                    : {branch.name}
-                  </Button>
-                )}
-                {canManageBranch(session.user, branch.id) && (
-                  <Button onClick={() => setSelected(branch)}>
-                    지점 수정: {branch.name}
-                  </Button>
-                )}
-              </div>
-            </article>
-          ))}
-          <Pager page={page} total={data.data.meta.total} onChange={setPage} />
-        </>
-      )}
+                </td>
+                <td>
+                  {can(session.user, branch.id) && (
+                    <Button
+                      aria-label={`${closureAction}: ${branch.name}`}
+                      onClick={() => setClosureBranch(branch)}
+                    >
+                      {closureAction}
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </ListTable>
+        <ListFooter
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={data.data?.meta.total ?? 0}
+          loading={data.isPending}
+          error={!!data.error}
+          onChange={setPage}
+        />
+      </ListCard>
       <Panel
         open={closureBranch !== null}
         onClose={() => setClosureBranch(null)}
@@ -130,7 +181,7 @@ function BranchManagementContent() {
           />
         )}
       </Panel>
-    </section>
+    </>
   );
 }
 export function BranchForm({
