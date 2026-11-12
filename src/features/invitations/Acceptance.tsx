@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshControl } from "../../shared/ui/RefreshControl";
 import { useSession } from "../../app/context";
 import { api, ApiError } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
@@ -381,7 +380,7 @@ export function PendingApproval() {
         <p className="help my-5">
           {approved
             ? "업무 공간에 들어가려면 다시 로그인해 주세요."
-            : "관리자가 승인하면 해당 지점의 업무 공간을 사용할 수 있어요."}
+            : "승인 결과를 확인하려면 이 페이지를 새로고침해 주세요."}
         </p>
         {status.data?.invitations?.map((i) => (
           <article className="my-3" key={i.invitationId}>
@@ -397,20 +396,12 @@ export function PendingApproval() {
           />
         )}
         {error && <FieldError>{error.message}</FieldError>}
-        <div className="flex flex-wrap gap-2">
-          <RefreshControl
-            label="승인 상태 새로고침"
-            updatedAt={status.dataUpdatedAt}
-            fetching={status.isFetching}
-            refresh={() => void status.refetch()}
-          />
-          <Button disabled={leaving} onClick={() => void leave()}>
-            {approved ? "다시 로그인" : "로그아웃"}
-          </Button>
-        </div>
+        <Button disabled={leaving} onClick={() => void leave()}>
+          {approved ? "다시 로그인" : "로그아웃"}
+        </Button>
         {workspace && (
           <Link
-            className="btn mt-4"
+            className="btn ml-2"
             to={`/app/${session.data.branches[0]?.id || "all"}/home`}
           >
             기존 지점 업무로 돌아가기
