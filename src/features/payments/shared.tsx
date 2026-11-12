@@ -30,7 +30,17 @@ export function useSalesSearch() {
       },
       { replace: name !== "detail" },
     );
-  return { params, page, update };
+  // 필터 초기화: 지정한 키만 지우고 detail 등 나머지 파라미터는 유지한다.
+  const reset = (names: string[]) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        names.forEach((name) => next.delete(name));
+        return next;
+      },
+      { replace: true },
+    );
+  return { params, page, update, reset };
 }
 export function SalesPager({
   page,
@@ -72,16 +82,21 @@ export function useSalesClock() {
   return now;
 }
 export const dateTime = formatDateTime;
+/** 목록 카드 안에서 필터 바 아래 보조 행으로 고객 선택을 놓을 때의 배치. */
+export const LIST_CUSTOMER_SELECTOR_CLASS =
+  "grid gap-3 border-b border-line px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end";
 export function CustomerSelector({
   value,
   onChange,
   disabled = false,
   allowAll = false,
+  className = "my-3",
 }: {
   value: string;
   onChange: (id: string) => void;
   disabled?: boolean;
   allowAll?: boolean;
+  className?: string;
 }) {
   const { session, scope } = useApp();
   const [search, setSearch] = useState("");
@@ -105,7 +120,7 @@ export function CustomerSelector({
     retry: false,
   });
   return (
-    <div className="my-3">
+    <div className={className}>
       <Field label="고객 검색 (이름·회원번호·연락처)">
         <input
           value={search}

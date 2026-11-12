@@ -3,6 +3,17 @@ import type { components } from "../src/shared/api/foundation.generated";
 
 type Payment = components["schemas"]["Payment"];
 const notice = "Mock 결제·실제 금전 이동 없음";
+
+// 결제 목록은 기본이 최신순이므로 방금 만든 결제가 첫 행이다. 고객 이름 셀 링크로 상세를 연다.
+async function openNewestPayment(page: Page, id: string) {
+  await page
+    .getByRole("table", { name: "결제 목록" })
+    .getByRole("row")
+    .nth(1)
+    .getByRole("button")
+    .click();
+  await expect(page).toHaveURL(new RegExp(`[?&]detail=${id}(&|$)`));
+}
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByRole("button", { name: "사장님으로 체험" }).click();
@@ -108,9 +119,7 @@ test("MSW: approval, purchase snapshot detail and unused full refund", async ({
   const payment = await purchase(page);
   const panel = page.getByRole("dialog");
   await panel.getByRole("button", { name: "확인", exact: true }).click();
-  await page
-    .getByRole("button", { name: `결제 상세: ${payment.id}`, exact: true })
-    .click();
+  await openNewestPayment(page, payment.id);
   await expect(panel.getByText("발급 이용권", { exact: true })).toBeVisible();
   await expect(panel.getByText("6,000분", { exact: true })).toBeVisible();
   await expect(panel.getByText("시작 일시", { exact: true })).toBeVisible();
@@ -183,9 +192,7 @@ test("MSW: failed payment issues no pass and date/status filters use canonical t
   const params = new URL(filtered.url()).searchParams;
   expect(params.get("from")).toBe("2026-09-30T15:00:00.000Z");
   expect(params.get("to")).toBe("2026-11-01T15:00:00.000Z");
-  await page
-    .getByRole("button", { name: `결제 상세: ${payment.id}`, exact: true })
-    .click();
+  await openNewestPayment(page, payment.id);
   await expect(
     page
       .getByRole("dialog")

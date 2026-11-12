@@ -5,10 +5,11 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AppContext } from "../../app/context";
 import { MockStore } from "../../mocks/store";
@@ -484,4 +485,106 @@ it("includes cached session age when a panel is opened so time cannot move backw
   expect(
     screen.queryByRole("button", { name: "전액 환불" }),
   ).not.toBeInTheDocument();
+});
+
+function LocationProbe() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
+const search = () =>
+  new URLSearchParams(screen.getByTestId("search").textContent ?? "");
+
+it.each([
+  ["passes", <Passes key="passes" />, "보유 이용권 목록", "보유 이용권 상세"],
+  ["payments", <Payments key="payments" />, "결제 목록", "결제 상세"],
+] as const)(
+  "opens the %s detail panel from the customer name cell without a separate detail button",
+  async (_, element, table, title) => {
+    const user = userEvent.setup();
+    mount(
+      <>
+        {element}
+        <LocationProbe />
+      </>,
+      "?page=1",
+    );
+    const list = await screen.findByRole("table", { name: table });
+    expect(
+      screen.queryByRole("button", { name: /상세: / }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(list).queryByRole("columnheader", { name: "상세" }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      await within(list).findByRole("button", { name: "홍길동" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: title }),
+    ).toBeInTheDocument();
+    expect(search().get("detail")).toBe(
+      element.key === "passes" ? "pass1" : "p1",
+    );
+    expect(search().get("page")).toBe("1");
+  },
+);
+
+it("drops the page on pass filter change and resets only filter params", async () => {
+  const user = userEvent.setup();
+  mount(
+    <>
+      <Passes />
+      <LocationProbe />
+    </>,
+    "?tab=passes&status=활성&kind=시간권&sort=expiresAt&page=2",
+  );
+  await screen.findByText("무기한 시간권");
+  await user.selectOptions(screen.getByLabelText("이용권 정렬 방향"), "asc");
+  expect(search().get("direction")).toBe("asc");
+  expect(search().has("page")).toBe(false);
+  await user.click(screen.getByRole("button", { name: "초기화" }));
+  expect([...search().keys()]).toEqual(["tab"]);
+});
+
+it("resets payment filters including advanced filters but keeps unrelated params", async () => {
+  const user = userEvent.setup();
+  mount(
+    <>
+      <Payments />
+      <LocationProbe />
+    </>,
+    "?tab=payments&status=승인&from=2026-11-01&methods=카드&customerId=c1&page=3",
+  );
+  await screen.findByText("무기한 시간권");
+  await user.click(screen.getByRole("button", { name: "초기화" }));
+  expect([...search().keys()]).toEqual(["tab"]);
+});
+
+it("shows the payment list states and Mock payment action inside the list card", async () => {
+  mount(<Payments />, "?from=2026-11-03&to=2026-11-01");
+  const table = await screen.findByRole("table", { name: "결제 목록" });
+  expect(
+    within(table).getByText("시작일은 종료일보다 늦을 수 없어요"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("항목 수 확인 불가")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+  expect(
+    table
+      .closest(".card")!
+      .querySelector(".filters")!
+      .contains(screen.getByRole("button", { name: "Mock 결제" })),
+  ).toBe(true);
+  expect(listPayments).not.toHaveBeenCalled();
+});
+
+it("shows an empty pass list inside the table with a page footer", async () => {
+  vi.mocked(listPasses).mockResolvedValue({
+    items: [],
+    meta: { page: 1, pageSize: 20, total: 0 },
+  });
+  mount(<Passes />);
+  const table = await screen.findByRole("table", { name: "보유 이용권 목록" });
+  expect(
+    await within(table).findByText("조건에 맞는 보유 이용권이 없어요"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("총 0건 · 1페이지")).toBeInTheDocument();
 });

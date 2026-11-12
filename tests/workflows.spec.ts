@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+
+// 결제 목록은 기본이 최신순이므로 방금 만든 결제가 첫 행이다. 고객 이름 셀 링크로 상세를 연다.
+async function openNewestPayment(page: Page, id: string) {
+  await page
+    .getByRole("table", { name: "결제 목록" })
+    .getByRole("row")
+    .nth(1)
+    .getByRole("button")
+    .click();
+  await expect(page).toHaveURL(new RegExp(`[?&]detail=${id}(&|$)`));
+}
 async function login(page: Page, role = "사장님") {
   await page.goto("/login");
   await page.getByRole("button", { name: `${role}으로 체험` }).click();
@@ -114,9 +125,7 @@ test("purchase/refund and room booking conflicts preserve input", async ({
   const payment = await (await paymentResponse).json();
   await expect(panel.getByText("결제 승인", { exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "확인", exact: true }).click();
-  await page
-    .getByRole("button", { name: `결제 상세: ${payment.id}`, exact: true })
-    .click();
+  await openNewestPayment(page, payment.id);
   await panel.getByRole("button", { name: "전액 환불", exact: true }).click();
   await panel.getByLabel("환불 사유").fill("미사용 전액 환불 요청");
   await panel

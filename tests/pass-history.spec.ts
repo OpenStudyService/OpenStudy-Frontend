@@ -56,7 +56,11 @@ test("adjustments persist in shared demo views and history filters use UTC bound
   await expect(panel.getByText("700분", { exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "닫기", exact: true }).click();
   await page.getByRole("tab", { name: /회원/ }).click();
-  await page.getByRole("button", { name: "이서준", exact: true }).click();
+  // 보유 이용권 표도 고객 이름을 셀 링크로 쓰므로 회원 목록 표로 범위를 좁힌다.
+  await page
+    .getByRole("table", { name: "회원 목록" })
+    .getByRole("button", { name: "이서준", exact: true })
+    .click();
   await panel.getByRole("button", { name: "구매·사용 내역 보기" }).click();
   await expect(
     panel.getByText("사유: E2E 잔량 보정", { exact: true }),
