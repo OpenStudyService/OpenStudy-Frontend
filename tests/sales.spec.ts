@@ -68,6 +68,16 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
         }),
       ),
     ).toBe(true);
+    const advanced = filters.getByText("고급 필터", { exact: true });
+    const branchGroup = filters.getByRole("group", { name: "집계 지점" });
+    const branchBox = (await branchGroup.boundingBox())!;
+    expect((await advanced.boundingBox())!.y).toBeGreaterThanOrEqual(
+      branchBox.y + branchBox.height,
+    );
+    await advanced.click();
+    await expect(filters.getByLabel("결제 수단")).toBeVisible();
+    await advanced.click();
+    await expect(filters.getByLabel("결제 수단")).toBeHidden();
     await filters.getByLabel("환불 집계 기준").selectOption("paymentDate");
     await filters.getByLabel("결제 용도").selectOption("이용권");
     await summaryTab.focus();

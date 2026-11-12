@@ -293,15 +293,6 @@ function SalesWorkspace() {
               isPassUsage ? "이용권 사용량 조회 조건" : "매출 조회 조건"
             }
           >
-            {isSalesReport && (
-              <AdvancedFilters
-                values={advanced}
-                branches={session.branches.filter((b) =>
-                  can(session.user, b.id),
-                )}
-                change={(key, values) => changeFilters({ [key]: values })}
-              />
-            )}
             <div className="filters">
               <label className="field">
                 시작일
@@ -411,6 +402,17 @@ function SalesWorkspace() {
                   </label>
                 ))}
               </fieldset>
+            )}
+            {isSalesReport && (
+              <div className="px-4">
+                <AdvancedFilters
+                  values={advanced}
+                  branches={session.branches.filter((b) =>
+                    can(session.user, b.id),
+                  )}
+                  change={(key, values) => changeFilters({ [key]: values })}
+                />
+              </div>
             )}
             {isSalesReport && defaultPeriod && !forbidden && (
               <p className="help px-5" aria-label="적용된 기본 날짜">
