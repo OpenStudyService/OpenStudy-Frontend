@@ -116,6 +116,9 @@ test("exact lookup, check-in, same-branch move and checkout update the shared se
   await expect(seat(page, "A-01", "사용 중")).toContainText("이서준");
   await seat(page, "A-01", "사용 중").click();
   await dialog.getByRole("button", { name: "좌석 이동", exact: true }).click();
+  await expect(
+    dialog.getByRole("button", { name: "이동 가능 좌석 새로고침" }),
+  ).toHaveCount(0);
   await dialog
     .getByRole("combobox", { name: "이동할 좌석", exact: true })
     .selectOption("gangnam-seat-2");

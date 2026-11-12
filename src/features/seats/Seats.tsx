@@ -1113,9 +1113,6 @@ function SessionAction({
                 </select>
               </Field>
             )}
-            <Button type="button" onClick={() => void board.refetch()}>
-              이동 가능 좌석 새로고침
-            </Button>
           </>
         ) : (
           <p className="tip">
