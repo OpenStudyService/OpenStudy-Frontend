@@ -161,7 +161,7 @@ for (const width of [1024, 1440]) {
       ["products", "상품 등록"],
       ["payments", "Mock 결제"],
       ["attendance", "근무 등록"],
-      ["employees", "직원 상세: 박준호"],
+      ["employees", "박준호"],
     ]) {
       await page.goto(`/app/gangnam/${route}`);
       await page.getByRole("button", { name, exact: true }).click();

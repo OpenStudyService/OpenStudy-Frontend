@@ -200,6 +200,76 @@ it("selects employee tabs by click and arrow keys while preserving search", asyn
   expect(searchParams().get("tab")).toBe("invitations");
 });
 
+it("lists employees in the common list layout and keeps presets in an owner-only tab", async () => {
+  const user = userEvent.setup();
+  const router = createMemoryRouter(
+    [{ path: "/", element: <EmployeeManagement /> }],
+    { initialEntries: ["/?employeeSearch=staff&employeePage=2"] },
+  );
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === "/permissions"
+      ? definitions
+      : String(path).startsWith("/permission-presets")
+        ? {
+            items: presets,
+            meta: { page: 1, pageSize: 100, total: presets.length },
+          }
+        : { items: [], meta: { page: 2, pageSize: 20, total: 0 } },
+  );
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  const searchParams = () => new URLSearchParams(router.state.location.search);
+  const table = screen.getByRole("table", { name: "직원 목록" });
+  expect(
+    await within(table).findByText("조회 가능한 직원이 없어요"),
+  ).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "권한 프리셋" })).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: /직원 상세/ }),
+  ).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "초기화" }));
+  expect(searchParams().has("employeeSearch")).toBe(false);
+  expect(searchParams().has("employeePage")).toBe(false);
+
+  await user.click(screen.getByRole("tab", { name: "권한 프리셋" }));
+  expect(searchParams().get("tab")).toBe("presets");
+  expect(
+    await screen.findByRole("heading", { name: "권한 프리셋" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "프리셋 수정: 운영 담당" }),
+  ).toBeVisible();
+  expect(screen.queryByRole("table", { name: "직원 목록" })).toBeNull();
+});
+
+it("hides the preset tab from branch admins and falls back to the employee list", async () => {
+  setActor("admin");
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === "/permissions"
+      ? definitions
+      : { items: [], meta: { page: 1, pageSize: 20, total: 0 } },
+  );
+  const router = createMemoryRouter(
+    [{ path: "/", element: <EmployeeManagement /> }],
+    { initialEntries: ["/?tab=presets"] },
+  );
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  expect(screen.queryByRole("tab", { name: "권한 프리셋" })).toBeNull();
+  expect(screen.getByRole("tab", { name: "직원 목록" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(screen.getByRole("table", { name: "직원 목록" })).toBeVisible();
+});
+
 describe("organization policies", () => {
   it("checks all seven days, closure and overnight boundaries", () => {
     expect(hoursError(defaultHours())).toBeUndefined();

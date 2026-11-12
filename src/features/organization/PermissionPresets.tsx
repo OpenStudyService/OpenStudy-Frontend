@@ -20,7 +20,7 @@ export function PresetManagement({
 }) {
   const [selected, setSelected] = useState<Preset | "new" | null>(null);
   return (
-    <section className="card mt-5 p-4">
+    <section className="card p-4">
       <h2>권한 프리셋</h2>
       <p className="help">
         프리셋 수정은 기존 직원·초대에 자동 반영되지 않습니다. 시스템 기본값은
