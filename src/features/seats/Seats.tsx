@@ -197,6 +197,7 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
               {canWriteSeats(session.user, branchId) && (
                 <Button
                   variant="primary"
+                  className="ml-auto"
                   onClick={() => update("detail", "new")}
                 >
                   좌석 등록

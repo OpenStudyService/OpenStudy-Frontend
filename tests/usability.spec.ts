@@ -33,6 +33,7 @@ test("registration actions sit at the right edge of their filters", async ({
     ["tasks?q=확인", "업무 등록", "q", "확인"],
     ["members?tab=members&q=010", "회원 등록", "q", "010"],
     ["reservations?status=확정", "예약 등록", "status", "확정"],
+    ["spaces?tab=seats&status=사용+가능", "좌석 등록", "status", "사용 가능"],
     ["spaces?tab=rooms&status=사용+가능", "스터디룸 등록", "status", "사용 가능"],
     ["facilities?q=점검", "시설 점검 등록", "q", "점검"],
     ["inquiries?q=문의", "고객 문의 등록", "q", "문의"],
