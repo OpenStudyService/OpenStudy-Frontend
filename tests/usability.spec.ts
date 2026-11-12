@@ -30,6 +30,7 @@ test("registration actions sit at the right edge of their filters", async ({
   page,
 }) => {
   const screens = [
+    ["tasks?q=확인", "업무 등록", "q", "확인"],
     ["members?tab=members&q=010", "회원 등록", "q", "010"],
     ["reservations?status=확정", "예약 등록", "status", "확정"],
     ["spaces?tab=rooms&status=사용+가능", "스터디룸 등록", "status", "사용 가능"],
