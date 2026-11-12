@@ -217,12 +217,13 @@ test("branch switching is cancelled before drafts disappear", async ({
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
-  await page.goto("/app/gangnam/employees?tab=invitations");
-  await page.getByLabel("초대 이름", { exact: true }).fill("보존할 입력");
+  // 초대 폼은 오른쪽 패널로 옮겨 지점 선택과 함께 조작할 수 없으므로 화면 안에 있는 분류 등록 폼으로 확인한다.
+  await page.goto("/app/gangnam/products?tab=categories");
+  await page.getByLabel("분류 이름", { exact: true }).fill("보존할 입력");
   page.once("dialog", (d) => d.dismiss());
   await page.getByLabel("현재 지점", { exact: true }).selectOption("seongsu");
-  await expect(page).toHaveURL(/\/gangnam\/employees/);
-  await expect(page.getByLabel("초대 이름", { exact: true })).toHaveValue(
+  await expect(page).toHaveURL(/\/gangnam\/products/);
+  await expect(page.getByLabel("분류 이름", { exact: true })).toHaveValue(
     "보존할 입력",
   );
   await expect(page.getByLabel("현재 지점", { exact: true })).toHaveValue(

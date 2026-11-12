@@ -2,31 +2,45 @@ import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { api, queryString, MOCK } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
 import { permissions } from "../../shared/domain/schema";
 import { useIdempotency } from "../../shared/api/useIdempotency";
-import { Button, Badge, ErrorState, State } from "../../shared/ui/primitives";
-import { Field, Pager, SaveError, useListSearch } from "../organization/shared";
+import {
+  Button,
+  Badge,
+  ErrorState,
+  Panel,
+  State,
+} from "../../shared/ui/primitives";
+import { Icon } from "../../shared/ui/Icon";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
+import { Field, SaveError, useListSearch } from "../organization/shared";
 import { rolePermissions } from "../organization/model";
 type Invitation = components["schemas"]["Invitation"];
+const PAGE_SIZE = 20;
+// 초기화 대상: URL의 검색어·페이지(상태 필터는 화면 상태). tab은 남긴다.
+const INVITATION_FILTER_KEYS = ["invitationSearch", "invitationPage"];
+const expiry = (value: string) => new Date(value).toLocaleString("ko-KR");
 export function InvitationManagement() {
   const { session, scope } = useApp(),
     query = useQueryClient(),
     { page, search, setPage, setSearch } = useListSearch("invitation"),
-    key = useIdempotency();
-  const [name, setName] = useState(""),
-    [email, setEmail] = useState(""),
-    [branchId, setBranch] = useState(scope === "all" ? "" : scope),
-    [role, setRole] = useState<"staff" | "admin">("staff"),
-    [grants, setGrants] = useState<components["schemas"]["Permissions"]>([]),
-    [error, setError] = useState<Error | null>(null),
+    key = useIdempotency(),
+    [, setParams] = useSearchParams();
+  const [error, setError] = useState<Error | null>(null),
     [busy, setBusy] = useState(false),
     [selectedId, setSelectedId] = useState<string | null>(null),
     [reason, setReason] = useState(""),
-    [filter, setFilter] = useState("");
-  const leave = useDraftGuard({ name, email, branchId, role, grants });
+    [filter, setFilter] = useState(""),
+    [creating, setCreating] = useState(false);
   const rejection = useDraftGuard(reason);
   const managed = session.branches
     .filter(
@@ -53,7 +67,7 @@ export function InvitationManagement() {
     ],
     queryFn: ({ signal }) =>
       api<components["schemas"]["InvitationPage"]>(
-        `/invitations?${queryString({ scope, page, pageSize: 20, q: search, status: filter })}`,
+        `/invitations?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status: filter })}`,
         { signal },
       ),
     retry: false,
@@ -111,22 +125,274 @@ export function InvitationManagement() {
       setBusy(false);
     }
   }
+  function openDetail(id: string) {
+    if (!rejection.confirm()) return;
+    setSelectedId(id);
+    setError(null);
+    setReason("");
+  }
+  function closeDetail() {
+    if (!rejection.confirm()) return;
+    setSelectedId(null);
+    setError(null);
+    setReason("");
+  }
+  const branchName = (id: string) =>
+    session.branches.find((b) => b.id === id)?.name ?? id;
   if (!managed.length) return <State title="초대 관리 권한이 없어요" />;
   return (
-    <section className="grid gap-4">
-      {leave.guard}
+    <section>
       {rejection.guard}
-      <h2>초대·승인 관리</h2>
       {MOCK && (
-        <p className="help">데모에서는 이메일을 실제 발송하지 않습니다.</p>
+        <p className="help mb-4">데모에서는 이메일을 실제 발송하지 않습니다.</p>
       )}
-      <p className="help">
-        초대 상태와 이메일 발송 상태는 별개입니다. 발송 완료만으로 직원이
-        활성화되지 않습니다. 회수한 소속은 기존 계정으로 수락 후 승인해야
-        복구됩니다.
-      </p>
+      <ListCard>
+        <ListFilters
+          actions={
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              <Icon name="plus" size={16} />
+              직원 초대
+            </Button>
+          }
+        >
+          <input
+            type="search"
+            aria-label="초대 이름·이메일 검색"
+            placeholder="초대 이름·이메일 검색"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            aria-label="초대 상태 필터"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">전체 상태</option>
+            {["초대 대기", "승인 대기", "활성", "거절", "취소", "만료"].map(
+              (s) => (
+                <option key={s}>{s}</option>
+              ),
+            )}
+          </select>
+          <Button
+            variant="quiet"
+            onClick={() => {
+              setFilter("");
+              setParams(
+                (current) => {
+                  const next = new URLSearchParams(current);
+                  INVITATION_FILTER_KEYS.forEach((k) => next.delete(k));
+                  return next;
+                },
+                { replace: true },
+              );
+            }}
+          >
+            초기화
+          </Button>
+        </ListFilters>
+        <p className="px-5 pb-3 text-xs text-muted">
+          초대 상태와 이메일 발송 상태는 별개입니다. 발송 완료만으로 직원이
+          활성화되지 않습니다. 회수한 소속은 기존 계정으로 수락 후 승인해야
+          복구됩니다.
+        </p>
+        <ListTable
+          label="초대 목록"
+          columns={[
+            "초대 이름",
+            "이메일",
+            "지점·역할",
+            "초대 상태",
+            "발송 상태",
+            "수락 기한",
+          ]}
+          loading={rows.isPending}
+          error={rows.error}
+          onRetry={() => void rows.refetch()}
+          isEmpty={!rows.data?.items.length}
+          empty={{ title: "초대 내역이 없어요" }}
+        >
+          {rows.data?.items.map((i) => (
+            <tr key={i.id}>
+              <td>
+                <button
+                  className="cell-link"
+                  disabled={busy}
+                  onClick={() => openDetail(i.id)}
+                >
+                  {i.name}
+                </button>
+              </td>
+              <td>{i.email}</td>
+              <td>
+                {branchName(i.branchId)}
+                <span className="help block">
+                  {i.role === "admin" ? "지점 관리자" : "일반 직원"}
+                </span>
+              </td>
+              <td>
+                <Badge>{i.status}</Badge>
+              </td>
+              <td>
+                <Badge>{i.delivery}</Badge>
+              </td>
+              <td>{expiry(i.expiresAt)}</td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={rows.data?.meta.total ?? 0}
+          loading={rows.isPending}
+          error={!!rows.error}
+          onChange={setPage}
+        />
+      </ListCard>
+      <Panel
+        open={creating}
+        onClose={() => setCreating(false)}
+        title="직원 초대"
+        description="초대 이메일을 보내고, 수락 후 승인하면 직원으로 등록돼요."
+      >
+        {/* 패널을 닫으면 폼이 사라지므로 입력 중인 초안은 패널의 확인을 거쳐 버린다. */}
+        {creating && (
+          <InvitationCreateForm
+            managed={managed}
+            onSaved={async () => {
+              setCreating(false);
+              await refresh();
+            }}
+            refresh={refresh}
+          />
+        )}
+      </Panel>
+      <Panel
+        open={selectedId !== null}
+        onClose={closeDetail}
+        closeDisabled={busy}
+        title="초대 상세"
+      >
+        {detail.isPending ? (
+          <State loading />
+        ) : detail.error ? (
+          <ErrorState
+            error={detail.error}
+            retry={() => void detail.refetch()}
+          />
+        ) : (
+          selected && (
+            <section className="grid gap-3">
+              <h3>{selected.name} 초대 처리</h3>
+              <p>
+                {selected.status} · {selected.delivery} · 버전{" "}
+                {selected.version}
+              </p>
+              <p className="help">
+                {selected.email} · {branchName(selected.branchId)} ·{" "}
+                {selected.role === "admin" ? "지점 관리자" : "일반 직원"} · 수락
+                기한 {expiry(selected.expiresAt)}
+              </p>
+              {selected.rejectionReason && (
+                <p>반려 사유: {selected.rejectionReason}</p>
+              )}
+              {selected.role === "admin" && !session.user.owner ? (
+                <p>지점 관리자 초대 처리는 사장님만 할 수 있습니다.</p>
+              ) : (
+                <>
+                  {["초대 대기", "만료"].includes(selected.status) && (
+                    <>
+                      <p className="help">
+                        재발급하면 이전 링크는 폐기되고 지금부터 새 24시간이
+                        부여됩니다. 자동 메일 재시도는 기한을 연장하지 않습니다.
+                      </p>
+                      <Button
+                        disabled={commandDisabled}
+                        onClick={() => void action(selected, "reissue")}
+                      >
+                        새 24시간으로 재발급
+                      </Button>
+                    </>
+                  )}
+                  {selected.status === "초대 대기" && (
+                    <Button
+                      disabled={commandDisabled}
+                      onClick={() => void action(selected, "cancel")}
+                    >
+                      초대 취소
+                    </Button>
+                  )}
+                  {selected.status === "승인 대기" && (
+                    <>
+                      <p className="help">
+                        승인 대기에는 별도 수락 기한이 없습니다. 신규 직원은
+                        승인 뒤 다시 로그인해야 합니다.
+                      </p>
+                      <Button
+                        disabled={commandDisabled}
+                        onClick={() => void action(selected, "approve")}
+                      >
+                        최종 승인
+                      </Button>
+                      <Field label="반려 사유">
+                        <input
+                          disabled={busy}
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          maxLength={1000}
+                        />
+                      </Field>
+                      <Button
+                        disabled={commandDisabled || !reason.trim()}
+                        onClick={() => void action(selected, "reject")}
+                      >
+                        초대 반려
+                      </Button>
+                    </>
+                  )}
+                </>
+              )}
+              <SaveError
+                error={error}
+                refresh={async () => {
+                  await refresh();
+                }}
+              />
+            </section>
+          )
+        )}
+      </Panel>
+    </section>
+  );
+}
+
+function InvitationCreateForm({
+  managed,
+  onSaved,
+  refresh,
+}: {
+  managed: { id: string; name: string; status: string }[];
+  onSaved: () => Promise<void>;
+  refresh: () => Promise<void>;
+}) {
+  const { session, scope } = useApp(),
+    key = useIdempotency();
+  const [name, setName] = useState(""),
+    [email, setEmail] = useState(""),
+    [branchId, setBranch] = useState(scope === "all" ? "" : scope),
+    [role, setRole] = useState<"staff" | "admin">("staff"),
+    [grants, setGrants] = useState<components["schemas"]["Permissions"]>([]),
+    [error, setError] = useState<Error | null>(null),
+    [busy, setBusy] = useState(false);
+  const leave = useDraftGuard({ name, email, branchId, role, grants });
+  return (
+    <>
+      {leave.guard}
       <form
-        className="card grid gap-3 p-4"
+        className="grid gap-3"
         onSubmit={async (e) => {
           e.preventDefault();
           setError(null);
@@ -154,7 +420,7 @@ export function InvitationManagement() {
             });
             setName("");
             setEmail("");
-            await refresh();
+            await onSaved();
           } catch (e) {
             setError(e as Error);
           } finally {
@@ -163,7 +429,6 @@ export function InvitationManagement() {
         }}
       >
         <fieldset className="contents" disabled={busy}>
-          <h3>직원 초대</h3>
           <Field label="초대 이름">
             <input
               required
@@ -230,144 +495,17 @@ export function InvitationManagement() {
                 </label>
               ))}
           </fieldset>
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" variant="primary" disabled={busy}>
             초대 이메일 발송 요청
           </Button>
         </fieldset>
-      </form>
-      <Field label="초대 이름·이메일 검색">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} />
-      </Field>
-      <Field label="초대 상태 필터">
-        <select
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            setPage(1);
+        <SaveError
+          error={error}
+          refresh={async () => {
+            await refresh();
           }}
-        >
-          <option value="">전체 상태</option>
-          {["초대 대기", "승인 대기", "활성", "거절", "취소", "만료"].map(
-            (s) => (
-              <option key={s}>{s}</option>
-            ),
-          )}
-        </select>
-      </Field>
-      {rows.isPending ? (
-        <State loading />
-      ) : rows.error ? (
-        <ErrorState error={rows.error} retry={() => void rows.refetch()} />
-      ) : (
-        <>
-          {!rows.data.items.length && <State title="초대 내역이 없어요" />}
-          {rows.data.items.map((i) => (
-            <article className="card p-4" key={i.id}>
-              <h3>
-                {i.name} · {i.email}
-              </h3>
-              <p>
-                {session.branches.find((b) => b.id === i.branchId)?.name} ·{" "}
-                {i.role === "admin" ? "지점 관리자" : "일반 직원"}
-              </p>
-              <Badge>{i.status}</Badge> <Badge>{i.delivery}</Badge>
-              <p className="help">
-                수락 기한: {new Date(i.expiresAt).toLocaleString("ko-KR")}
-              </p>
-              {i.rejectionReason && <p>반려 사유: {i.rejectionReason}</p>}
-              <Button
-                disabled={busy}
-                onClick={() => {
-                  if (!rejection.confirm()) return;
-                  setSelectedId(i.id);
-                  setError(null);
-                  setReason("");
-                }}
-              >
-                초대 상세: {i.name}
-              </Button>
-            </article>
-          ))}
-          <Pager page={page} total={rows.data.meta.total} onChange={setPage} />
-        </>
-      )}
-      {selectedId && detail.isPending && <State loading />}
-      {selectedId && detail.error && (
-        <ErrorState error={detail.error} retry={() => void detail.refetch()} />
-      )}
-      {selected && (
-        <section className="card grid gap-3 p-4">
-          <h3>{selected.name} 초대 처리</h3>
-          <p>
-            {selected.status} · {selected.delivery} · 버전 {selected.version}
-          </p>
-          {selected.role === "admin" && !session.user.owner ? (
-            <p>지점 관리자 초대 처리는 사장님만 할 수 있습니다.</p>
-          ) : (
-            <>
-              {["초대 대기", "만료"].includes(selected.status) && (
-                <>
-                  <p className="help">
-                    재발급하면 이전 링크는 폐기되고 지금부터 새 24시간이
-                    부여됩니다. 자동 메일 재시도는 기한을 연장하지 않습니다.
-                  </p>
-                  <Button
-                    disabled={commandDisabled}
-                    onClick={() => void action(selected, "reissue")}
-                  >
-                    새 24시간으로 재발급
-                  </Button>
-                </>
-              )}
-              {selected.status === "초대 대기" && (
-                <Button
-                  disabled={commandDisabled}
-                  onClick={() => void action(selected, "cancel")}
-                >
-                  초대 취소
-                </Button>
-              )}
-              {selected.status === "승인 대기" && (
-                <>
-                  <p className="help">
-                    승인 대기에는 별도 수락 기한이 없습니다. 신규 직원은 승인 뒤
-                    다시 로그인해야 합니다.
-                  </p>
-                  <Button
-                    disabled={commandDisabled}
-                    onClick={() => void action(selected, "approve")}
-                  >
-                    최종 승인
-                  </Button>
-                  <Field label="반려 사유">
-                    <input
-                      disabled={busy}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      maxLength={1000}
-                    />
-                  </Field>
-                  <Button
-                    disabled={commandDisabled || !reason.trim()}
-                    onClick={() => void action(selected, "reject")}
-                  >
-                    초대 반려
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-          <Button disabled={busy} onClick={() => setSelectedId(null)}>
-            상세 닫기
-          </Button>
-        </section>
-      )}
-      <SaveError
-        error={error}
-        refresh={async () => {
-          await refresh();
-        }}
-      />
-    </section>
+        />
+      </form>
+    </>
   );
 }

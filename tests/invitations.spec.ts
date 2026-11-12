@@ -7,13 +7,16 @@ test("F03 new acceptance and approved limited session requires login", async ({
   await page.getByRole("button", { name: "사장님으로 체험" }).click();
   await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
   await page.goto("/app/gangnam/employees?tab=invitations");
+  await page.getByRole("button", { name: "직원 초대", exact: true }).click();
   await page.getByLabel("초대 이름", { exact: true }).fill("초대 동료");
   await page
     .getByLabel("초대 이메일 (발송 후 변경 불가)")
     .fill("invite-new@example.test");
   await page.getByRole("button", { name: "초대 이메일 발송 요청" }).click();
   await expect(
-    page.getByRole("button", { name: "초대 상세: 초대 동료" }),
+    page
+      .getByRole("table", { name: "초대 목록" })
+      .getByRole("button", { name: "초대 동료", exact: true }),
   ).toBeVisible();
   await expect(page.locator('a[href*="token="]')).toHaveCount(0);
   const mailToken = await page.evaluate(async () => {
@@ -47,7 +50,9 @@ test("F03 new acceptance and approved limited session requires login", async ({
   await page.getByLabel("새 계정 비밀번호").fill("demo-password1");
   await page.getByLabel("비밀번호 확인").fill("wrong-password");
   await page.getByRole("button", { name: "초대 수락", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("비밀번호가 일치하지 않습니다.");
+  await expect(page.getByRole("alert")).toHaveText(
+    "비밀번호가 일치하지 않습니다.",
+  );
   await page.getByLabel("비밀번호 확인").fill("demo-password1");
   await page.getByRole("button", { name: "초대 수락", exact: true }).click();
   await expect(
@@ -63,7 +68,9 @@ test("F03 new acceptance and approved limited session requires login", async ({
     page.getByRole("heading", { name: "최종 승인을 기다리고 있어요" }),
   ).toBeVisible();
   await expect(page.getByText(/^마지막 조회/)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "승인 상태 새로고침" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "승인 상태 새로고침" }),
+  ).toHaveCount(0);
   // The fixture changes the manager state through the contract command, without promoting this session.
   await page.evaluate(async () => {
     const { token } = await fetch("/api/auth/csrf").then((r) => r.json());

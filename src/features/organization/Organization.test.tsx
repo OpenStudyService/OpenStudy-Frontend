@@ -176,17 +176,13 @@ it("selects employee tabs by click and arrow keys while preserving search", asyn
 
   expect(employeesTab).toHaveAttribute("aria-selected", "true");
   expect(screen.getByLabelText("직원 이름·이메일 검색")).toHaveValue("staff");
-  expect(
-    screen.queryByRole("button", { name: "초대 이메일 발송 요청" }),
-  ).toBeNull();
+  expect(screen.queryByRole("button", { name: "직원 초대" })).toBeNull();
 
   await user.click(invitationsTab);
   expect(invitationsTab).toHaveAttribute("aria-selected", "true");
   expect(searchParams().get("tab")).toBe("invitations");
   expect(screen.queryByLabelText("직원 이름·이메일 검색")).toBeNull();
-  expect(
-    screen.getByRole("button", { name: "초대 이메일 발송 요청" }),
-  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "직원 초대" })).toBeVisible();
 
   await user.keyboard("{ArrowLeft}");
   await waitFor(() =>

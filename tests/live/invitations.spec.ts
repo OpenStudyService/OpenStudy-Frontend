@@ -107,6 +107,7 @@ async function detail(context: BrowserContext, id: string) {
 }
 async function create(page: Page, branch: string, email: string, name: string) {
   await page.goto(`/app/${branch}/employees?tab=invitations`);
+  await page.getByRole("button", { name: "직원 초대", exact: true }).click();
   await page.getByLabel("초대 이름", { exact: true }).fill(name);
   await page.getByLabel("초대 이메일 (발송 후 변경 불가)").fill(email);
   const created = page.waitForResponse(
@@ -118,7 +119,9 @@ async function create(page: Page, branch: string, email: string, name: string) {
   expect((await created).status()).toBe(201);
   await page.getByLabel("초대 이름·이메일 검색").fill(email);
   await expect(
-    page.getByRole("button", { name: `초대 상세: ${name}`, exact: true }),
+    page
+      .getByRole("table", { name: "초대 목록" })
+      .getByRole("button", { name, exact: true }),
   ).toBeVisible();
   const invitation = (await list(page.context(), email)).find(
     (item) => item.email === email && item.status === "초대 대기",
@@ -187,7 +190,8 @@ async function acceptNew(page: Page, link: string) {
 async function approve(page: Page, branch: string, name: string) {
   await page.goto(`/app/${branch}/employees?tab=invitations`);
   await page
-    .getByRole("button", { name: `초대 상세: ${name}`, exact: true })
+    .getByRole("table", { name: "초대 목록" })
+    .getByRole("button", { name, exact: true })
     .click();
   await page.getByRole("button", { name: "최종 승인", exact: true }).click();
   await expect(page.getByText(/활성 · 발송 완료 · 버전/)).toBeVisible();
@@ -207,7 +211,8 @@ test("real SMTP link: two-browser approval, restricted session, relogin, and an 
     const firstInvitation = await create(manager.page, first.id, email, name);
     const link = await mailLink(manager.context, email);
     await manager.page
-      .getByRole("button", { name: `초대 상세: ${name}`, exact: true })
+      .getByRole("table", { name: "초대 목록" })
+      .getByRole("button", { name, exact: true })
       .click();
     await expect(
       manager.page.getByRole("button", { name: "최종 승인", exact: true }),
@@ -432,7 +437,8 @@ test("reissued and expired mail links are rejected, with CSRF enforced by the re
     );
     const oldLink = await mailLink(manager.context, email);
     await manager.page
-      .getByRole("button", { name: `초대 상세: ${name}`, exact: true })
+      .getByRole("table", { name: "초대 목록" })
+      .getByRole("button", { name, exact: true })
       .click();
     await manager.page
       .getByRole("button", { name: "새 24시간으로 재발급" })
@@ -499,7 +505,8 @@ test("a rejected applicant sees the reason in a separate browser", async ({
     await login(page, email);
     await manager.page.reload();
     await manager.page
-      .getByRole("button", { name: `초대 상세: ${name}`, exact: true })
+      .getByRole("table", { name: "초대 목록" })
+      .getByRole("button", { name, exact: true })
       .click();
     await manager.page
       .getByLabel("반려 사유", { exact: true })
