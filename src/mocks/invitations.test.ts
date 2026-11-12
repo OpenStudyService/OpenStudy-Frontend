@@ -48,14 +48,14 @@ it("keeps tokens/passwords out of admin DTOs and persisted storage; new acceptan
     mode: "NEW_ACCOUNT",
     token,
     email: i.email,
-    password: "password-test",
+    password: "password-test1",
   });
   expect(await accepted.json()).toMatchObject({
     nextAction: "LOGIN_FOR_APPROVAL_STATUS",
   });
   expect(store.persona).toBeNull();
   expect(JSON.stringify(sessionStorage)).not.toContain(token);
-  expect(JSON.stringify(sessionStorage)).not.toContain("password-test");
+  expect(JSON.stringify(sessionStorage)).not.toContain("password-test1");
   expect(
     (await request("/invitations/preview", "POST", { token })).status,
   ).toBe(410);
@@ -127,7 +127,7 @@ it("shows rejection reasons only in the invitee's status and forces a limited ap
     mode: "NEW_ACCOUNT",
     token,
     email: i.email,
-    password: "password-test",
+    password: "password-test1",
   });
   const current = await (await request(`/invitations/${i.id}`)).json();
   await request(`/invitations/${i.id}/reject`, "POST", {

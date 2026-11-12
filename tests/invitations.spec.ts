@@ -38,11 +38,17 @@ test("F03 new acceptance and approved limited session requires login", async ({
   }, mailToken);
   await expect(page.getByLabel("새 계정 비밀번호")).toBeVisible();
   await expect(page).toHaveURL(/\/invitations\/accept$/);
-  await page.getByLabel("새 계정 비밀번호").fill("demo-password");
+  await page.getByLabel("새 계정 비밀번호").fill("demopassword1");
+  await page.getByLabel("비밀번호 확인").fill("demopassword1");
+  await page.getByRole("button", { name: "초대 수락", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "영문, 숫자, 특수문자를 각각 하나 이상",
+  );
+  await page.getByLabel("새 계정 비밀번호").fill("demo-password1");
   await page.getByLabel("비밀번호 확인").fill("wrong-password");
   await page.getByRole("button", { name: "초대 수락", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("비밀번호가 일치하지 않습니다.");
-  await page.getByLabel("비밀번호 확인").fill("demo-password");
+  await page.getByLabel("비밀번호 확인").fill("demo-password1");
   await page.getByRole("button", { name: "초대 수락", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "초대 수락이 완료됐어요" }),
@@ -51,7 +57,7 @@ test("F03 new acceptance and approved limited session requires login", async ({
   await page
     .getByLabel("이메일", { exact: true })
     .fill("invite-new@example.test");
-  await page.getByLabel("비밀번호", { exact: true }).fill("demo-password");
+  await page.getByLabel("비밀번호", { exact: true }).fill("demo-password1");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "최종 승인을 기다리고 있어요" }),
@@ -97,7 +103,7 @@ test("F03 new acceptance and approved limited session requires login", async ({
   await page
     .getByLabel("이메일", { exact: true })
     .fill("invite-new@example.test");
-  await page.getByLabel("비밀번호", { exact: true }).fill("demo-password");
+  await page.getByLabel("비밀번호", { exact: true }).fill("demo-password1");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: /안녕하세요, 초대 동료/ }),

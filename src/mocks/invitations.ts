@@ -2,6 +2,7 @@
 import { http, HttpResponse } from "msw/http";
 import { z } from "zod";
 import type { components } from "../shared/api/foundation.generated";
+import { newPasswordError } from "../shared/domain/password";
 import { permissions } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
 type Invitation = components["schemas"]["Invitation"];
@@ -158,10 +159,7 @@ export const invitationHandlers = [
               mode: z.literal("NEW_ACCOUNT"),
               token: z.string(),
               email: z.email(),
-              password: z
-                .string()
-                .min(8)
-                .refine((s) => new TextEncoder().encode(s).length <= 72),
+              password: z.string().refine((value) => !newPasswordError(value)),
             })
             .strict(),
           z

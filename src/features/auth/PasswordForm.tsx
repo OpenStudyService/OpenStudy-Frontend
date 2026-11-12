@@ -1,14 +1,10 @@
 import { useState } from "react";
 import { ApiError } from "../../shared/api/client";
+import {
+  newPasswordError,
+  newPasswordRequirements,
+} from "../../shared/domain/password";
 import { Button, FieldError } from "../../shared/ui/primitives";
-
-export function newPasswordError(value: string) {
-  if (
-    Array.from(value).length < 8 ||
-    new TextEncoder().encode(value).length > 72
-  )
-    return "새 비밀번호는 8자 이상, UTF-8 72바이트 이하로 입력해 주세요.";
-}
 
 export const invalidResetLink =
   "이 링크를 사용할 수 없습니다. 관리자에게 재설정 링크를 다시 요청해 주세요.";
@@ -112,9 +108,19 @@ export function PasswordForm({
           required
           disabled={busy || invalid}
           aria-invalid={!!fields.newPassword}
+          aria-describedby="new-password-requirements"
         />
-        {fields.newPassword && <FieldError>{fields.newPassword}</FieldError>}
+        {fields.newPassword && (
+          <FieldError id="new-password-requirements">
+            {fields.newPassword}
+          </FieldError>
+        )}
       </label>
+      {!fields.newPassword && (
+        <p className="help" id="new-password-requirements">
+          {newPasswordRequirements}
+        </p>
+      )}
       {error && <FieldError>{error}</FieldError>}
       <Button type="submit" variant="primary" disabled={busy || invalid}>
         {change ? "비밀번호 변경" : "새 비밀번호 저장"}
