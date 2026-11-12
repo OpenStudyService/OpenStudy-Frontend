@@ -350,6 +350,14 @@ export function Layout() {
           </NavLink>
         ))}
         <div className="flex-1" />
+        <NavLink
+          to={`/app/${scope}/settings`}
+          onClick={(event) => menuClick(event, "settings")}
+          className={({ isActive }) => `rail-link ${isActive ? "active" : ""}`}
+        >
+          <Icon name="settings" />
+          설정
+        </NavLink>
         <Avatar
           name={activeUser.nickname || activeUser.name}
           src={activeUser.avatar}
@@ -375,17 +383,6 @@ export function Layout() {
           <div className="flex items-center gap-3">
             <Badge>{MOCK ? "데모 데이터" : "실제 API 연결"}</Badge>
             {!MOCK && lookups.data?.preview && <Badge>로컬 샘플</Badge>}
-            <NavLink
-              to={`/app/${scope}/settings`}
-              onClick={(event) => menuClick(event, "settings")}
-              className={({ isActive }) =>
-                `btn shrink-0 ${isActive ? "primary" : ""}`
-              }
-              aria-label="개인 설정"
-            >
-              <Icon name="settings" size={16} />
-              설정
-            </NavLink>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
                 <button
@@ -486,19 +483,21 @@ export function Layout() {
         </main>
       </div>
       <nav className="bottom-nav" aria-label="모바일 빠른 탐색">
-        {quickLinks.map(([p, icon, label]) => (
-          <NavLink
-            key={p}
-            to={`/app/${scope}/${p}`}
-            onClick={(event) => menuClick(event, p)}
-            className={({ isActive }) =>
-              `rail-link ${isActive ? "active" : ""}`
-            }
-          >
-            <Icon name={icon} />
-            {label}
-          </NavLink>
-        ))}
+        {[...quickLinks, ["settings", "settings", "설정"]].map(
+          ([p, icon, label]) => (
+            <NavLink
+              key={p}
+              to={`/app/${scope}/${p}`}
+              onClick={(event) => menuClick(event, p)}
+              className={({ isActive }) =>
+                `rail-link ${isActive ? "active" : ""}`
+              }
+            >
+              <Icon name={icon} />
+              {label}
+            </NavLink>
+          ),
+        )}
       </nav>
       <Panel
         open={navOpen}

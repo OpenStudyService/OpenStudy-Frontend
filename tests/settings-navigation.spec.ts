@@ -27,9 +27,14 @@ for (const [account, canManage, owner] of [
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/app/gangnam/home");
-      const settingsLink = page.getByRole("link", { name: "개인 설정" });
+      const settingsLink = page
+        .getByRole("navigation", {
+          name: width === 390 ? "모바일 빠른 탐색" : "빠른 탐색",
+          exact: true,
+        })
+        .getByRole("link", { name: "설정", exact: true });
       await expect(settingsLink).toBeVisible();
-      await expect(settingsLink).toHaveText("설정");
+      await expect(page.locator('.topbar a[href$="/settings"]')).toHaveCount(0);
       if (width === 390) {
         await page.getByRole("button", { name: "메뉴 열기" }).click();
         await expect(
