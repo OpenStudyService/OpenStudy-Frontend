@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshControl } from "../../shared/ui/RefreshControl";
 import { useSession } from "../../app/context";
-import { api } from "../../shared/api/client";
+import { api, ApiError } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
 import type { CurrentUser } from "../../shared/domain/schema";
+import {
+  newPasswordError,
+  newPasswordRequirements,
+} from "../../shared/domain/password";
 import {
   Button,
   ErrorState,
@@ -45,7 +48,11 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
     () => new URLSearchParams(fragment.slice(1)).get("token") || "",
   );
   const [preview, setPreview] = useState<Preview | null>(null),
+    [previewError, setPreviewError] = useState<Error | null>(null),
+    [previewAttempt, setPreviewAttempt] = useState(0),
     [error, setError] = useState<Error | null>(null),
+    [passwordError, setPasswordError] = useState<string>(),
+    [passwordMismatch, setPasswordMismatch] = useState(false),
     [busy, setBusy] = useState(false),
     [accepted, setAccepted] = useState(false);
   useEffect(() => {
@@ -58,26 +65,53 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
       "",
       cleanUrl.pathname + cleanUrl.search,
     );
-    const controller = new AbortController();
+  }, [token]);
+  useEffect(() => {
     if (!token) return;
+    const controller = new AbortController();
     api<Preview>("/invitations/preview", {
       method: "POST",
       body: { token },
       signal: controller.signal,
+      scope: "public",
     })
-      .then(setPreview)
+      .then((value) => {
+        if (!controller.signal.aborted) setPreview(value);
+      })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(e as Error);
+        if (!controller.signal.aborted) {
+          setPreviewError(
+            e instanceof ApiError ? e : new Error("초대 링크를 확인하지 못했어요."),
+          );
+        }
       });
     return () => controller.abort();
-  }, [token]);
+  }, [token, previewAttempt]);
+  const canRetryPreview =
+    previewError instanceof ApiError &&
+    (previewError.detail.code === "NETWORK_ERROR" ||
+      previewError.detail.code === "CSRF_INVALID" ||
+      previewError.status >= 500);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget,
-      password = String(new FormData(form).get("password") || "");
-    if (!preview) return;
-    setBusy(true);
+    if (!preview || busy) return;
+    const form = event.currentTarget;
+    const fields = new FormData(form);
+    const password = String(fields.get("password") ?? "");
     setError(null);
+    if (preview.acceptanceMode === "NEW_ACCOUNT") {
+      const validation = newPasswordError(password);
+      setPasswordError(validation);
+      if (validation) return;
+    }
+    if (
+      preview.acceptanceMode === "NEW_ACCOUNT" &&
+      password !== fields.get("passwordConfirmation")
+    ) {
+      setPasswordMismatch(true);
+      return;
+    }
+    setBusy(true);
     try {
       if (
         preview.acceptanceMode === "EXISTING_ACCOUNT" &&
@@ -92,14 +126,6 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
         query.clear();
         query.setQueryData(["session"], current);
       } else {
-        if (
-          preview.acceptanceMode === "NEW_ACCOUNT" &&
-          (password.length < 8 ||
-            new TextEncoder().encode(password).length > 72)
-        )
-          throw new Error(
-            "비밀번호는 8자 이상, UTF-8 72바이트 이하로 입력해 주세요.",
-          );
         const result = await api<components["schemas"]["AcceptanceResult"]>(
           "/invitations/accept",
           {
@@ -161,8 +187,22 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
           </p>
         ) : !token ? (
           <FieldError>유효한 이메일 초대 링크를 다시 열어 주세요.</FieldError>
-        ) : !preview && !error ? (
+        ) : previewError ? (
+          <ErrorState
+            error={previewError}
+            retry={
+              canRetryPreview
+                ? () => {
+                    setPreviewError(null);
+                    setPreviewAttempt((attempt) => attempt + 1);
+                  }
+                : undefined
+            }
+          />
+        ) : !preview || session.isFetching ? (
           <State loading />
+        ) : session.error ? (
+          <ErrorState error={session.error} retry={() => void session.refetch()} />
         ) : (
           preview &&
           (needsLogout ? (
@@ -204,9 +244,49 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
                       needsLogin ? "current-password" : "new-password"
                     }
                     required
-                    minLength={needsLogin ? 1 : 8}
+                    aria-invalid={!!passwordError}
+                    aria-describedby={
+                      needsLogin ? undefined : "invite-password-requirements"
+                    }
+                    onChange={() => {
+                      setPasswordError(undefined);
+                      setPasswordMismatch(false);
+                    }}
                   />
                 </label>
+              )}
+              {preview.acceptanceMode === "NEW_ACCOUNT" &&
+                (passwordError ? (
+                  <FieldError id="invite-password-requirements">
+                    {passwordError}
+                  </FieldError>
+                ) : (
+                  <p className="help" id="invite-password-requirements">
+                    {newPasswordRequirements}
+                  </p>
+                ))}
+              {preview.acceptanceMode === "NEW_ACCOUNT" && (
+                <div>
+                  <label className="field">
+                    비밀번호 확인
+                    <input
+                      name="passwordConfirmation"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      aria-invalid={passwordMismatch}
+                      aria-describedby={
+                        passwordMismatch ? "invite-password-confirmation-error" : undefined
+                      }
+                      onChange={() => setPasswordMismatch(false)}
+                    />
+                  </label>
+                  {passwordMismatch && (
+                    <FieldError id="invite-password-confirmation-error">
+                      비밀번호가 일치하지 않습니다.
+                    </FieldError>
+                  )}
+                </div>
               )}
               {preview.acceptanceMode === "EXISTING_ACCOUNT" && (
                 <p className="help">
@@ -318,7 +398,7 @@ export function PendingApproval() {
         <p className="help my-5">
           {approved
             ? "업무 공간에 들어가려면 다시 로그인해 주세요."
-            : "관리자가 승인하면 해당 지점의 업무 공간을 사용할 수 있어요."}
+            : "승인 결과를 확인하려면 이 페이지를 새로고침해 주세요."}
         </p>
         {status.data?.invitations?.map((i) => (
           <article className="my-3" key={i.invitationId}>
@@ -334,20 +414,12 @@ export function PendingApproval() {
           />
         )}
         {error && <FieldError>{error.message}</FieldError>}
-        <div className="flex flex-wrap gap-2">
-          <RefreshControl
-            label="승인 상태 새로고침"
-            updatedAt={status.dataUpdatedAt}
-            fetching={status.isFetching}
-            refresh={() => void status.refetch()}
-          />
-          <Button disabled={leaving} onClick={() => void leave()}>
-            {approved ? "다시 로그인" : "로그아웃"}
-          </Button>
-        </div>
+        <Button disabled={leaving} onClick={() => void leave()}>
+          {approved ? "다시 로그인" : "로그아웃"}
+        </Button>
         {workspace && (
           <Link
-            className="btn mt-4"
+            className="btn ml-2"
             to={`/app/${session.data.branches[0]?.id || "all"}/home`}
           >
             기존 지점 업무로 돌아가기

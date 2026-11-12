@@ -34,8 +34,8 @@ function post(path: string, body?: object, csrf = true) {
 it("changes the password without ending the current session", async () => {
   const version = store.user().version;
   const same = await post("/me/password", {
-    currentPassword: "fixture-password",
-    newPassword: "fixture-password",
+    currentPassword: "fixture-password1",
+    newPassword: "fixture-password1",
   });
   expect(await same.json()).toMatchObject({
     code: "PASSWORD_SAME_AS_CURRENT",
@@ -44,16 +44,16 @@ it("changes the password without ending the current session", async () => {
   expect(
     (
       await post("/me/password", {
-        currentPassword: "fixture-password",
-        newPassword: "  new password  ",
+        currentPassword: "fixture-password1",
+        newPassword: "  new-password1  ",
       })
     ).status,
   ).toBe(204);
   expect(store.persona).toBe("owner");
   expect(store.user().version).toBe(version);
   const wrong = await post("/me/password", {
-    currentPassword: "fixture-password",
-    newPassword: "another password",
+    currentPassword: "fixture-password1",
+    newPassword: "another-password2",
   });
   expect(await wrong.json()).toMatchObject({
     code: "CURRENT_PASSWORD_MISMATCH",
@@ -105,7 +105,7 @@ it("queues delivery, invalidates replaced and consumed links, and completes anon
     (
       await post("/password-resets/complete", {
         token,
-        newPassword: "new fixture password",
+        newPassword: "new-fixture-password2",
       })
     ).status,
   ).toBe(204);

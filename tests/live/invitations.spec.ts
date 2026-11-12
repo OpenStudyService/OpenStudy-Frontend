@@ -172,6 +172,7 @@ async function acceptNew(page: Page, link: string) {
   await expect(page.getByLabel("새 계정 비밀번호")).toBeVisible();
   await expect(page).toHaveURL(`${baseURL}/invitations/accept`);
   await page.getByLabel("새 계정 비밀번호").fill(password);
+  await page.getByLabel("비밀번호 확인").fill(password);
   await page.evaluate(() =>
     window.dispatchEvent(
       new PopStateEvent("popstate", { state: window.history.state }),
@@ -509,7 +510,7 @@ test("a rejected applicant sees the reason in a separate browser", async ({
     await expect(
       manager.page.getByText(/거절 · 발송 완료 · 버전/),
     ).toBeVisible();
-    await page.getByRole("button", { name: "승인 상태 새로고침" }).click();
+    await page.reload();
     await expect(
       page.getByText("반려 사유: 근무 일정 재확인 필요"),
     ).toBeVisible();
@@ -546,6 +547,7 @@ test("a signed-in user can log out and continue the new-account mail link withou
       .click();
     await expect(recipient.page.getByLabel("새 계정 비밀번호")).toBeVisible();
     await recipient.page.getByLabel("새 계정 비밀번호").fill(password);
+    await recipient.page.getByLabel("비밀번호 확인").fill(password);
     await recipient.page
       .getByRole("button", { name: "초대 수락", exact: true })
       .click();

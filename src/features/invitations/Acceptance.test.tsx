@@ -59,8 +59,18 @@ it("POSTs fragment token outside query keys and sends only the discriminated acc
   );
   await userEvent.type(
     screen.getByLabelText("새 계정 비밀번호"),
-    "secure-password",
+    "secure-password1",
   );
+  const confirmation = screen.getByLabelText("비밀번호 확인");
+  await userEvent.type(confirmation, "different-password");
+  await userEvent.click(screen.getByRole("button", { name: "초대 수락" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("비밀번호가 일치하지 않습니다.");
+  expect(vi.mocked(api).mock.calls.map(([path]) => path)).toEqual([
+    "/invitations/preview",
+  ]);
+  expect(screen.getByLabelText("새 계정 비밀번호")).toHaveValue("secure-password1");
+  await userEvent.clear(confirmation);
+  await userEvent.type(confirmation, "secure-password1");
   await userEvent.click(screen.getByRole("button", { name: "초대 수락" }));
   expect(
     await screen.findByRole("heading", { name: "초대 수락이 완료됐어요" }),
@@ -71,7 +81,7 @@ it("POSTs fragment token outside query keys and sends only the discriminated acc
       mode: "NEW_ACCOUNT",
       token: "secret-link",
       email: preview.email,
-      password: "secure-password",
+      password: "secure-password1",
     },
   });
 });
@@ -117,6 +127,7 @@ it("accepts an existing account without sending a password or changing other bra
   mount();
   await screen.findByRole("button", { name: "초대 수락" });
   expect(screen.queryByLabelText("새 계정 비밀번호")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("비밀번호 확인")).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "초대 수락" }));
   expect(api).toHaveBeenCalledWith("/invitations/accept", {
     method: "POST",
@@ -169,8 +180,9 @@ it("retains the private link and password when browser history resynchronizes th
   const query = mountBrowser();
   await userEvent.type(
     await screen.findByLabelText("새 계정 비밀번호"),
-    "secure-password",
+    "secure-password1",
   );
+  await userEvent.type(screen.getByLabelText("비밀번호 확인"), "secure-password1");
   expect(window.location.hash).toBe("");
   act(() => {
     window.dispatchEvent(
@@ -178,7 +190,7 @@ it("retains the private link and password when browser history resynchronizes th
     );
   });
   expect(screen.getByLabelText("새 계정 비밀번호")).toHaveValue(
-    "secure-password",
+    "secure-password1",
   );
   await userEvent.click(screen.getByRole("button", { name: "초대 수락" }));
   expect(

@@ -2,6 +2,7 @@ import { HttpResponse } from "msw/http";
 import { assert, DomainError, store } from "./store";
 import { organizationEmployee } from "./organization";
 import { canManageBranch } from "../features/organization/model";
+import { newPasswordError } from "../shared/domain/password";
 
 let db: typeof store.db | undefined;
 const passwords = new Map<string, string | null>();
@@ -61,10 +62,12 @@ function validation(
 function password(value: unknown, field: "currentPassword" | "newPassword") {
   if (
     typeof value !== "string" ||
-    Array.from(value).length < (field === "newPassword" ? 8 : 1) ||
-    new TextEncoder().encode(value).length > 72
+    !value ||
+    (field === "currentPassword" && new TextEncoder().encode(value).length > 72)
   )
     throw validation(field, "비밀번호 형식을 확인해 주세요.");
+  const error = field === "newPassword" && newPasswordError(value);
+  if (error) throw validation(field, error);
   return value;
 }
 

@@ -11,7 +11,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Login } from "./Login";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { api, ApiError } from "../../shared/api/client";
-import { newPasswordError, PasswordForm } from "./PasswordForm";
+import { PasswordForm } from "./PasswordForm";
+import { newPasswordError } from "../../shared/domain/password";
 import { PasswordReset } from "./PasswordReset";
 
 vi.mock("../../shared/api/client", async (original) => ({
@@ -79,7 +80,7 @@ it("scrubs the fragment and sends only body fields before returning to login", a
     }),
   );
   fireEvent.change(screen.getByLabelText("새 비밀번호"), {
-    target: { value: "  valid pass  " },
+    target: { value: "  valid-pass1  " },
   });
   fireEvent.click(screen.getByRole("button", { name: "새 비밀번호 저장" }));
   expect(
@@ -91,7 +92,7 @@ it("scrubs the fragment and sends only body fields before returning to login", a
     "/password-resets/complete",
     expect.objectContaining({
       method: "POST",
-      body: { token: "reset-fixture", newPassword: "  valid pass  " },
+      body: { token: "reset-fixture", newPassword: "  valid-pass1  " },
     }),
   );
 });
@@ -106,7 +107,7 @@ it.each(["preview", "complete"])(
     openLink();
     if (stage === "complete") {
       fireEvent.change(await screen.findByLabelText("새 비밀번호"), {
-        target: { value: "valid pass" },
+        target: { value: "valid-pass1" },
       });
       fireEvent.click(screen.getByRole("button", { name: "새 비밀번호 저장" }));
     }
@@ -119,10 +120,12 @@ it.each(["preview", "complete"])(
 );
 
 it("validates code points and UTF-8 bytes without trimming", () => {
-  expect(newPasswordError(" ".repeat(8))).toBeUndefined();
+  for (const invalid of ["1234567!", "Letters!", "Letters1 ", "A1!😀😀😀😀"]) {
+    expect(newPasswordError(invalid)).toBeTruthy();
+  }
   expect(newPasswordError("😀".repeat(7))).toBeTruthy();
-  expect(newPasswordError("😀".repeat(18))).toBeUndefined();
-  expect(newPasswordError("😀".repeat(19))).toBeTruthy();
+  expect(newPasswordError("A1!" + "가".repeat(23))).toBeUndefined();
+  expect(newPasswordError("A1!" + "가".repeat(24))).toBeTruthy();
 });
 
 it.each([
@@ -145,11 +148,11 @@ it.each([
       target: { value: "old-password" },
     });
     fireEvent.change(screen.getByLabelText("새 비밀번호"), {
-      target: { value: "new-password" },
+      target: { value: "new-password1" },
     });
     fireEvent.click(screen.getByRole("button", { name: "비밀번호 변경" }));
     await waitFor(() =>
-      expect(submit).toHaveBeenCalledWith("new-password", "old-password"),
+      expect(submit).toHaveBeenCalledWith("new-password1", "old-password"),
     );
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(

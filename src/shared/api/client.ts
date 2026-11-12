@@ -38,23 +38,23 @@ let csrfPromise: Promise<string> | undefined;
 export function clearCsrf() {
   csrfPromise = undefined;
 }
+async function fetchCsrf(options?: RequestOptions) {
+  const data = await api<{ token: string }>("/auth/csrf", options);
+  if (typeof data?.token !== "string" || !data.token) {
+    throw new ApiError(0, {
+      code: "INVALID_RESPONSE",
+      message: "인증 준비에 실패했습니다.",
+    });
+  }
+  return data.token;
+}
 /** The session CSRF token, fetched once and cached; non-GET requests must send it as X-CSRF-Token. */
 export async function csrf() {
   if (csrfPromise) return csrfPromise;
-  const request = api<{ token: string }>("/auth/csrf")
-    .then((data) => {
-      if (typeof data?.token !== "string" || !data.token) {
-        throw new ApiError(0, {
-          code: "INVALID_RESPONSE",
-          message: "인증 준비에 실패했습니다.",
-        });
-      }
-      return data.token;
-    })
-    .catch((e) => {
-      if (csrfPromise === request) clearCsrf();
-      throw e;
-    });
+  const request = fetchCsrf().catch((e) => {
+    if (csrfPromise === request) clearCsrf();
+    throw e;
+  });
   csrfPromise = request;
   return request;
 }
@@ -63,20 +63,28 @@ type RequestOptions = {
   body?: unknown;
   signal?: AbortSignal;
   key?: string;
+  scope?: "session" | "public";
 };
 
 async function request(path: string, options: RequestOptions, accept: string) {
-  const signal = options.signal
-    ? AbortSignal.any([privateRequests.signal, options.signal])
-    : privateRequests.signal;
-  signal.throwIfAborted();
+  const isPublic = options.scope === "public";
+  const signal = isPublic
+    ? options.signal
+    : options.signal
+      ? AbortSignal.any([privateRequests.signal, options.signal])
+      : privateRequests.signal;
+  signal?.throwIfAborted();
   const method = (options.method || "GET").toUpperCase(),
     headers: Record<string, string> = { Accept: accept };
   const multipart = options.body instanceof FormData;
   if (options.body !== undefined && !multipart)
     headers["Content-Type"] = "application/json";
-  if (!["GET", "HEAD"].includes(method)) headers["X-CSRF-Token"] = await csrf();
-  signal.throwIfAborted();
+  if (!["GET", "HEAD"].includes(method)) {
+    headers["X-CSRF-Token"] = isPublic
+      ? await fetchCsrf({ scope: "public", signal })
+      : await csrf();
+  }
+  signal?.throwIfAborted();
   if (options.key) headers["Idempotency-Key"] = options.key;
   let response: Response;
   try {
@@ -90,14 +98,14 @@ async function request(path: string, options: RequestOptions, accept: string) {
       signal,
     });
   } catch (e) {
-    signal.throwIfAborted();
+    signal?.throwIfAborted();
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new ApiError(0, {
       code: "NETWORK_ERROR",
       message: "연결하지 못했습니다. 네트워크와 서버를 확인해 주세요.",
     });
   }
-  signal.throwIfAborted();
+  signal?.throwIfAborted();
   if (!response.ok) {
     let detail: ErrorBody;
     try {
@@ -119,7 +127,7 @@ async function request(path: string, options: RequestOptions, accept: string) {
         message: `요청에 실패했습니다. (${response.status})`,
       };
     }
-    signal.throwIfAborted();
+    signal?.throwIfAborted();
     const rawRequestId =
       response.headers.get("X-Request-ID") || detail.requestId;
     const requestId =
@@ -133,8 +141,9 @@ async function request(path: string, options: RequestOptions, accept: string) {
         : undefined;
     delete detail.requestId;
     detail = { ...detail, ...(requestId ? { requestId } : {}) };
-    if (response.status === 401 || detail.code === "CSRF_INVALID") clearCsrf();
-    if (response.status === 401 && !path.startsWith("/auth/login")) {
+    if (!isPublic && (response.status === 401 || detail.code === "CSRF_INVALID"))
+      clearCsrf();
+    if (!isPublic && response.status === 401 && !path.startsWith("/auth/login")) {
       abortPrivateRequests();
       window.dispatchEvent(
         new CustomEvent("openstudy:session-expired", { detail: detail.code }),
@@ -155,7 +164,7 @@ export async function api<T>(
 ): Promise<T> {
   const { response, signal } = await request(path, options, "application/json");
   const body = response.status === 204 ? "" : await response.text();
-  signal.throwIfAborted();
+  signal?.throwIfAborted();
   if (["/auth/login", "/auth/logout", "/invitations/accept"].includes(path)) {
     clearCsrf();
     abortPrivateRequests();
@@ -177,7 +186,7 @@ export async function apiCsv(path: string, abortSignal?: AbortSignal) {
       message: "CSV 응답을 확인할 수 없어요. 다시 시도해 주세요.",
     });
   const blob = await response.blob();
-  signal.throwIfAborted();
+  signal?.throwIfAborted();
   return { blob, disposition: response.headers.get("Content-Disposition") };
 }
 
