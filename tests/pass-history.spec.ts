@@ -112,9 +112,7 @@ test("history lists scoped usage with purchase branch, stable filters and readon
   await page.getByLabel("이용 지점 필터").selectOption("gangnam");
   await page.getByLabel("이용 상태 필터").selectOption("이용 중");
   await expect(table.getByText("퇴실 시 확정", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "김지우 이용 상세", exact: true })
-    .click();
+  await table.getByRole("button", { name: "김지우", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(
     dialog.getByText("이동 이력이 없어요.", { exact: true }),

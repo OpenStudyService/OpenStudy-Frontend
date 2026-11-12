@@ -7,15 +7,19 @@ import {
   Badge,
   Button,
   ErrorState,
-  FieldError,
   Heading,
   Panel,
   State,
 } from "../../shared/ui/primitives";
-import { Field } from "../organization/shared";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
 import {
   CustomerSelector,
-  SalesPager,
+  LIST_CUSTOMER_SELECTOR_CLASS,
   dateTime,
   useSalesSearch,
 } from "../payments/shared";
@@ -23,6 +27,18 @@ import { seatApi } from "../seats/api";
 import { RangeFilter } from "./RangeFilter";
 import { timeRange } from "./model";
 import type { SessionFilters } from "./model";
+
+const PAGE_SIZE = 20;
+// 초기화 대상: 목록 필터와 페이지. tab·detail은 남긴다.
+const HISTORY_FILTER_KEYS = [
+  "status",
+  "seatId",
+  "direction",
+  "customerId",
+  "from",
+  "to",
+  "page",
+];
 
 export function SeatHistory({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp();
@@ -40,7 +56,7 @@ export function SeatHistory({ embedded = false }: { embedded?: boolean }) {
 }
 function HistoryWorkspace({ embedded }: { embedded: boolean }) {
   const { session, scope } = useApp();
-  const { params, page, update } = useSalesSearch();
+  const { params, page, update, reset } = useSalesSearch();
   const [, setParams] = useSearchParams();
   const branchId =
     scope === "all" ? params.get("historyBranch") || "all" : scope;
@@ -56,7 +72,7 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
   const filters: SessionFilters = {
     scope: branchId,
     page,
-    pageSize: 20,
+    pageSize: PAGE_SIZE,
     sort: "checkedInAt",
     direction: params.get("direction") === "asc" ? "asc" : "desc",
     status:
@@ -119,36 +135,33 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
           description="입실 시각을 기준으로 이용과 차감 내역을 확인해요."
         />
       )}
-      <p className="help">
-        입실 시각 기준으로 조회해요. 구매 지점과 이용 지점은 다를 수 있어요.
-      </p>
-      {scope === "all" && (
-        <Field label="이용 지점 필터">
+      <ListCard>
+        <ListFilters>
+          {scope === "all" && (
+            <select
+              aria-label="이용 지점 필터"
+              value={branchId}
+              onChange={(e) =>
+                setParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.set("historyBranch", e.target.value);
+                  next.delete("seatId");
+                  next.delete("detail");
+                  next.delete("page");
+                  return next;
+                })
+              }
+            >
+              <option value="all">전체 지점</option>
+              {session.branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
-            value={branchId}
-            onChange={(e) =>
-              setParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.set("historyBranch", e.target.value);
-                next.delete("seatId");
-                next.delete("detail");
-                next.delete("page");
-                return next;
-              })
-            }
-          >
-            <option value="all">전체 지점</option>
-            {session.branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
-      <div className="my-4 grid gap-3 sm:grid-cols-3">
-        <Field label="이용 상태 필터">
-          <select
+            aria-label="이용 상태 필터"
             value={filters.status || ""}
             onChange={(e) => update("status", e.target.value)}
           >
@@ -156,9 +169,8 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
             <option>이용 중</option>
             <option>종료</option>
           </select>
-        </Field>
-        <Field label="좌석 필터">
           <select
+            aria-label="좌석 필터"
             value={filters.seatId || ""}
             disabled={branchId === "all" || !seats.data || !!seats.error}
             onChange={(e) => update("seatId", e.target.value)}
@@ -176,140 +188,135 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
                 </option>
               ))}
           </select>
-        </Field>
-        <Field label="입실 일시 정렬">
           <select
+            aria-label="입실 일시 정렬"
             value={filters.direction}
             onChange={(e) => update("direction", e.target.value)}
           >
             <option value="desc">최신순</option>
             <option value="asc">오래된 순</option>
           </select>
-        </Field>
-      </div>
-      {seats.error && (
-        <ErrorState error={seats.error} retry={() => void seats.refetch()} />
-      )}
-      <CustomerSelector
-        allowAll
-        value={filters.customerId || ""}
-        onChange={(id) => update("customerId", id)}
-      />
-      <RangeFilter
-        key={`${from}:${to}`}
-        from={from}
-        to={to}
-        onApply={(start, end) =>
-          setParams((prev) => {
-            const next = new URLSearchParams(prev);
-            if (start) next.set("from", start);
-            else next.delete("from");
-            if (end) next.set("to", end);
-            else next.delete("to");
-            next.delete("page");
-            return next;
-          })
-        }
-      />
-      {validation ? (
-        <FieldError>{validation}</FieldError>
-      ) : hasBlockingReadError(rows) ? (
-        <ErrorState error={rows.error!} retry={() => void rows.refetch()} />
-      ) : rows.isPending ? (
-        <State loading />
-      ) : (
-        rows.data && (
-          <>
-            <div
-              className="data-scroll"
-              tabIndex={0}
-              role="region"
-              aria-label="입퇴실 이력 표"
-            >
-              <table
-                className="data-table min-w-[960px]"
-                aria-label="입퇴실 이력"
-              >
-                <thead>
-                  <tr>
-                    {[
-                      "고객",
-                      "이용 지점·좌석",
-                      "구매 지점·상품",
-                      "입실·퇴실",
-                      "상태",
-                      "이용·차감·초과",
-                      "상세",
-                    ].map((label) => (
-                      <th key={label}>{label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.data.items.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        {row.customer.name}
-                        <br />
-                        {row.customer.memberNo}
-                      </td>
-                      <td>
-                        {branchName(row.branchId)}
-                        <br />
-                        {row.seat.zone} · {row.seat.seatNo}
-                      </td>
-                      <td>
-                        {branchName(row.pass.purchaseBranchId)}
-                        <br />
-                        {row.pass.productName}
-                      </td>
-                      <td>
-                        {dateTime(row.checkedInAt)}
-                        <br />
-                        {dateTime(row.checkedOutAt)}
-                      </td>
-                      <td>
-                        <Badge>{row.status}</Badge>
-                      </td>
-                      <td>
-                        {row.status === "이용 중" ? (
-                          "퇴실 시 확정"
-                        ) : (
-                          <>
-                            {row.usedMinutes}분 이용
-                            <br />
-                            차감 {row.deductedMinutes}분 ·{" "}
-                            {formatKrw(row.deductedKrw)}
-                            <br />
-                            초과 {row.overageMinutes}분 ·{" "}
-                            {formatKrw(row.overageKrw)}
-                          </>
-                        )}
-                      </td>
-                      <td>
-                        <Button
-                          onClick={() => update("detail", row.id)}
-                          aria-label={`${row.customer.name} 이용 상세`}
-                        >
-                          상세
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!rows.data.items.length && (
-              <State title="조건에 맞는 입퇴실 이력이 없어요" />
-            )}
-            <SalesPager
-              page={rows.data.meta.page}
-              total={rows.data.meta.total}
-              onChange={(value) => update("page", String(value))}
+          <Button
+            variant="quiet"
+            onClick={() =>
+              // 지점 필터가 지워지면 지점을 바꿀 때처럼 그 지점 기준 상세도 닫는다.
+              reset(
+                params.has("historyBranch")
+                  ? [...HISTORY_FILTER_KEYS, "historyBranch", "detail"]
+                  : HISTORY_FILTER_KEYS,
+              )
+            }
+          >
+            초기화
+          </Button>
+        </ListFilters>
+        <RangeFilter
+          inline
+          key={`${from}:${to}`}
+          from={from}
+          to={to}
+          onApply={(start, end) =>
+            setParams((prev) => {
+              const next = new URLSearchParams(prev);
+              if (start) next.set("from", start);
+              else next.delete("from");
+              if (end) next.set("to", end);
+              else next.delete("to");
+              next.delete("page");
+              return next;
+            })
+          }
+        />
+        <CustomerSelector
+          className={LIST_CUSTOMER_SELECTOR_CLASS}
+          allowAll
+          value={filters.customerId || ""}
+          onChange={(id) => update("customerId", id)}
+        />
+        {seats.error && (
+          <div className="border-b border-line px-4 py-3">
+            <ErrorState
+              error={seats.error}
+              retry={() => void seats.refetch()}
             />
-          </>
-        )
-      )}
+          </div>
+        )}
+        <p className="px-5 py-3 text-xs text-muted">
+          입실 시각 기준으로 조회해요. 구매 지점과 이용 지점은 다를 수 있어요.
+        </p>
+        <ListTable
+          label="입퇴실 이력"
+          columns={[
+            "고객",
+            "이용 지점·좌석",
+            "구매 지점·상품",
+            "입실·퇴실",
+            "상태",
+            "이용·차감·초과",
+          ]}
+          state={validation && <State title={validation} />}
+          loading={rows.isPending}
+          error={hasBlockingReadError(rows) ? rows.error : null}
+          onRetry={() => void rows.refetch()}
+          isEmpty={!rows.data?.items.length}
+          empty={{ title: "조건에 맞는 입퇴실 이력이 없어요" }}
+        >
+          {rows.data?.items.map((row) => (
+            <tr key={row.id}>
+              <td>
+                <button
+                  className="cell-link"
+                  onClick={() => update("detail", row.id)}
+                >
+                  {row.customer.name}
+                </button>
+                <span className="help block">{row.customer.memberNo}</span>
+              </td>
+              <td>
+                {branchName(row.branchId)}
+                <span className="help block">
+                  {row.seat.zone} · {row.seat.seatNo}
+                </span>
+              </td>
+              <td>
+                {branchName(row.pass.purchaseBranchId)}
+                <span className="help block">{row.pass.productName}</span>
+              </td>
+              <td>
+                {dateTime(row.checkedInAt)}
+                <span className="help block">{dateTime(row.checkedOutAt)}</span>
+              </td>
+              <td>
+                <Badge>{row.status}</Badge>
+              </td>
+              <td>
+                {row.status === "이용 중" ? (
+                  "퇴실 시 확정"
+                ) : (
+                  <>
+                    {row.usedMinutes}분 이용
+                    <span className="help block">
+                      차감 {row.deductedMinutes}분 ·{" "}
+                      {formatKrw(row.deductedKrw)}
+                    </span>
+                    <span className="help block">
+                      초과 {row.overageMinutes}분 · {formatKrw(row.overageKrw)}
+                    </span>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={rows.data?.meta.page ?? page}
+          pageSize={PAGE_SIZE}
+          total={rows.data?.meta.total ?? 0}
+          loading={!validation && rows.isPending}
+          error={!!validation || !!rows.error}
+          onChange={(value) => update("page", String(value))}
+        />
+      </ListCard>
       {selected && (
         <Panel
           open

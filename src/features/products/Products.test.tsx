@@ -192,9 +192,8 @@ function mount(search = "") {
 }
 const open = async (name = "10시간권") => {
   mount();
-  await userEvent.click(
-    await screen.findByRole("button", { name: `상품 상세: ${name}` }),
-  );
+  const table = await screen.findByRole("table", { name: "상품 목록" });
+  await userEvent.click(await within(table).findByRole("button", { name }));
   return screen.findByRole("dialog");
 };
 
@@ -202,10 +201,21 @@ it("lists terms with explicit units and unlimited validity, and never offers del
   mount();
   await screen.findByText(/10시간\(600분\)/);
   expect(screen.getByText(/유효기간 무기한/)).toBeVisible();
-  expect(screen.getByText(/판매 지점: 강남점/)).toBeVisible();
+  expect(
+    within(screen.getByRole("table", { name: "상품 목록" })).getAllByRole(
+      "cell",
+      { name: "강남점" },
+    )[0],
+  ).toBeVisible();
   expect(screen.getByRole("button", { name: "상품 등록" })).toBeVisible();
   expect(screen.queryByRole("button", { name: /삭제/ })).toBeNull();
-  const dialog = await open();
+  await userEvent.click(
+    within(screen.getByRole("table", { name: "상품 목록" })).getByRole(
+      "button",
+      { name: "10시간권" },
+    ),
+  );
+  const dialog = await screen.findByRole("dialog");
   expect(within(dialog).queryByRole("button", { name: /삭제/ })).toBeNull();
   expect(
     within(dialog).getByRole("button", { name: "판매 중지" }),
@@ -508,4 +518,33 @@ it("restricts category writes to the owner", async () => {
   await screen.findByText("PERIOD · 기간권");
   expect(screen.queryByRole("button", { name: "분류 등록" })).toBeNull();
   expect(screen.queryByRole("button", { name: /분류 수정/ })).toBeNull();
+});
+
+it("places product registration and filters in the list filter bar and resets only filter keys", async () => {
+  const router = mount(
+    "?productSearch=10&productStatus=판매+중&productKind=시간권&productAvailability=판매+가능&productPage=2&keep=1",
+  );
+  const searchParams = () => new URLSearchParams(router.state.location.search);
+  const table = await screen.findByRole("table", { name: "상품 목록" });
+  await within(table).findByRole("button", { name: "10시간권" });
+  const register = screen.getByRole("button", { name: "상품 등록" });
+  expect(register.closest(".filters")).toBe(
+    screen.getByLabelText("판매 가능 여부").closest(".filters"),
+  );
+  expect(
+    screen.queryByRole("button", { name: /상품 상세/ }),
+  ).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "초기화" }));
+  expect([...searchParams().keys()]).toEqual(["keep"]);
+  expect(screen.getByLabelText("상품명·코드 검색")).toHaveValue("");
+});
+
+it("shows an empty product result inside the table", async () => {
+  products = [];
+  mount();
+  const table = await screen.findByRole("table", { name: "상품 목록" });
+  expect(
+    await within(table).findByText("조건에 맞는 상품이 없어요"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("총 0건 · 1페이지")).toBeInTheDocument();
 });

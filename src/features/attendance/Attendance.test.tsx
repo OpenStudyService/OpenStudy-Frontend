@@ -261,7 +261,12 @@ it("uses server minutes identically in list and detail, with no staff filter or 
   expect(row).toBeVisible();
   expect(screen.queryByLabelText("근태 직원")).toBeNull();
   expect(screen.queryByLabelText("조회 대상")).toBeNull();
-  await user.click(screen.getByRole("button", { name: "2026-11-05 09:00" }));
+  await user.click(
+    within(screen.getByRole("table", { name: "출퇴근 기록" })).getByRole(
+      "button",
+      { name: "본인" },
+    ),
+  );
   const panel = await screen.findByRole("dialog");
   expect(await within(panel).findByText("실근무: 498분")).toBeVisible();
   expect(
@@ -281,4 +286,21 @@ it("rejects malformed list and detail rather than showing an empty success", asy
   await expect(attendanceApi.get("1")).rejects.toMatchObject({
     detail: { code: "INVALID_RESPONSE" },
   });
+});
+it("shows attendance records in the list layout with empty state inside the table and resettable filters", async () => {
+  const user = show(
+    <AttendanceRecords />,
+    "/?status=퇴근&from=2026-11-01&page=2",
+  );
+  const table = screen.getByRole("table", { name: "출퇴근 기록" });
+  expect(
+    await within(table).findByText("조건에 맞는 실제 출퇴근 기록이 없습니다."),
+  ).toBeVisible();
+  expect(screen.getByLabelText("근태 상태")).toHaveValue("퇴근");
+  expect(screen.getByLabelText("출근 시작일")).toHaveValue("2026-11-01");
+  expect(screen.getByText("총 0건 · 2페이지")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "초기화" }));
+  expect(screen.getByLabelText("근태 상태")).toHaveValue("");
+  expect(screen.getByLabelText("출근 시작일")).toHaveValue("");
+  expect(await screen.findByText("총 0건 · 1페이지")).toBeVisible();
 });

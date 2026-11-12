@@ -7,15 +7,14 @@ import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { api, MOCK, queryString } from "../../shared/api/client";
 import { saleAvailabilities } from "../../shared/domain/sale";
+import { Badge, Button, Heading, Panel } from "../../shared/ui/primitives";
 import {
-  Badge,
-  Button,
-  ErrorState,
-  Heading,
-  Panel,
-  State,
-} from "../../shared/ui/primitives";
-import { Field, Pager, useListSearch } from "../organization/shared";
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
+import { useListSearch } from "../organization/shared";
 import { CategoryManagement } from "./Categories";
 import { ProductCreate } from "./ProductCreate";
 import { ProductDetail } from "./ProductDetail";
@@ -29,6 +28,17 @@ import {
   saleLabel,
 } from "./model";
 import type { Product, ProductPage } from "./model";
+
+// 초기화 대상: 상품 목록 필터와 페이지만. tab은 남긴다.
+const PRODUCT_FILTER_KEYS = [
+  "productSearch",
+  "productStatus",
+  "productKind",
+  "productCategory",
+  "productAvailability",
+  "productPage",
+];
+const PAGE_SIZE = 20;
 
 export function ProductManagement() {
   const { session, scope } = useApp();
@@ -69,7 +79,7 @@ export function ProductManagement() {
     ],
     queryFn: ({ signal }) =>
       api<ProductPage>(
-        `/products?${queryString({ scope, page, pageSize: 20, q: search, status, kind, categoryId, availability, sort: "name", direction: "asc" })}`,
+        `/products?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status, kind, categoryId, availability, sort: "name", direction: "asc" })}`,
         { signal },
       ),
     enabled: tab === "products",
@@ -88,13 +98,7 @@ export function ProductManagement() {
       <Heading
         title="상품 관리"
         description="시간권·기간권·정액권의 판매 조건과 변경 이력을 관리해요."
-      >
-        {tab === "products" && writable.length > 0 && (
-          <Button variant="primary" onClick={() => setSelected("new")}>
-            상품 등록
-          </Button>
-        )}
-      </Heading>
+      />
       <Tabs.Root
         value={tab}
         onValueChange={(value) =>
@@ -116,35 +120,42 @@ export function ProductManagement() {
           </Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="products">
-          <Field label="판매 가능 여부">
-            <select
-              value={availability}
-              onChange={(e) => setFilter("productAvailability", e.target.value)}
-            >
-              <option value="">전체</option>
-              {saleAvailabilities.map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </Field>
           {MOCK && (
             <p className="help mb-4">
               데모 화면입니다. 변경 내용은 실제 상품 정보에 반영되지 않습니다.
             </p>
           )}
-          <p className="help mb-3">
-            상품은 삭제할 수 없어요. 더 이상 팔지 않는 상품은 판매를 중지해
-            주세요. 기존 구매 내역과 변경 이력은 보존돼요.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-4">
-            <Field label="상품명·코드 검색">
+          <ListCard>
+            <ListFilters
+              actions={
+                writable.length > 0 && (
+                  <Button variant="primary" onClick={() => setSelected("new")}>
+                    상품 등록
+                  </Button>
+                )
+              }
+            >
               <input
+                type="search"
+                aria-label="상품명·코드 검색"
+                placeholder="상품명·코드 검색"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-            </Field>
-            <Field label="판매 상태 필터">
               <select
+                aria-label="판매 가능 여부"
+                value={availability}
+                onChange={(e) =>
+                  setFilter("productAvailability", e.target.value)
+                }
+              >
+                <option value="">판매 가능 여부 전체</option>
+                {saleAvailabilities.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+              <select
+                aria-label="판매 상태 필터"
                 value={status}
                 onChange={(e) => setFilter("productStatus", e.target.value)}
               >
@@ -153,9 +164,8 @@ export function ProductManagement() {
                   <option key={s}>{s}</option>
                 ))}
               </select>
-            </Field>
-            <Field label="상품 유형 필터">
               <select
+                aria-label="상품 유형 필터"
                 value={kind}
                 onChange={(e) => setFilter("productKind", e.target.value)}
               >
@@ -164,9 +174,8 @@ export function ProductManagement() {
                   <option key={k}>{k}</option>
                 ))}
               </select>
-            </Field>
-            <Field label="분류 필터">
               <select
+                aria-label="분류 필터"
                 value={categoryId}
                 onChange={(e) => setFilter("productCategory", e.target.value)}
               >
@@ -177,61 +186,91 @@ export function ProductManagement() {
                   </option>
                 ))}
               </select>
-            </Field>
-          </div>
-          {products.isPending ? (
-            <State loading />
-          ) : !products.data || hasBlockingReadError(products) ? (
-            <ErrorState
-              error={products.error!}
-              retry={() => void products.refetch()}
-            />
-          ) : (
-            <>
-              {!products.data.items.length && (
-                <State title="조건에 맞는 상품이 없어요" />
-              )}
-              {products.data.items.map((product) => (
-                <article
-                  className="my-3 rounded-xl border border-line p-4"
-                  key={product.id}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3>{product.name}</h3>
-                      <p className="help">
-                        {product.code} · {product.terms.kind} ·{" "}
-                        {product.category.name} · {won(product.priceKrw)}
-                      </p>
-                      <p>{termsLabel(product.terms)}</p>
-                      {saleLabel(product) && (
-                        <p className="help">{saleLabel(product)}</p>
-                      )}
-                      <p className="help">
-                        판매 지점:{" "}
-                        {product.branchIds.map(branchName).join(", ")}
-                      </p>
-                      <Badge>{product.status}</Badge>
-                      {!product.canEdit && (
-                        <p className="help">
-                          조회 전용 · 모든 판매 지점의 운영 권한이 있어야 수정할
-                          수 있어요.
-                        </p>
-                      )}
-                    </div>
-                    <Button onClick={() => setSelected(product)}>
-                      상품 상세: {product.name}
-                    </Button>
-                  </div>
-                </article>
+              <Button
+                variant="quiet"
+                onClick={() =>
+                  setParams(
+                    (current) => {
+                      const next = new URLSearchParams(current);
+                      PRODUCT_FILTER_KEYS.forEach((key) => next.delete(key));
+                      return next;
+                    },
+                    { replace: true },
+                  )
+                }
+              >
+                초기화
+              </Button>
+            </ListFilters>
+            <p className="px-5 pb-3 text-xs text-muted">
+              상품은 삭제할 수 없어요. 더 이상 팔지 않는 상품은 판매를 중지해
+              주세요. 기존 구매 내역과 변경 이력은 보존돼요.
+            </p>
+            <ListTable
+              label="상품 목록"
+              columns={[
+                "상품명",
+                "유형",
+                "분류",
+                "판매 금액",
+                "이용 조건",
+                "판매 지점",
+                "상태",
+              ]}
+              loading={products.isPending}
+              error={
+                !products.data || hasBlockingReadError(products)
+                  ? products.error
+                  : null
+              }
+              onRetry={() => void products.refetch()}
+              isEmpty={!products.data?.items.length}
+              empty={{ title: "조건에 맞는 상품이 없어요" }}
+            >
+              {products.data?.items.map((product) => (
+                <tr key={product.id}>
+                  <td>
+                    <button
+                      className="cell-link"
+                      onClick={() => setSelected(product)}
+                    >
+                      {product.name}
+                    </button>
+                    <span className="help block">{product.code}</span>
+                  </td>
+                  <td>{product.terms.kind}</td>
+                  <td>{product.category.name}</td>
+                  <td>{won(product.priceKrw)}</td>
+                  <td>
+                    {termsLabel(product.terms)}
+                    {saleLabel(product) && (
+                      <span className="help block">{saleLabel(product)}</span>
+                    )}
+                  </td>
+                  <td>{product.branchIds.map(branchName).join(", ")}</td>
+                  <td>
+                    <Badge>{product.status}</Badge>
+                    {!product.canEdit && (
+                      <span
+                        className="help block"
+                        title="모든 판매 지점의 운영 권한이 있어야 수정할 수 있어요."
+                      >
+                        조회 전용
+                      </span>
+                    )}
+                  </td>
+                </tr>
               ))}
-              <Pager
-                page={page}
-                total={products.data.meta.total}
-                onChange={setPage}
-              />
-            </>
-          )}
+            </ListTable>
+            <ListFooter
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={products.data?.meta.total ?? 0}
+              loading={products.isPending}
+              error={!!products.error}
+              onChange={setPage}
+            />
+          </ListCard>
         </Tabs.Content>
         <Tabs.Content value="categories">
           <CategoryManagement />

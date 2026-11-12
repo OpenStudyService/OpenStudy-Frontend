@@ -615,11 +615,9 @@ test("real closure warns about existing bookings and blocks new bookings", async
     await owner.page.goto("/app/1/settings");
     await owner.page.getByRole("button", { name: /휴무일 관리:/ }).click();
     owner.page.once("dialog", (dialog) => dialog.accept());
-    const row = panel
-      .getByRole("article")
-      .filter({
-        has: owner.page.getByRole("heading", { name: date, exact: true }),
-      });
+    const row = panel.getByRole("article").filter({
+      has: owner.page.getByRole("heading", { name: date, exact: true }),
+    });
     await row.getByRole("button", { name: "휴무일 삭제" }).click();
     await expect(row).toHaveCount(0);
   } finally {
@@ -666,7 +664,8 @@ test("real product sale period and limit can be configured and cleared", async (
       new Date(Date.parse(instant) + 9 * 3600000).toISOString().slice(0, 16);
     await owner.page.goto("/app/1/products");
     await owner.page
-      .getByRole("button", { name: "상품 상세: " + product.name })
+      .getByRole("table", { name: "상품 목록" })
+      .getByRole("button", { name: product.name, exact: true })
       .click();
     const panel = owner.page.getByRole("dialog");
     const start = panel.getByLabel("판매 시작", { exact: true });

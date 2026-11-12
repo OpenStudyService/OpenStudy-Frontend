@@ -50,7 +50,8 @@ test("owner registers a period pass, changes it, stops sales and reads the befor
 
   await page.getByLabel("상품명·코드 검색").fill("검증");
   await page
-    .getByRole("button", { name: "상품 상세: 검증 4주 기간권" })
+    .getByRole("table", { name: "상품 목록" })
+    .getByRole("button", { name: "검증 4주 기간권", exact: true })
     .click();
   const detail = page.getByRole("dialog");
   await expect(detail.getByLabel("상품 유형")).toBeDisabled();
@@ -87,7 +88,10 @@ test("a staff member sees only the branch's products and cannot manage sale stat
   await page.goto("/app/all/products");
   await expect(page.getByRole("heading", { name: "상품 관리" })).toBeVisible();
   await expect(page.getByRole("button", { name: /삭제/ })).toHaveCount(0);
-  const product = page.getByRole("button", { name: /^상품 상세:/ }).first();
+  const product = page
+    .getByRole("table", { name: "상품 목록" })
+    .getByRole("button")
+    .first();
   await product.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("button", { name: "판매 중지" })).toHaveCount(
