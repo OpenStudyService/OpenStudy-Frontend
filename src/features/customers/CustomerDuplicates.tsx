@@ -18,7 +18,7 @@ import { listPayments } from "../payments/api";
 import { customerApi } from "./api";
 import { CustomerMergeErrorLink } from "./CustomerMergeErrorLink";
 import { useCustomerLeaveGuard, useCustomerWrite } from "./hooks";
-import type { CustomerDuplicatePage } from "./model";
+import { customerKeys, type CustomerDuplicatePage } from "./model";
 
 type Group = CustomerDuplicatePage["items"][number];
 
@@ -33,8 +33,10 @@ export function CustomerDuplicates({
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Group | null>(null);
   const rows = useQuery({
-    queryKey: ["data", session.user.id, "all", "customers", "duplicates", page],
+    queryKey: customerKeys.duplicates(session.user.id, page),
     queryFn: ({ signal }) => customerApi.duplicates(page, signal),
+    // The customer list already observes and refreshes the first page.
+    refetchOnMount: page !== 1,
     retry: false,
   });
 

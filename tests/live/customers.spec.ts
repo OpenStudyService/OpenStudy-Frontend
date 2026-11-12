@@ -331,7 +331,7 @@ test("real duplicate comparison, OWNER merge and use of an absorbed pass", async
       reader.page.getByRole("heading", { name: "회원 관리" }),
     ).toBeVisible();
     await expect(
-      reader.page.getByRole("button", { name: "중복 고객 확인" }),
+      reader.page.getByRole("button", { name: /중복 의심 \d+건/ }),
     ).toHaveCount(0);
     expect((await api(reader.context, "/customer-duplicates")).status()).toBe(
       403,
@@ -374,7 +374,7 @@ test("real duplicate comparison, OWNER merge and use of an absorbed pass", async
     });
 
     await owner.page.goto("/app/all/members?tab=members");
-    await owner.page.getByRole("button", { name: "중복 고객 확인" }).click();
+    await owner.page.getByRole("button", { name: /중복 의심 \d+건/ }).click();
     const panel = owner.page.getByRole("dialog");
     await panel.getByRole("button", { name: "고객 비교: " + phone }).click();
     await expect(panel.getByRole("note")).toContainText(
