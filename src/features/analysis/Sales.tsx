@@ -27,7 +27,10 @@ import { SalesChartExport } from "./SalesChartExport";
 import { DailyClosings } from "./DailyClosings";
 import { PassUsage } from "./PassUsage";
 import {
-  AdvancedFilters,
+  SalesAdvancedFilters,
+  SalesProductKindFilter,
+} from "./SalesAdvancedFilters";
+import {
   AppliedAdvancedFilters,
   readAdvancedFilters,
 } from "../payments/AdvancedFilters";
@@ -315,25 +318,10 @@ function SalesWorkspace() {
               </Button>
               {isPassUsage ? (
                 <>
-                  <label className="field">
-                    상품 유형
-                    <select
-                      multiple
-                      value={advanced.productKinds}
-                      onChange={(e) =>
-                        changeFilters({
-                          productKinds: Array.from(
-                            e.target.selectedOptions,
-                            (option) => option.value,
-                          ),
-                        })
-                      }
-                    >
-                      {["시간권", "기간권", "정액권"].map((kind) => (
-                        <option key={kind}>{kind}</option>
-                      ))}
-                    </select>
-                  </label>
+                  <SalesProductKindFilter
+                    values={advanced.productKinds}
+                    change={(productKinds) => changeFilters({ productKinds })}
+                  />
                   <label className="field">
                     상품 분류 코드
                     <input
@@ -405,7 +393,7 @@ function SalesWorkspace() {
             )}
             {isSalesReport && (
               <div className="px-4">
-                <AdvancedFilters
+                <SalesAdvancedFilters
                   values={advanced}
                   branches={session.branches.filter((b) =>
                     can(session.user, b.id),

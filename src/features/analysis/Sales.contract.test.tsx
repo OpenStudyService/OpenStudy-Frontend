@@ -248,7 +248,8 @@ it("opens usage by URL and queries only its applicable filters", async () => {
   const filters = region("이용권 사용량 조회 조건");
   expect(filters.getByLabelText("시작일")).toHaveValue("");
   expect(filters.getByRole("group", { name: "이용 지점" })).toBeVisible();
-  expect(filters.getByLabelText("상품 유형")).toHaveValue(["시간권"]);
+  const kinds = filters.getByRole("button", { name: "상품 유형, 시간권" });
+  expect(kinds).toBeVisible();
   expect(filters.getByLabelText("상품 분류 코드")).toHaveValue("TIME");
   expect(filters.queryByText("고급 필터")).not.toBeInTheDocument();
   expect(filters.queryByLabelText("환불 집계 기준")).not.toBeInTheDocument();
@@ -263,20 +264,55 @@ it("opens usage by URL and queries only its applicable filters", async () => {
   for (const key of ["refundBasis", "purpose", "methods", "ledgerPage"])
     expect(query.has(key)).toBe(false);
 
-  await userEvent.selectOptions(filters.getByLabelText("상품 유형"), [
-    "기간권",
-  ]);
+  await userEvent.click(kinds);
+  const options = screen.getByRole("dialog", { name: "상품 유형" });
+  expect(
+    within(options).getByRole("checkbox", { name: "시간권" }),
+  ).toBeChecked();
+  await userEvent.click(
+    within(options).getByRole("checkbox", { name: "기간권" }),
+  );
   await waitFor(() =>
     expect(requests.at(-1)?.searchParams.getAll("productKinds")).toEqual([
       "시간권",
       "기간권",
     ]),
   );
+  await userEvent.keyboard("{Escape}");
   await selectTab("원장");
   expect(screen.getByLabelText("환불 집계 기준")).toHaveValue("paymentDate");
   expect(screen.getByLabelText("결제 용도")).toHaveValue("사물함");
-  expect(screen.getByLabelText("상품 유형")).toHaveValue(["시간권", "기간권"]);
-  expect(screen.getByLabelText("결제 수단")).toHaveValue(["카드"]);
+  await userEvent.click(screen.getByRole("button", { name: "고급 필터" }));
+  const advanced = screen.getByRole("dialog", { name: "매출 고급 필터" });
+  expect(
+    within(advanced).getByRole("button", { name: "상품 유형, 2개 선택" }),
+  ).toBeVisible();
+  expect(within(advanced).getByLabelText("결제 수단")).toHaveValue(["카드"]);
+
+  await userEvent.click(
+    within(advanced).getByRole("button", { name: "환불 처리 지점, 전체" }),
+  );
+  const branches = within(
+    screen.getByRole("dialog", { name: "환불 처리 지점" }),
+  );
+  await userEvent.click(branches.getByRole("checkbox", { name: "강남점" }));
+  await userEvent.click(branches.getByRole("checkbox", { name: "성수점" }));
+  expect(branches.getByRole("checkbox", { name: "강남점" })).toBeChecked();
+  expect(branches.getByRole("checkbox", { name: "성수점" })).toBeChecked();
+  await waitFor(() =>
+    expect(
+      requests.some(
+        (url) =>
+          url.pathname === "/api/sales/ledger" &&
+          url.searchParams.getAll("processingBranchIds").join(",") ===
+            "gangnam,seongsu",
+      ),
+    ).toBe(true),
+  );
+  await userEvent.keyboard("{Escape}");
+  expect(advanced).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  expect(advanced).not.toBeInTheDocument();
 });
 
 it("shows the sales validation only on the views that use those conditions", async () => {

@@ -68,16 +68,38 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
         }),
       ),
     ).toBe(true);
-    const advanced = filters.getByText("고급 필터", { exact: true });
+    const advanced = filters.getByRole("button", {
+      name: "고급 필터",
+      exact: true,
+    });
     const branchGroup = filters.getByRole("group", { name: "집계 지점" });
     const branchBox = (await branchGroup.boundingBox())!;
     expect((await advanced.boundingBox())!.y).toBeGreaterThanOrEqual(
       branchBox.y + branchBox.height,
     );
     await advanced.click();
-    await expect(filters.getByLabel("결제 수단")).toBeVisible();
-    await advanced.click();
-    await expect(filters.getByLabel("결제 수단")).toBeHidden();
+    const advancedPanel = page.getByRole("dialog", { name: "매출 고급 필터" });
+    await expect(advancedPanel.getByLabel("결제 수단")).toBeVisible();
+    for (const [field, choice] of [
+      ["상품 유형", "시간권"],
+      ["환불 처리 지점", "강남점"],
+    ]) {
+      await advancedPanel
+        .getByRole("button", { name: `${field}, 전체` })
+        .click();
+      const dropdown = page.getByRole("dialog", { name: field, exact: true });
+      const checkbox = dropdown.getByRole("checkbox", { name: choice });
+      await checkbox.click();
+      await expect(checkbox).toBeChecked();
+      await checkbox.click();
+      await expect(checkbox).not.toBeChecked();
+      await page.keyboard.press("Escape");
+      await expect(dropdown).toBeHidden();
+      await expect(advancedPanel).toBeVisible();
+    }
+    await page.keyboard.press("Escape");
+    await expect(advancedPanel).toBeHidden();
+    await expect(advanced).toBeFocused();
     await filters.getByLabel("환불 집계 기준").selectOption("paymentDate");
     await filters.getByLabel("결제 용도").selectOption("이용권");
     await summaryTab.focus();
@@ -142,7 +164,9 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
       name: "이용권 사용량 조회 조건",
     });
     await expect(usageFilters.getByLabel("시작일")).toHaveValue("2026-09-01");
-    await expect(usageFilters.getByLabel("상품 유형")).toBeVisible();
+    await expect(
+      usageFilters.getByRole("button", { name: "상품 유형, 전체" }),
+    ).toBeVisible();
     await expect(page.getByLabel("환불 집계 기준")).toHaveCount(0);
     expect(await hasNoHorizontalOverflow()).toBe(true);
 
