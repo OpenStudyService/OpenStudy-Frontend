@@ -1,4 +1,4 @@
-import { Popover } from "radix-ui";
+import { Collapsible, Popover } from "radix-ui";
 import { Icon } from "../../shared/ui/Icon";
 import { Button } from "../../shared/ui/primitives";
 import type { AdvancedFilterValues } from "../payments/AdvancedFilters";
@@ -14,71 +14,85 @@ export function SalesAdvancedFilters({
   branches: Choice[];
   change: (key: keyof AdvancedFilterValues, values: string[]) => void;
 }) {
+  const activeCount = Object.values(values).filter(
+    (value) => value?.length,
+  ).length;
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <Button type="button">
-          고급 필터
-          <Icon name="chevron" className="rotate-90" size={14} />
-        </Button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          aria-label="매출 고급 필터"
-          align="start"
-          sideOffset={6}
-          className="z-50 grid w-[32rem] max-w-[var(--radix-popover-content-available-width)] max-h-[var(--radix-popover-content-available-height)] gap-4 overflow-auto rounded-lg border border-line bg-surface p-4 shadow-xl sm:grid-cols-2"
+    <Collapsible.Root className="border-t border-line">
+      <Collapsible.Trigger asChild>
+        <button
+          type="button"
+          className="group flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-soft focus-visible:-outline-offset-4 data-[state=open]:bg-soft sm:px-5"
         >
-          <FilterDropdown
-            label="결제 수단"
-            options={["현금", "카드", "계좌이체", "기타"].map((id) => ({
-              id,
-              name: id,
-            }))}
-            values={values.methods}
-            change={(methods) => change("methods", methods)}
-          />
-          <SalesProductKindFilter
-            values={values.productKinds}
-            change={(kinds) => change("productKinds", kinds)}
-          />
-          <label className="field">
-            상품 분류 코드
-            <input
-              value={values.categoryCode ?? ""}
-              onChange={(e) =>
-                change("categoryCode", e.target.value ? [e.target.value] : [])
-              }
+          고급 필터
+          <span className="flex items-center gap-2.5">
+            {activeCount > 0 && (
+              <span className="text-xs font-medium text-primary">
+                {activeCount}개 적용
+              </span>
+            )}
+            <Icon
+              name="chevron"
+              className="rotate-90 text-muted transition-transform group-data-[state=open]:-rotate-90"
+              size={16}
             />
-          </label>
-          <label className="field">
-            처리자 ID (쉼표로 구분)
-            <input
-              key={values.operatorIds.join(",")}
-              defaultValue={values.operatorIds.join(",")}
-              onBlur={(e) => {
-                const ids = [
-                  ...new Set(
-                    e.target.value
-                      .split(",")
-                      .map((id) => id.trim())
-                      .filter(Boolean),
-                  ),
-                ];
-                if (ids.join(",") !== values.operatorIds.join(","))
-                  change("operatorIds", ids);
-              }}
-            />
-          </label>
-          <FilterDropdown
-            label="환불 처리 지점"
-            options={branches}
-            values={values.processingBranchIds}
-            change={(ids) => change("processingBranchIds", ids)}
+          </span>
+        </button>
+      </Collapsible.Trigger>
+      <Collapsible.Content
+        role="region"
+        aria-label="매출 고급 필터"
+        className="grid gap-4 border-t border-line bg-canvas/50 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3 [&_.field>input]:h-10"
+      >
+        <FilterDropdown
+          label="결제 수단"
+          options={["현금", "카드", "계좌이체", "기타"].map((id) => ({
+            id,
+            name: id,
+          }))}
+          values={values.methods}
+          change={(methods) => change("methods", methods)}
+        />
+        <SalesProductKindFilter
+          values={values.productKinds}
+          change={(kinds) => change("productKinds", kinds)}
+        />
+        <FilterDropdown
+          label="환불 처리 지점"
+          options={branches}
+          values={values.processingBranchIds}
+          change={(ids) => change("processingBranchIds", ids)}
+        />
+        <label className="field">
+          상품 분류 코드
+          <input
+            value={values.categoryCode ?? ""}
+            onChange={(e) =>
+              change("categoryCode", e.target.value ? [e.target.value] : [])
+            }
           />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+        </label>
+        <label className="field">
+          처리자 ID (쉼표로 구분)
+          <input
+            key={values.operatorIds.join(",")}
+            defaultValue={values.operatorIds.join(",")}
+            onBlur={(e) => {
+              const ids = [
+                ...new Set(
+                  e.target.value
+                    .split(",")
+                    .map((id) => id.trim())
+                    .filter(Boolean),
+                ),
+              ];
+              if (ids.join(",") !== values.operatorIds.join(","))
+                change("operatorIds", ids);
+            }}
+          />
+        </label>
+      </Collapsible.Content>
+    </Collapsible.Root>
   );
 }
 
@@ -123,7 +137,7 @@ function FilterDropdown({
         <Popover.Trigger asChild>
           <Button
             type="button"
-            className="justify-between"
+            className="h-10 min-w-0 justify-between text-[13px] font-medium"
             aria-label={`${label}, ${selection}`}
           >
             <span className="min-w-0 truncate">{selection}</span>

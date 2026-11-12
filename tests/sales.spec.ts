@@ -77,9 +77,18 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
     expect((await advanced.boundingBox())!.y).toBeGreaterThanOrEqual(
       branchBox.y + branchBox.height,
     );
+    const advancedPanel = filters.getByRole("region", {
+      name: "매출 고급 필터",
+    });
+    await expect(advancedPanel).toBeHidden();
+    await expect(advanced).toHaveAttribute("aria-expanded", "false");
     await advanced.click();
-    const advancedPanel = page.getByRole("dialog", { name: "매출 고급 필터" });
     await expect(advancedPanel).toBeVisible();
+    await expect(advanced).toHaveAttribute("aria-expanded", "true");
+    expect((await filters.boundingBox())!.height).toBeGreaterThan(
+      filtersBox.height,
+    );
+    expect(await hasNoHorizontalOverflow()).toBe(true);
     for (const [field, choice] of [
       ["결제 수단", "카드"],
       ["상품 유형", "시간권"],
@@ -98,11 +107,14 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
       await expect(dropdown).toBeHidden();
       await expect(advancedPanel).toBeVisible();
     }
-    await page.keyboard.press("Escape");
+    await advanced.press("Space");
     await expect(advancedPanel).toBeHidden();
+    await expect(advanced).toHaveAttribute("aria-expanded", "false");
     await expect(advanced).toBeFocused();
     await filters.getByLabel("환불 집계 기준").selectOption("paymentDate");
+    await expect(page).toHaveURL(/refundBasis=paymentDate/);
     await filters.getByLabel("결제 용도").selectOption("이용권");
+    await expect(page).toHaveURL(/[?&]purpose=/);
     await summaryTab.focus();
     await page.keyboard.press("ArrowRight");
     for (const [tab, view, table] of [

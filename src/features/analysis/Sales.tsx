@@ -47,6 +47,8 @@ const salesTabs = [
   { value: "pass-usage", label: "이용권 사용량" },
 ] as const;
 const defaultView = salesTabs[0].value;
+const branchOptionClass =
+  "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border border-line bg-surface px-3 py-1.5 text-xs font-medium transition-colors hover:bg-canvas has-checked:border-primary/35 has-checked:bg-soft has-checked:text-primary";
 
 export function Sales() {
   const { session, scope } = useApp();
@@ -291,12 +293,12 @@ function SalesWorkspace() {
         </Tabs.List>
         {!isClosings && (
           <section
-            className="card mb-5"
+            className="card mb-5 shadow-sm"
             aria-label={
               isPassUsage ? "이용권 사용량 조회 조건" : "매출 조회 조건"
             }
           >
-            <div className="filters">
+            <div className="grid grid-cols-2 items-start gap-3 p-4 pb-3 sm:gap-4 sm:px-5 sm:pt-5 lg:grid-cols-4 [&_:is(input,select)]:h-10">
               <label className="field">
                 시작일
                 <input
@@ -313,9 +315,6 @@ function SalesWorkspace() {
                   onChange={(e) => change("to", e.target.value)}
                 />
               </label>
-              <Button onClick={() => changeFilters({ from: [], to: [] })}>
-                이번 달 기본 기간
-              </Button>
               {isPassUsage ? (
                 <>
                   <SalesProductKindFilter
@@ -361,57 +360,65 @@ function SalesWorkspace() {
                 </>
               )}
             </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 pb-4 sm:px-5">
+              <p className="help min-w-0 flex-1 basis-52">
+                {isSalesReport && defaultPeriod && !forbidden ? (
+                  <span aria-label="적용된 기본 날짜">
+                    {formatBusinessDate(defaultPeriod.from)} ~{" "}
+                    {formatBusinessDate(defaultPeriod.to)} (종료일 미포함)
+                  </span>
+                ) : (
+                  "기간을 비우면 이번 달 1일부터 내일 0시까지 조회해요. 최대 366일 · 한국 시간"
+                )}
+              </p>
+              <Button
+                type="button"
+                className="min-h-8"
+                onClick={() => changeFilters({ from: [], to: [] })}
+              >
+                이번 달 기본 기간
+              </Button>
+            </div>
             {scope === "all" && (
-              <fieldset className="border-t border-line p-5">
-                <legend className="px-2 text-xs">
-                  {isPassUsage ? "이용 지점" : "집계 지점"}
-                </legend>
-                <label className="mr-4 inline-flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={!selected.length}
-                    onChange={() => changeFilters({ branchIds: [] })}
-                  />
-                  {isPassUsage
-                    ? "조회 가능한 전체 이용 지점"
-                    : "매출 조회 가능한 전체 지점"}
-                </label>
-                {branches.map((b) => (
-                  <label
-                    key={b.id}
-                    className="mr-4 inline-flex items-center gap-2 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(b.id)}
-                      onChange={(e) => changeBranch(b.id, e.target.checked)}
-                    />
-                    {b.name}
-                  </label>
-                ))}
-              </fieldset>
-            )}
-            {isSalesReport && (
-              <div className="px-4">
-                <SalesAdvancedFilters
-                  values={advanced}
-                  branches={session.branches.filter((b) =>
-                    can(session.user, b.id),
-                  )}
-                  change={(key, values) => changeFilters({ [key]: values })}
-                />
+              <div className="border-t border-line px-4 py-3 sm:px-5">
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 text-xs font-semibold text-muted">
+                    {isPassUsage ? "이용 지점" : "집계 지점"}
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    <label className={branchOptionClass}>
+                      <input
+                        type="checkbox"
+                        checked={!selected.length}
+                        onChange={() => changeFilters({ branchIds: [] })}
+                      />
+                      {isPassUsage
+                        ? "조회 가능한 전체 이용 지점"
+                        : "매출 조회 가능한 전체 지점"}
+                    </label>
+                    {branches.map((b) => (
+                      <label key={b.id} className={branchOptionClass}>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(b.id)}
+                          onChange={(e) => changeBranch(b.id, e.target.checked)}
+                        />
+                        {b.name}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
               </div>
             )}
-            {isSalesReport && defaultPeriod && !forbidden && (
-              <p className="help px-5" aria-label="적용된 기본 날짜">
-                {formatBusinessDate(defaultPeriod.from)} ~{" "}
-                {formatBusinessDate(defaultPeriod.to)} (종료일 미포함)
-              </p>
+            {isSalesReport && (
+              <SalesAdvancedFilters
+                values={advanced}
+                branches={session.branches.filter((b) =>
+                  can(session.user, b.id),
+                )}
+                change={(key, values) => changeFilters({ [key]: values })}
+              />
             )}
-            <p className="help px-5 pb-5">
-              기간을 비우면 이번 달 1일부터 내일 0시까지 조회합니다. 직접
-              입력하는 기간은 최대 366일입니다. 날짜는 한국 시간 기준입니다.
-            </p>
           </section>
         )}
         {!isClosings && (invalid || (isSalesReport && forbidden)) ? (

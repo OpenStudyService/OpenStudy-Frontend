@@ -282,8 +282,10 @@ it("opens usage by URL and queries only its applicable filters", async () => {
   await selectTab("원장");
   expect(screen.getByLabelText("환불 집계 기준")).toHaveValue("paymentDate");
   expect(screen.getByLabelText("결제 용도")).toHaveValue("사물함");
-  await userEvent.click(screen.getByRole("button", { name: "고급 필터" }));
-  const advanced = screen.getByRole("dialog", { name: "매출 고급 필터" });
+  const advancedToggle = screen.getByRole("button", { name: /^고급 필터/ });
+  expect(advancedToggle).toHaveAttribute("aria-expanded", "false");
+  await userEvent.click(advancedToggle);
+  const advanced = screen.getByRole("region", { name: "매출 고급 필터" });
   expect(
     within(advanced).getByRole("button", { name: "상품 유형, 2개 선택" }),
   ).toBeVisible();
@@ -328,8 +330,10 @@ it("opens usage by URL and queries only its applicable filters", async () => {
   );
   await userEvent.keyboard("{Escape}");
   expect(advanced).toBeVisible();
-  await userEvent.keyboard("{Escape}");
-  expect(advanced).not.toBeInTheDocument();
+  await userEvent.click(advancedToggle);
+  expect(advancedToggle).toHaveAttribute("aria-expanded", "false");
+  expect(advancedToggle).toHaveTextContent("4개 적용");
+  expect(advanced).not.toBeVisible();
 });
 
 it("shows the sales validation only on the views that use those conditions", async () => {
