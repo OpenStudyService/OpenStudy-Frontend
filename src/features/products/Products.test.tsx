@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProductManagement } from "./Products";
 import { api, ApiError } from "../../shared/api/client";
@@ -168,18 +174,21 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-function mount() {
+function mount(search = "") {
+  const router = createMemoryRouter(
+    [{ path: "/", element: <ProductManagement /> }],
+    { initialEntries: [`/${search}`] },
+  );
   render(
     <QueryClientProvider
       client={
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <MemoryRouter>
-        <ProductManagement />
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+  return router;
 }
 const open = async (name = "10시간권") => {
   mount();
@@ -456,10 +465,46 @@ it("shows what changed in each revision and the first registration", async () =>
   expect(within(dialog).getByText(/최초 등록/)).toBeVisible();
 });
 
+it("selects product tabs by click and arrow keys while preserving filters", async () => {
+  const user = userEvent.setup();
+  const router = mount("?productAvailability=판매+가능&productPage=2");
+  const productsTab = screen.getByRole("tab", { name: "상품 목록" });
+  const categoriesTab = screen.getByRole("tab", { name: "분류" });
+  const searchParams = () => new URLSearchParams(router.state.location.search);
+
+  expect(productsTab).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByLabelText("판매 가능 여부")).toHaveValue("판매 가능");
+  expect(screen.getByRole("button", { name: "상품 등록" })).toBeVisible();
+
+  await user.click(categoriesTab);
+  expect(categoriesTab).toHaveAttribute("aria-selected", "true");
+  expect(searchParams().get("tab")).toBe("categories");
+  expect(searchParams().get("productPage")).toBe("1");
+  expect(screen.queryByLabelText("판매 가능 여부")).toBeNull();
+  expect(screen.queryByRole("button", { name: "상품 등록" })).toBeNull();
+  expect(screen.getByRole("button", { name: "분류 등록" })).toBeVisible();
+
+  await user.keyboard("{ArrowLeft}");
+  await waitFor(() =>
+    expect(productsTab).toHaveAttribute("aria-selected", "true"),
+  );
+  expect(productsTab).toHaveFocus();
+  expect(searchParams().has("tab")).toBe(false);
+  expect(screen.getByLabelText("판매 가능 여부")).toHaveValue("판매 가능");
+  expect(screen.getByRole("button", { name: "상품 등록" })).toBeVisible();
+
+  await user.keyboard("{ArrowRight}");
+  await waitFor(() =>
+    expect(categoriesTab).toHaveAttribute("aria-selected", "true"),
+  );
+  expect(categoriesTab).toHaveFocus();
+  expect(searchParams().get("tab")).toBe("categories");
+});
+
 it("restricts category writes to the owner", async () => {
   session("manager");
   mount();
-  await userEvent.click(await screen.findByRole("button", { name: "분류" }));
+  await userEvent.click(screen.getByRole("tab", { name: "분류" }));
   await screen.findByText("PERIOD · 기간권");
   expect(screen.queryByRole("button", { name: "분류 등록" })).toBeNull();
   expect(screen.queryByRole("button", { name: /분류 수정/ })).toBeNull();
