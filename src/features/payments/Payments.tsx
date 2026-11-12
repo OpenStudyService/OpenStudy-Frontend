@@ -13,12 +13,16 @@ import { can } from "../../shared/domain/schema";
 import {
   Badge,
   Button,
-  ErrorState,
   Heading,
   Panel,
   State,
 } from "../../shared/ui/primitives";
-import { Field } from "../organization/shared";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
 import { listPayments } from "./api";
 import {
   AdvancedFilters,
@@ -31,11 +35,28 @@ import { PaymentCreate, PaymentResult } from "./PaymentCreate";
 import { PaymentPanel } from "./PaymentPanels";
 import {
   CustomerSelector,
+  LIST_CUSTOMER_SELECTOR_CLASS,
   MockPaymentNotice,
-  SalesPager,
   dateTime,
   useSalesSearch,
 } from "./shared";
+
+const PAGE_SIZE = 20;
+const PAYMENT_FILTER_KEYS = [
+  "status",
+  "branchId",
+  "from",
+  "to",
+  "sort",
+  "direction",
+  "customerId",
+  "methods",
+  "productKinds",
+  "categoryCode",
+  "operatorIds",
+  "processingBranchIds",
+  "page",
+];
 
 function calendarDayStart(input: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) return undefined;
@@ -60,7 +81,7 @@ export function Payments({ embedded = false }: { embedded?: boolean }) {
 function PaymentsSession({ embedded }: { embedded: boolean }) {
   const { session, scope } = useApp();
   const query = useQueryClient();
-  const { params, page, update } = useSalesSearch();
+  const { params, page, update, reset } = useSalesSearch();
   const [, setParams] = useSearchParams();
   const advanced = readAdvancedFilters(params);
   const [busy, setBusy] = useState(false);
@@ -83,7 +104,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
     categoryCode: advanced.categoryCode ?? undefined,
     scope: requestedScope,
     page,
-    pageSize: 20,
+    pageSize: PAGE_SIZE,
     status,
     from:
       fromStart === undefined ? undefined : new Date(fromStart).toISOString(),
@@ -123,90 +144,94 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
       setResult(undefined);
     }
   }
+  const createButton = writable && (
+    <Button
+      variant="primary"
+      onClick={() => {
+        setResult(undefined);
+        update("detail", "new");
+      }}
+    >
+      Mock 결제
+    </Button>
+  );
+  const data = invalidRange ? undefined : payments.data;
   return (
     <section className={embedded ? "" : "page"}>
       <Heading
         title="결제 관리"
         description="Mock 결제 내역과 이용권 발급·환불을 확인해요."
       >
-        {writable && (
-          <Button
-            variant="primary"
-            onClick={() => {
-              setResult(undefined);
-              update("detail", "new");
-            }}
-          >
-            Mock 결제
-          </Button>
-        )}
+        {!readable && createButton}
       </Heading>
       <MockPaymentNotice />
       {readable ? (
-        <>
-          <div className="grid gap-3 sm:grid-cols-4 my-4">
-            <Field label="결제 상태 필터">
-              <select
-                value={status ?? ""}
-                onChange={(e) => update("status", e.target.value)}
-              >
-                <option value="">전체 상태</option>
-                {paymentStatuses.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </Field>
+        <ListCard>
+          <ListFilters actions={createButton}>
+            <select
+              aria-label="결제 상태 필터"
+              value={status ?? ""}
+              onChange={(e) => update("status", e.target.value)}
+            >
+              <option value="">전체 상태</option>
+              {paymentStatuses.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
             {scope === "all" && (
-              <Field label="결제 지점 필터">
-                <select
-                  value={branch}
-                  onChange={(e) => update("branchId", e.target.value)}
-                >
-                  <option value="">전체 지점</option>
-                  {session.branches
-                    .filter((b) => can(session.user, b.id, "payments:read"))
-                    .map((b) => (
-                      <option value={b.id} key={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                </select>
-              </Field>
+              <select
+                aria-label="결제 지점 필터"
+                value={branch}
+                onChange={(e) => update("branchId", e.target.value)}
+              >
+                <option value="">전체 지점</option>
+                {session.branches
+                  .filter((b) => can(session.user, b.id, "payments:read"))
+                  .map((b) => (
+                    <option value={b.id} key={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+              </select>
             )}
-            <Field label="결제 기간 시작">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted">결제 기간</span>
               <input
                 type="date"
+                aria-label="결제 기간 시작"
                 value={from}
                 onChange={(e) => update("from", e.target.value)}
               />
-            </Field>
-            <Field label="결제 기간 종료">
+              <span aria-hidden="true">~</span>
               <input
                 type="date"
+                aria-label="결제 기간 종료"
                 value={to}
                 onChange={(e) => update("to", e.target.value)}
               />
-            </Field>
-            <Field label="결제 정렬">
-              <select
-                value={filters.sort}
-                onChange={(e) => update("sort", e.target.value)}
-              >
-                <option value="createdAt">결제일</option>
-                <option value="amountKrw">금액</option>
-              </select>
-            </Field>
-            <Field label="결제 정렬 방향">
-              <select
-                value={filters.direction}
-                onChange={(e) => update("direction", e.target.value)}
-              >
-                <option value="desc">내림차순</option>
-                <option value="asc">오름차순</option>
-              </select>
-            </Field>
-          </div>
+            </span>
+            <select
+              aria-label="결제 정렬"
+              value={filters.sort}
+              onChange={(e) => update("sort", e.target.value)}
+            >
+              <option value="createdAt">결제일 순</option>
+              <option value="amountKrw">금액 순</option>
+            </select>
+            <select
+              aria-label="결제 정렬 방향"
+              value={filters.direction}
+              onChange={(e) => update("direction", e.target.value)}
+            >
+              <option value="desc">내림차순</option>
+              <option value="asc">오름차순</option>
+            </select>
+            <Button variant="quiet" onClick={() => reset(PAYMENT_FILTER_KEYS)}>
+              초기화
+            </Button>
+          </ListFilters>
           <AdvancedFilters
+            className="border-b border-line [&_.filters]:border-b-0 [&>summary]:cursor-pointer [&>summary]:px-4 [&>summary]:py-3 [&>summary]:text-xs [&>summary]:text-muted"
             values={advanced}
             branches={session.branches.filter((b) => can(session.user, b.id))}
             change={(key, values) =>
@@ -220,127 +245,117 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
             }
           />
           <CustomerSelector
+            className={LIST_CUSTOMER_SELECTOR_CLASS}
             value={filters.customerId ?? ""}
             onChange={(id) => update("customerId", id)}
             allowAll
           />
-          {invalidRange ? (
-            <State
-              title={
-                invalidDate
-                  ? "올바른 결제 기간을 입력해 주세요"
-                  : "시작일은 종료일보다 늦을 수 없어요"
-              }
-            />
-          ) : payments.isPending ? (
-            <State loading />
-          ) : hasBlockingReadError(payments) ? (
-            <ErrorState
-              error={payments.error!}
-              retry={() => void payments.refetch()}
-            />
-          ) : (
-            payments.data && (
-              <>
-                <section
-                  aria-label="결제 목록 적용 조건과 합계"
-                  className="my-4"
-                >
-                  <AppliedAdvancedFilters values={payments.data.filter} />
-                  <p className="help">
-                    적용 지점{" "}
-                    {payments.data.filter.branchIds
-                      .map(
-                        (id) =>
-                          session.branches.find((b) => b.id === id)?.name ?? id,
-                      )
-                      .join(", ")}{" "}
-                    · {payments.data.filter.status ?? "전체 상태"}
-                    {payments.data.filter.customerId &&
-                      ` · 고객 ID ${payments.data.filter.customerId}`}
-                  </p>
-                  <p className="help">
-                    결제 생성 시각{" "}
-                    {payments.data.filter.from
-                      ? formatDateTime(payments.data.filter.from)
-                      : "제한 없음"}
-                    {" ~ "}
-                    {payments.data.filter.to
-                      ? `${formatDateTime(payments.data.filter.to)} 미만`
-                      : "제한 없음"}
-                  </p>
-                  <dl className="grid gap-2 sm:grid-cols-3">
-                    {(
-                      [
-                        ["승인", payments.data.summary.approved],
-                        ["실패", payments.data.summary.failed],
-                        ["환불", payments.data.summary.refunded],
-                      ] as const
-                    ).map(([label, total]) => (
-                      <div key={label}>
-                        <dt>{label}</dt>
-                        <dd>
-                          {total.count}건 · {formatKrw(total.amountKrw)}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-                {!payments.data.items.length ? (
-                  <State title="조건에 맞는 결제가 없어요" />
-                ) : (
-                  <div className="data-scroll">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>고객</th>
-                          <th>구매 상품</th>
-                          <th>결제 지점</th>
-                          <th>서버 산정 금액</th>
-                          <th>상태</th>
-                          <th>결제 일시</th>
-                          <th>상세</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {payments.data.items.map((p) => (
-                          <tr key={p.id}>
-                            <td>
-                              {p.customer.name}
-                              <span className="help block">
-                                {p.customer.memberNo}
-                              </span>
-                            </td>
-                            <td>{p.productName ?? p.purpose}</td>
-                            <td>
-                              {session.branches.find((b) => b.id === p.branchId)
-                                ?.name ?? p.branchId}
-                            </td>
-                            <td>{formatKrw(p.amountKrw)}</td>
-                            <td>
-                              <Badge>{p.status}</Badge>
-                            </td>
-                            <td>{dateTime(p.createdAt)}</td>
-                            <td>
-                              <Button onClick={() => update("detail", p.id)}>
-                                결제 상세: {p.id}
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+          {data && (
+            <section
+              aria-label="결제 목록 적용 조건과 합계"
+              className="grid gap-1 border-b border-line px-5 py-3"
+            >
+              <AppliedAdvancedFilters values={data.filter} />
+              <p className="help">
+                적용 지점{" "}
+                {data.filter.branchIds
+                  .map(
+                    (id) =>
+                      session.branches.find((b) => b.id === id)?.name ?? id,
+                  )
+                  .join(", ")}{" "}
+                · {data.filter.status ?? "전체 상태"}
+                {data.filter.customerId &&
+                  ` · 고객 ID ${data.filter.customerId}`}
+              </p>
+              <p className="help">
+                결제 생성 시각{" "}
+                {data.filter.from
+                  ? formatDateTime(data.filter.from)
+                  : "제한 없음"}
+                {" ~ "}
+                {data.filter.to
+                  ? `${formatDateTime(data.filter.to)} 미만`
+                  : "제한 없음"}
+              </p>
+              <dl className="grid gap-2 text-xs sm:grid-cols-3">
+                {(
+                  [
+                    ["승인", data.summary.approved],
+                    ["실패", data.summary.failed],
+                    ["환불", data.summary.refunded],
+                  ] as const
+                ).map(([label, total]) => (
+                  <div key={label}>
+                    <dt className="text-muted">{label}</dt>
+                    <dd className="font-semibold">
+                      {total.count}건 · {formatKrw(total.amountKrw)}
+                    </dd>
                   </div>
-                )}
-                <SalesPager
-                  page={page}
-                  total={payments.data.meta.total}
-                  onChange={(value) => update("page", String(value))}
-                />
-              </>
-            )
+                ))}
+              </dl>
+            </section>
           )}
-        </>
+          <ListTable
+            label="결제 목록"
+            columns={[
+              "고객",
+              "구매 상품",
+              "결제 지점",
+              "서버 산정 금액",
+              "상태",
+              "결제 일시",
+            ]}
+            state={
+              invalidRange && (
+                <State
+                  title={
+                    invalidDate
+                      ? "올바른 결제 기간을 입력해 주세요"
+                      : "시작일은 종료일보다 늦을 수 없어요"
+                  }
+                />
+              )
+            }
+            loading={payments.isPending}
+            error={hasBlockingReadError(payments) ? payments.error : null}
+            onRetry={() => void payments.refetch()}
+            isEmpty={!data?.items.length}
+            empty={{ title: "조건에 맞는 결제가 없어요" }}
+          >
+            {data?.items.map((p) => (
+              <tr key={p.id}>
+                <td>
+                  <button
+                    className="cell-link"
+                    onClick={() => update("detail", p.id)}
+                  >
+                    {p.customer.name}
+                  </button>
+                  <span className="help block">{p.customer.memberNo}</span>
+                </td>
+                <td>{p.productName ?? p.purpose}</td>
+                <td>
+                  {session.branches.find((b) => b.id === p.branchId)?.name ??
+                    p.branchId}
+                </td>
+                <td>{formatKrw(p.amountKrw)}</td>
+                <td>
+                  <Badge>{p.status}</Badge>
+                </td>
+                <td>{dateTime(p.createdAt)}</td>
+              </tr>
+            ))}
+          </ListTable>
+          <ListFooter
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={data?.meta.total ?? 0}
+            loading={!invalidRange && payments.isPending}
+            error={invalidRange || !!payments.error}
+            onChange={(value) => update("page", String(value))}
+          />
+        </ListCard>
       ) : (
         <State
           title="결제 목록 조회 권한이 없어요"

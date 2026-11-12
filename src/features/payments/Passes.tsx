@@ -1,29 +1,39 @@
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
+import { Badge, Button, Heading } from "../../shared/ui/primitives";
 import {
-  Badge,
-  Button,
-  ErrorState,
-  Heading,
-  State,
-} from "../../shared/ui/primitives";
-import { Field } from "../organization/shared";
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
 import { listPasses } from "./api";
 import { passKinds, passStatuses } from "./model";
 import type { PassFilters } from "./model";
 import { PassPanel, passBalance } from "./PaymentPanels";
 import {
   CustomerSelector,
+  LIST_CUSTOMER_SELECTOR_CLASS,
   MockPaymentNotice,
-  SalesPager,
   dateTime,
   useSalesSearch,
 } from "./shared";
 
+const PASS_FILTER_KEYS = [
+  "status",
+  "kind",
+  "branchId",
+  "sort",
+  "direction",
+  "customerId",
+  "page",
+];
+const PAGE_SIZE = 20;
+
 export function Passes({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp();
-  const { params, page, update } = useSalesSearch();
+  const { params, page, update, reset } = useSalesSearch();
   const branch = params.get("branchId") || "";
   const requestedScope =
     scope === "all" && session.branches.some((b) => b.id === branch)
@@ -32,7 +42,7 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
   const filters: PassFilters = {
     scope: requestedScope,
     page,
-    pageSize: 20,
+    pageSize: PAGE_SIZE,
     customerId: params.get("customerId") || undefined,
     status: passStatuses.find((s) => s === params.get("status")),
     kind: passKinds.find((k) => k === params.get("kind")),
@@ -61,14 +71,10 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
         />
       )}
       <MockPaymentNotice />
-      <CustomerSelector
-        value={filters.customerId ?? ""}
-        onChange={(id) => update("customerId", id)}
-        allowAll
-      />
-      <div className="grid gap-3 sm:grid-cols-4 my-4">
-        <Field label="이용권 상태 필터">
+      <ListCard>
+        <ListFilters>
           <select
+            aria-label="이용권 상태 필터"
             value={filters.status ?? ""}
             onChange={(e) => update("status", e.target.value)}
           >
@@ -77,9 +83,8 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
               <option key={s}>{s}</option>
             ))}
           </select>
-        </Field>
-        <Field label="이용권 유형 필터">
           <select
+            aria-label="이용권 유형 필터"
             value={filters.kind ?? ""}
             onChange={(e) => update("kind", e.target.value)}
           >
@@ -88,10 +93,9 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
               <option key={s}>{s}</option>
             ))}
           </select>
-        </Field>
-        {scope === "all" && (
-          <Field label="구매 지점 필터">
+          {scope === "all" && (
             <select
+              aria-label="구매 지점 필터"
               value={branch}
               onChange={(e) => update("branchId", e.target.value)}
             >
@@ -102,90 +106,82 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
                 </option>
               ))}
             </select>
-          </Field>
-        )}
-        <Field label="이용권 정렬">
+          )}
           <select
+            aria-label="이용권 정렬"
             value={filters.sort}
             onChange={(e) => update("sort", e.target.value)}
           >
-            <option value="createdAt">발급일</option>
-            <option value="expiresAt">만료일</option>
+            <option value="createdAt">발급일 순</option>
+            <option value="expiresAt">만료일 순</option>
           </select>
-        </Field>
-        <Field label="이용권 정렬 방향">
           <select
+            aria-label="이용권 정렬 방향"
             value={filters.direction}
             onChange={(e) => update("direction", e.target.value)}
           >
             <option value="desc">내림차순</option>
             <option value="asc">오름차순</option>
           </select>
-        </Field>
-      </div>
-      {passes.isPending ? (
-        <State loading />
-      ) : hasBlockingReadError(passes) ? (
-        <ErrorState error={passes.error!} retry={() => void passes.refetch()} />
-      ) : (
-        passes.data && (
-          <>
-            {!passes.data.items.length ? (
-              <State title="조건에 맞는 보유 이용권이 없어요" />
-            ) : (
-              <div className="data-scroll">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>고객</th>
-                      <th>이용권</th>
-                      <th>잔량·이용 기간</th>
-                      <th>시작 일시</th>
-                      <th>만료 일시</th>
-                      <th>상태</th>
-                      <th>상세</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {passes.data.items.map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          {p.customer.name}
-                          <span className="help block">
-                            {p.customer.memberNo}
-                          </span>
-                        </td>
-                        <td>
-                          {p.productName}
-                          <span className="help block">{p.kind}</span>
-                        </td>
-                        <td>{passBalance(p)}</td>
-                        <td>{dateTime(p.startedAt)}</td>
-                        <td>
-                          {p.expiresAt ? dateTime(p.expiresAt) : "만료 없음"}
-                        </td>
-                        <td>
-                          <Badge>{p.status}</Badge>
-                        </td>
-                        <td>
-                          <Button onClick={() => update("detail", p.id)}>
-                            이용권 상세: {p.id}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <SalesPager
-              page={page}
-              total={passes.data.meta.total}
-              onChange={(value) => update("page", String(value))}
-            />
-          </>
-        )
-      )}
+          <Button variant="quiet" onClick={() => reset(PASS_FILTER_KEYS)}>
+            초기화
+          </Button>
+        </ListFilters>
+        <CustomerSelector
+          className={LIST_CUSTOMER_SELECTOR_CLASS}
+          value={filters.customerId ?? ""}
+          onChange={(id) => update("customerId", id)}
+          allowAll
+        />
+        <ListTable
+          label="보유 이용권 목록"
+          columns={[
+            "고객",
+            "이용권",
+            "잔량·이용 기간",
+            "시작 일시",
+            "만료 일시",
+            "상태",
+          ]}
+          loading={passes.isPending}
+          error={hasBlockingReadError(passes) ? passes.error : null}
+          onRetry={() => void passes.refetch()}
+          isEmpty={!passes.data?.items.length}
+          empty={{ title: "조건에 맞는 보유 이용권이 없어요" }}
+        >
+          {passes.data?.items.map((p) => (
+            <tr key={p.id}>
+              <td>
+                <button
+                  className="cell-link"
+                  onClick={() => update("detail", p.id)}
+                >
+                  {p.customer.name}
+                </button>
+                <span className="help block">{p.customer.memberNo}</span>
+              </td>
+              <td>
+                {p.productName}
+                <span className="help block">{p.kind}</span>
+              </td>
+              <td>{passBalance(p)}</td>
+              <td>{dateTime(p.startedAt)}</td>
+              <td>{p.expiresAt ? dateTime(p.expiresAt) : "만료 없음"}</td>
+              <td>
+                <Badge>{p.status}</Badge>
+              </td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={passes.data?.meta.total ?? 0}
+          loading={passes.isPending}
+          error={!!passes.error}
+          onChange={(value) => update("page", String(value))}
+        />
+      </ListCard>
       {detail && <PassPanel id={detail} onClose={() => update("detail", "")} />}
     </section>
   );

@@ -8,13 +8,13 @@ import {
   isAccessError,
 } from "../../shared/api/read-model";
 import { MOCK } from "../../shared/api/client";
+import { Badge, Button, Heading } from "../../shared/ui/primitives";
 import {
-  Badge,
-  Button,
-  ErrorState,
-  Heading,
-  State,
-} from "../../shared/ui/primitives";
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
 import { Icon } from "../../shared/ui/Icon";
 import { customerApi } from "./api";
 import {
@@ -99,8 +99,29 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
           데모 환경의 회원 정보 변경은 새로고침 후 초기화돼요.
         </p>
       )}
-      <div className="card overflow-hidden">
-        <div className="filters">
+      <ListCard>
+        <ListFilters
+          actions={
+            (duplicateTotal > 0 || creatable) && (
+              <>
+                {duplicateTotal > 0 && (
+                  <Button
+                    variant="quiet"
+                    onClick={() => setDuplicatesOpen(true)}
+                  >
+                    중복 의심 {duplicateTotal}건
+                  </Button>
+                )}
+                {creatable && (
+                  <Button variant="primary" onClick={() => show("new")}>
+                    <Icon name="plus" size={16} />
+                    회원 등록
+                  </Button>
+                )}
+              </>
+            )
+          }
+        >
           <input
             type="search"
             aria-label="회원 검색"
@@ -168,126 +189,64 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
           >
             초기화
           </Button>
-          {(duplicateTotal > 0 || creatable) && (
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {duplicateTotal > 0 && (
-                <Button variant="quiet" onClick={() => setDuplicatesOpen(true)}>
-                  중복 의심 {duplicateTotal}건
-                </Button>
-              )}
-              {creatable && (
-                <Button variant="primary" onClick={() => show("new")}>
-                  <Icon name="plus" size={16} />
-                  회원 등록
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+        </ListFilters>
         <p className="px-5 pb-3 text-xs text-muted">
           이름은 일부 일치, 회원번호는 정확히 일치하며 연락처는 숫자 4자리
           이상으로 검색해 주세요.
         </p>
-        <div className="data-scroll">
-          <table className="data-table" aria-label="회원 목록">
-            <thead>
-              <tr>
-                {[
-                  "회원번호",
-                  "회원 이름",
-                  "연락처",
-                  "상태",
-                  "등록 지점",
-                  "등록일",
-                ].map((label) => (
-                  <th key={label} scope="col">
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.isPending ||
-              hasBlockingReadError(rows) ||
-              !rows.data?.items.length ? (
-                <tr>
-                  <td colSpan={6}>
-                    {rows.isPending ? (
-                      <State loading />
-                    ) : hasBlockingReadError(rows) ? (
-                      <ErrorState
-                        error={rows.error!}
-                        retry={
-                          isAccessError(rows.error)
-                            ? undefined
-                            : () => void rows.refetch()
-                        }
-                      />
-                    ) : (
-                      <State
-                        title="등록된 항목이 없어요"
-                        message="검색 조건을 바꾸거나 새로운 회원을 등록해 주세요."
-                      />
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                rows.data.items.map((customer) => (
-                  <tr key={customer.id}>
-                    <td>{customer.memberNo}</td>
-                    <td>
-                      <button
-                        className="cell-link"
-                        onClick={() => show(customer.id)}
-                      >
-                        {customer.name}
-                      </button>
-                    </td>
-                    <td>{customer.phone}</td>
-                    <td>
-                      <Badge>{customer.status}</Badge>
-                    </td>
-                    <td>
-                      {customer.registeredBranchId
-                        ? (session.branches.find(
-                            (branch) =>
-                              branch.id === customer.registeredBranchId,
-                          )?.name ?? customer.registeredBranchId)
-                        : "등록 지점 미지정"}
-                    </td>
-                    <td>{displayDate(customer.registeredAt)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-xs text-muted">
-          <span>
-            {rows.error
-              ? "항목 수 확인 불가"
-              : rows.isPending
-                ? "항목 수 확인 중"
-                : `총 ${total}건 · ${page}페이지`}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              disabled={rows.isPending || !!rows.error || page <= 1}
-              onClick={() => filterPage(page - 1)}
-            >
-              이전
-            </Button>
-            <Button
-              disabled={
-                rows.isPending || !!rows.error || page * pageSize >= total
-              }
-              onClick={() => filterPage(page + 1)}
-            >
-              다음
-            </Button>
-          </div>
-        </footer>
-      </div>
+        <ListTable
+          label="회원 목록"
+          columns={[
+            "회원번호",
+            "회원 이름",
+            "연락처",
+            "상태",
+            "등록 지점",
+            "등록일",
+          ]}
+          loading={rows.isPending}
+          error={hasBlockingReadError(rows) ? rows.error : null}
+          onRetry={
+            isAccessError(rows.error) ? undefined : () => void rows.refetch()
+          }
+          isEmpty={!rows.data?.items.length}
+          empty={{
+            title: "등록된 항목이 없어요",
+            message: "검색 조건을 바꾸거나 새로운 회원을 등록해 주세요.",
+          }}
+        >
+          {rows.data?.items.map((customer) => (
+            <tr key={customer.id}>
+              <td>{customer.memberNo}</td>
+              <td>
+                <button className="cell-link" onClick={() => show(customer.id)}>
+                  {customer.name}
+                </button>
+              </td>
+              <td>{customer.phone}</td>
+              <td>
+                <Badge>{customer.status}</Badge>
+              </td>
+              <td>
+                {customer.registeredBranchId
+                  ? (session.branches.find(
+                      (branch) => branch.id === customer.registeredBranchId,
+                    )?.name ?? customer.registeredBranchId)
+                  : "등록 지점 미지정"}
+              </td>
+              <td>{displayDate(customer.registeredAt)}</td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          loading={rows.isPending}
+          error={!!rows.error}
+          onChange={filterPage}
+        />
+      </ListCard>
       {canMerge && duplicatesOpen && (
         <CustomerDuplicates
           key={session.user.id}

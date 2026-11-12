@@ -174,12 +174,15 @@ test("real API: approval and failure persist with server price and type-specific
         `/app/all/payments?status=실패&branchId=${branchId}&customerId=${customer.id}`,
       );
       await page.reload();
-      await expect(
-        page.getByRole("button", {
-          name: `결제 상세: ${failed.id}`,
-          exact: true,
-        }),
-      ).toBeVisible();
+      const rows = page
+        .getByRole("table", { name: "결제 목록" })
+        .getByRole("row");
+      await expect(rows).toHaveCount(2);
+      await rows
+        .nth(1)
+        .getByRole("button", { name: customer.name, exact: true })
+        .click();
+      await expect(page).toHaveURL(new RegExp(`[?&]detail=${failed.id}(&|$)`));
     }
   } finally {
     await context.close();

@@ -32,10 +32,12 @@ export function AdvancedFilters({
   values,
   branches,
   change,
+  className = "my-4",
 }: {
   values: AdvancedFilterValues;
   branches: { id: string; name: string }[];
   change: (key: keyof AdvancedFilterValues, values: string[]) => void;
+  className?: string;
 }) {
   function choices(
     key: MultiKey,
@@ -65,7 +67,7 @@ export function AdvancedFilters({
   }
 
   return (
-    <details className="my-4">
+    <details className={className}>
       <summary>고급 필터</summary>
       <div className="filters">
         {choices(
