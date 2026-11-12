@@ -103,16 +103,19 @@ it("exports each report with its screen query and the server filename", async ()
       screen.getByRole("button", { name: "이용 지점별 이용권 사용량" }),
     );
     const reports = [
-      ["매출 요약", "revenue", "revenue"],
-      ["지점별 매출 비교", "revenue-branches", "revenue/branches"],
-      ["매출 원장", "ledger", "ledger"],
-      ["이용권 판매량", "passes-volume", "passes/volume"],
-      ["이용권 상품별 판매", "passes-products", "passes/products"],
-      ["이용권 사용 현황", "passes-usage", "passes/usage"],
-      ["매출 추세", "trend", "trend", "revenue"],
-      ["이용권 판매량 추세", "trend", "trend", "passes"],
+      ["요약", "매출 요약", "revenue", "revenue"],
+      ["요약", "지점별 매출 비교", "revenue-branches", "revenue/branches"],
+      ["원장", "매출 원장", "ledger", "ledger"],
+      ["판매 분석", "이용권 판매량", "passes-volume", "passes/volume"],
+      ["판매 분석", "이용권 상품별 판매", "passes-products", "passes/products"],
+      ["요약", "이용권 사용 현황", "passes-usage", "passes/usage"],
+      ["추세", "매출 추세", "trend", "trend", "revenue"],
+      ["추세", "이용권 판매량 추세", "trend", "trend", "passes"],
     ];
-    for (const [title, report, screenPath, measure] of reports) {
+    for (const [tab, title, report, screenPath, measure] of reports) {
+      const trigger = screen.getByRole("tab", { name: tab });
+      if (trigger.getAttribute("aria-selected") !== "true")
+        await userEvent.click(trigger);
       const button = await screen.findByRole("button", {
         name: `${title} CSV 다운로드`,
       });
@@ -148,19 +151,21 @@ it("exports each report with its screen query and the server filename", async ()
 });
 
 const region = (name: string) => within(screen.getByRole("region", { name }));
+const selectTab = (name: string) =>
+  userEvent.click(screen.getByRole("tab", { name }));
 
 it("displays validated response metadata with all cards, tables and charts", async () => {
   show(september);
-  await screen.findByRole("img", { name: "순판매량 추세 차트" });
-  for (const name of [
-    "매출 요약",
-    "지점별 매출 비교",
-    "매출 최소 원장",
-    "이용권 판매량",
-    "상품 판매 순위",
-    "매출 추세",
-    "이용권 판매량 추세",
+  for (const [tab, name] of [
+    ["요약", "매출 요약"],
+    ["요약", "지점별 매출 비교"],
+    ["원장", "매출 최소 원장"],
+    ["판매 분석", "이용권 판매량"],
+    ["판매 분석", "상품 판매 순위"],
+    ["추세", "매출 추세"],
+    ["추세", "이용권 판매량 추세"],
   ]) {
+    await selectTab(tab);
     const result = region(name);
     expect(await result.findByText(/기준 시각:/)).toHaveTextContent(
       `Asia/Seoul · KRW`,
@@ -177,15 +182,16 @@ it("displays validated response metadata with all cards, tables and charts", asy
     expect(result.getByText(/적용 지점:/)).toHaveTextContent(
       "환불 처리일 기준",
     );
+    if (name === "상품 판매 순위")
+      expect(result.getByRole("table")).toBeVisible();
+    if (tab === "추세") expect(result.getByRole("img")).toBeVisible();
   }
-  expect(region("상품 판매 순위").getByRole("table")).toBeVisible();
-  expect(region("매출 추세").getByRole("img")).toBeVisible();
   expect(requests).toHaveLength(7);
   await userEvent.selectOptions(
     screen.getByLabelText("환불 집계 기준"),
     "paymentDate",
   );
-  await waitFor(() => expect(requests).toHaveLength(14));
+  await waitFor(() => expect(requests).toHaveLength(9));
   expect(
     requests
       .slice(7)
@@ -213,7 +219,12 @@ it("displays validated response metadata with all cards, tables and charts", asy
 
 it("shows applied advanced filter and server note on the card, ledger and trend", async () => {
   show(`${september}&methods=${encodeURIComponent("카드")}`);
-  for (const name of ["매출 요약", "매출 최소 원장", "매출 추세"]) {
+  for (const [tab, name] of [
+    ["요약", "매출 요약"],
+    ["원장", "매출 최소 원장"],
+    ["추세", "매출 추세"],
+  ]) {
+    await selectTab(tab);
     const result = await screen.findByRole("region", { name });
     expect(
       await within(result).findByText("환불은 원결제 수단으로 나눴다"),
@@ -274,10 +285,12 @@ it("renders the amounts and refund actor in closing detail", async () => {
 
 it("sends the product page and both trend measures but omits the fixed pass purpose", async () => {
   show(
-    `${september}&productPage=2&granularity=week&purpose=${encodeURIComponent("이용권")}`,
+    `${september}&view=sales&productPage=2&granularity=week&purpose=${encodeURIComponent("이용권")}`,
   );
   await region("상품 판매 순위").findByText("이 페이지에 상품이 없어요");
-  await waitFor(() => expect(requests).toHaveLength(7));
+  expect(requests).toHaveLength(2);
+  await selectTab("추세");
+  await waitFor(() => expect(requests).toHaveLength(4));
   const product = requests.find((url) =>
     url.pathname.endsWith("/passes/products"),
   );
@@ -302,25 +315,27 @@ it("sends the product page and both trend measures but omits the fixed pass purp
       ?.searchParams.has("purpose"),
   ).toBe(false);
   await userEvent.selectOptions(screen.getByLabelText("결제 용도"), "스터디룸");
+  expect(screen.getByText("이용권 판매량 추세 · 해당 없음")).toBeVisible();
+  await waitFor(() => expect(requests).toHaveLength(5));
+  await selectTab("판매 분석");
   expect(screen.getByText("이용권 판매 지표 · 해당 없음")).toBeVisible();
-  await waitFor(() => expect(requests).toHaveLength(11));
+  expect(requests).toHaveLength(5);
   expect(
     requests
-      .slice(7)
+      .slice(4)
       .every((url) => url.searchParams.get("purpose") === "스터디룸"),
   ).toBe(true);
 });
 
 it("shows an empty result, then clears it when a manual refresh receives 403", async () => {
   store.scenario = "empty";
-  show("");
+  show("?view=sales");
   expect(
     await screen.findByText("조회 조건에 맞는 상품 판매가 없어요"),
   ).toBeVisible();
-  expect(screen.getByLabelText("적용된 기본 날짜")).toHaveTextContent(
+  expect(await screen.findByLabelText("적용된 기본 날짜")).toHaveTextContent(
     "2026-11-01 ~ 2026-11-11",
   );
-  expect(region("매출 요약").getAllByText("0원").length).toBeGreaterThan(0);
   store.scenario = "forbidden";
   await act(() =>
     client.refetchQueries({

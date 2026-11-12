@@ -117,6 +117,7 @@ test("real API: approved/refunded totals agree across cards, branch comparison a
       .getByText(formatKrw(revenue.totals.netAmountKrw), { exact: true })
       .first(),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "판매 분석" }).click();
   const volume = await (await api(context, "/sales/passes/volume")).json();
   await expect(
     page
@@ -127,12 +128,14 @@ test("real API: approved/refunded totals agree across cards, branch comparison a
   await expect(
     page.getByRole("table", { name: "이용권 상품 판매 순위" }),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "추세" }).click();
   await expect(
     page.getByRole("img", { name: "순매출 추세 차트", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("img", { name: "순판매량 추세 차트", exact: true }),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "원장" }).click();
   const origin = page.getByRole("region", {
     name: "매출 최소 원장",
     exact: true,
@@ -140,6 +143,7 @@ test("real API: approved/refunded totals agree across cards, branch comparison a
   await expect(
     origin.getByRole("link", { name: "결제 보기" }).first(),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "요약" }).click();
   await page.getByRole("checkbox", { name: "Sales Two", exact: true }).click();
   await expect(page).toHaveURL(/branchIds=2/);
   await expect(
@@ -177,6 +181,7 @@ test("real API: approved/refunded totals agree across cards, branch comparison a
       .getByText(formatKrw(revenue.totals.netAmountKrw), { exact: true })
       .first(),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "원장" }).click();
   await page
     .getByRole("combobox", { name: "원장 항목", exact: true })
     .selectOption("환불");
@@ -208,7 +213,7 @@ test("real API: sales-only staff sees only permitted branch and no payment links
   browser,
 }) => {
   await login(context, "reader@sales.test");
-  await page.goto("/app/all/sales");
+  await page.goto("/app/all/sales?view=ledger");
   await expect(
     page.getByRole("checkbox", { name: "Sales One", exact: true }),
   ).toBeVisible();

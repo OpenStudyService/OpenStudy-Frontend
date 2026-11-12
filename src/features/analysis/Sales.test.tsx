@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router";
 import { Sales } from "./Sales";
+import { ApiError } from "../../shared/api/client";
 import type { CurrentUser } from "../../shared/domain/schema";
 import type {
   RevenueSummary,
@@ -180,6 +181,88 @@ function show(search = "") {
   );
 }
 
+it("uses the default for unknown views and changes only the view in the URL", async () => {
+  const conditions = new URLSearchParams([
+    ["from", "2026-11-01"],
+    ["to", "2026-11-05"],
+    ["branchIds", "1"],
+    ["refundBasis", "paymentDate"],
+    ["purpose", "이용권"],
+    ["methods", "카드"],
+    ["methods", "현금"],
+    ["ledgerPage", "3"],
+    ["entryType", "환불"],
+    ["productPage", "2"],
+    ["granularity", "week"],
+  ]);
+  show(`?${conditions}&view=unknown`);
+  const summaryTab = screen.getByRole("tab", { name: "요약", selected: true });
+  expect(summaryTab).toHaveClass("tab", "active");
+  await screen.findByText("용도별 매출");
+  expect(mocks.ledger).not.toHaveBeenCalled();
+  expect(mocks.volume).not.toHaveBeenCalled();
+  expect(mocks.products).not.toHaveBeenCalled();
+  expect(mocks.trend).not.toHaveBeenCalled();
+
+  await userEvent.click(summaryTab);
+  await userEvent.keyboard("{ArrowRight}");
+  expect(
+    await screen.findByRole("tabpanel", { name: "판매 분석" }),
+  ).toBeVisible();
+  expect(screen.queryByText("용도별 매출")).not.toBeInTheDocument();
+
+  const url = () =>
+    new URLSearchParams(screen.getByLabelText("주소 조건").textContent!);
+  conditions.set("view", "sales");
+  expect([...url()]).toEqual([...conditions]);
+
+  await userEvent.click(screen.getByRole("tab", { name: "원장" }));
+  expect(screen.getByLabelText("원장 항목")).toHaveValue("환불");
+  expect(mocks.ledger.mock.calls[0][1]).toMatchObject({ page: 3 });
+  conditions.set("view", "ledger");
+  expect([...url()]).toEqual([...conditions]);
+
+  await userEvent.click(summaryTab);
+  conditions.delete("view");
+  expect([...url()]).toEqual([...conditions]);
+});
+
+it.each([
+  ["summary", "매출 요약", mocks.revenue],
+  ["sales", "이용권 판매량", mocks.volume],
+  ["trend", "매출 추세", mocks.trend],
+  ["ledger", "매출 최소 원장", mocks.ledger],
+] as const)(
+  "shows loading, error and 403 for the %s tab",
+  async (view, name, read) => {
+    const rejectReads: ((error: Error) => void)[] = [];
+    read.mockImplementation(
+      () =>
+        new Promise((_, rejectRead) => {
+          rejectReads.push(rejectRead);
+        }),
+    );
+    show(`?view=${view}&from=2026-11-01&to=2026-11-05`);
+    const panel = within(screen.getByRole("tabpanel"));
+    const result = within(panel.getByRole("region", { name }));
+    expect(result.getByRole("status")).toBeVisible();
+    rejectReads.forEach((reject) => reject(new Error("서버 연결 실패")));
+    expect(await result.findByText("서버 연결 실패")).toBeVisible();
+
+    read.mockRejectedValue(
+      new ApiError(403, {
+        code: "FORBIDDEN",
+        message: "매출 조회 권한 없음",
+      }),
+    );
+    await userEvent.click(result.getByRole("button", { name: "다시 시도" }));
+    expect(
+      await screen.findByRole("heading", { name: "매출 조회 권한이 필요해요" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("region", { name })).not.toBeInTheDocument();
+  },
+);
+
 it("uses server default period and renders actual zero with transaction state and metadata", async () => {
   show();
   const summary = await screen.findByRole("region", { name: "매출 요약" });
@@ -192,7 +275,7 @@ it("uses server default period and renders actual zero with transaction state an
   expect(within(summary).getAllByText("0원").length).toBeGreaterThan(0);
   expect(within(summary).queryByText("거래 없음")).not.toBeInTheDocument();
   expect(within(summary).getByText(/이번 달 기본 기간/)).toBeVisible();
-  expect(screen.getAllByText(/기준 시각:/)).toHaveLength(3);
+  expect(screen.getAllByText(/기준 시각:/)).toHaveLength(2);
   expect(screen.getByRole("checkbox", { name: "강남점" })).toBeVisible();
   expect(
     screen.queryByRole("checkbox", { name: "홍대점" }),
@@ -261,10 +344,11 @@ it("warns before downloading ledger and product reports using their total row co
     items: [],
     meta: { page: 1, pageSize: 20, total: 1_002 },
   });
-  show();
+  show("?view=ledger");
   expect(
     await screen.findByRole("button", { name: "매출 원장 CSV 다운로드" }),
   ).toHaveAccessibleDescription("CSV에는 앞의 1,000행만 담겨요.");
+  await userEvent.click(screen.getByRole("tab", { name: "판매 분석" }));
   expect(
     await screen.findByRole("button", {
       name: "이용권 상품별 판매 CSV 다운로드",
@@ -274,7 +358,7 @@ it("warns before downloading ledger and product reports using their total row co
 
 it("uses scope as an explicit branch and never displays a private payment link from stale server hints", async () => {
   mocks.context.scope = "1";
-  show();
+  show("?view=ledger");
   await screen.findByText("첫 구매 상품", { exact: false });
   expect(mocks.revenue.mock.calls[0][0]).toEqual({
     branchIds: ["1"],
@@ -289,7 +373,7 @@ it("shows payment navigation only when server hint and current payment permissio
     ...session,
     user: { ...session.user, owner: true },
   };
-  show();
+  show("?view=ledger");
   expect(
     await screen.findByRole("link", { name: "결제 보기" }),
   ).toHaveAttribute("href", "/app/1/payments?detail=1");
@@ -328,13 +412,15 @@ it("distinguishes empty results from an actual zero and avoids an empty chart", 
     meta: { page: 1, pageSize: 20, total: 0 },
   });
   show();
+  await screen.findByText("용도별 매출");
+  expect(screen.queryByText("순매출 차트")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: "원장" }));
   expect(
     await screen.findByRole("heading", {
       name: "조회 조건에 맞는 거래가 없어요",
     }),
   ).toBeVisible();
   expect(screen.getAllByText("거래 없음").length).toBeGreaterThan(0);
-  expect(screen.queryByText("순매출 차트")).not.toBeInTheDocument();
 });
 it("shows a failed response as an error without fabricated amount cards", async () => {
   mocks.revenue.mockRejectedValue(new Error("서버 연결 실패"));
@@ -384,7 +470,6 @@ it("does not show the previous account's cached amounts while a new account is l
   mocks.branches.mockReturnValue(
     new Promise<BranchRevenueComparison>(() => undefined),
   );
-  mocks.ledger.mockReturnValue(new Promise<SalesLedgerPage>(() => undefined));
   mocks.context.session = { ...session, user: { ...session.user, id: "11" } };
   view.rerender(
     <QueryClientProvider client={client}>
@@ -396,7 +481,7 @@ it("does not show the previous account's cached amounts while a new account is l
   );
   expect(screen.queryByText("용도별 매출")).not.toBeInTheDocument();
   expect(screen.queryByText("1,000원")).not.toBeInTheDocument();
-  for (const name of ["매출 요약", "지점별 매출 비교", "매출 최소 원장"])
+  for (const name of ["매출 요약", "지점별 매출 비교"])
     expect(
       within(screen.getByRole("region", { name })).getByRole("status"),
     ).toBeVisible();
