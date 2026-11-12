@@ -62,9 +62,7 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
       <Heading
         title="스터디룸 관리"
         description="룸의 정원·시간당 요금과 운영 상태를 관리하세요."
-      >
-        <Button onClick={() => void data.refetch()}>새로고침</Button>
-      </Heading>
+      />
       <div className="card overflow-hidden">
         <div className="filters">
           <select
@@ -250,16 +248,7 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
       <Heading
         title="스터디룸 예약"
         description="한국 시간 기준의 예약 일정과 실제 이용 상태를 확인하세요."
-      >
-        <Button
-          onClick={() => {
-            void list.refetch();
-            if (branch) void calendar.refetch();
-          }}
-        >
-          새로고침
-        </Button>
-      </Heading>
+      />
       <div className="card overflow-hidden">
         <div className="filters">
           {scope === "all" && (

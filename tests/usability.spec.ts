@@ -72,6 +72,67 @@ test("registration actions sit at the right edge of their filters", async ({
   }
 });
 
+test("room reservations and space tabs refresh from the menu", async ({ page }) => {
+  const screens = [
+    {
+      route: "reservations?view=list&status=확정",
+      menu: "예약 관리",
+      paths: ["/api/room-reservations"],
+    },
+    {
+      route: "spaces?tab=lockers&assignmentState=사용+가능",
+      menu: "공간 관리",
+      paths: ["/api/lockers", "/api/lockers/occupancy"],
+    },
+    {
+      route: "spaces?tab=rooms&status=사용+가능",
+      menu: "공간 관리",
+      paths: ["/api/rooms"],
+    },
+    {
+      route: "spaces?tab=seats&status=사용+가능",
+      menu: "공간 관리",
+      paths: ["/api/seats/board"],
+    },
+  ];
+  await login(page);
+  for (const { route, menu, paths } of screens) {
+    await test.step(route, async () => {
+      const initial = Promise.all(
+        paths.map((path) =>
+          page.waitForResponse(
+            (response) =>
+              response.ok() &&
+              response.request().method() === "GET" &&
+              new URL(response.url()).pathname === path,
+          ),
+        ),
+      );
+      await page.goto(`/app/gangnam/${route}`);
+      const responses = await initial;
+      await Promise.all(responses.map((response) => response.finished()));
+      await expect(
+        page.getByRole("button", { name: /^(화면 |현황 )?새로고침$/ }),
+      ).toHaveCount(0);
+
+      const url = page.url();
+      const refreshed = Promise.all(
+        responses.map((initialResponse) =>
+          page.waitForResponse(
+            (response) =>
+              response.ok() &&
+              response.request().method() === "GET" &&
+              response.url() === initialResponse.url(),
+          ),
+        ),
+      );
+      await page.getByRole("link", { name: menu, exact: true }).click();
+      await refreshed;
+      await expect(page).toHaveURL(url);
+    });
+  }
+});
+
 async function accessible(page: Page) {
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
