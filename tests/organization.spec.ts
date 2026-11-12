@@ -47,7 +47,8 @@ test("membership editor sends one branch with both versions and preserves email"
   await login(page);
   await page.goto("/app/all/employees");
   await page
-    .getByRole("button", { name: "직원 상세: 박준호", exact: true })
+    .getByRole("table", { name: "직원 목록" })
+    .getByRole("button", { name: "박준호", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
   await expect(

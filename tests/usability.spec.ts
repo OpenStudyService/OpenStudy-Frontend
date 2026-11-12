@@ -34,7 +34,12 @@ test("registration actions sit at the right edge of their filters", async ({
     ["members?tab=members&q=010", "회원 등록", "q", "010"],
     ["reservations?status=확정", "예약 등록", "status", "확정"],
     ["spaces?tab=seats&status=사용+가능", "좌석 등록", "status", "사용 가능"],
-    ["spaces?tab=rooms&status=사용+가능", "스터디룸 등록", "status", "사용 가능"],
+    [
+      "spaces?tab=rooms&status=사용+가능",
+      "스터디룸 등록",
+      "status",
+      "사용 가능",
+    ],
     ["facilities?q=점검", "시설 점검 등록", "q", "점검"],
     ["inquiries?q=문의", "고객 문의 등록", "q", "문의"],
     ["notices?q=공지", "공지 등록", "q", "공지"],
@@ -54,10 +59,14 @@ test("registration actions sit at the right edge of their filters", async ({
         await expect(action).toBeVisible();
         expect(
           await filters.evaluate((bar) => {
-            const padding = Number.parseFloat(getComputedStyle(bar).paddingRight);
+            const padding = Number.parseFloat(
+              getComputedStyle(bar).paddingRight,
+            );
             const right = bar.getBoundingClientRect().right - padding;
             const button = bar.lastElementChild!.getBoundingClientRect();
-            return Math.abs(button.right - right) <= 1 && button.right <= innerWidth;
+            return (
+              Math.abs(button.right - right) <= 1 && button.right <= innerWidth
+            );
           }),
         ).toBe(true);
       }
@@ -152,7 +161,7 @@ for (const width of [1024, 1440]) {
       ["products", "상품 등록"],
       ["payments", "Mock 결제"],
       ["attendance", "근무 등록"],
-      ["employees", "직원 상세: 박준호"],
+      ["employees", "박준호"],
     ]) {
       await page.goto(`/app/gangnam/${route}`);
       await page.getByRole("button", { name, exact: true }).click();
@@ -376,7 +385,9 @@ test("room list can retry a failed read from its error message", async ({
   await expect(status).toHaveValue("운영 중단");
 });
 
-test("workspace reads follow menu actions without a refresh control", async ({ page }) => {
+test("workspace reads follow menu actions without a refresh control", async ({
+  page,
+}) => {
   const reads: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());

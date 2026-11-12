@@ -353,7 +353,8 @@ test("actual permission UI grants and revokes summary access; staff sees minimum
     ).toHaveCount(0);
     await owner.page.goto("/app/1/employees");
     await owner.page
-      .getByRole("button", { name: "직원 상세: Lockers Staff", exact: true })
+      .getByRole("table", { name: "직원 목록" })
+      .getByRole("button", { name: "Lockers Staff", exact: true })
       .click();
     const panel = owner.page.getByRole("dialog");
     const grant = panel.getByRole("checkbox", { name: label, exact: true });

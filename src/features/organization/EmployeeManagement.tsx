@@ -17,6 +17,12 @@ import {
   Panel,
   State,
 } from "../../shared/ui/primitives";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
 import { InvitationManagement } from "../invitations/Management";
 import { organizationRead } from "./api";
 import {
@@ -31,12 +37,15 @@ import { PresetManagement } from "./PermissionPresets";
 import {
   ContractNotice,
   Field,
-  Pager,
   SaveError,
   useListSearch,
   useOrganizationList,
   useRefreshOrganization,
 } from "./shared";
+
+const PAGE_SIZE = 20;
+// 초기화 대상: 직원 목록 검색과 페이지. tab은 남긴다.
+const EMPLOYEE_FILTER_KEYS = ["employeeSearch", "employeePage"];
 
 export function EmployeeManagement() {
   const { session, scope } = useApp();
@@ -56,7 +65,13 @@ function EmployeeManagementContent() {
   const { session, scope } = useApp();
   const { page, search, setPage, setSearch } = useListSearch("employee");
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "invitations" ? "invitations" : "employees";
+  // 권한 프리셋은 사장님만 관리하므로 그 외 사용자가 tab=presets로 들어오면 직원 목록을 보여 준다.
+  const tab =
+    params.get("tab") === "invitations"
+      ? "invitations"
+      : params.get("tab") === "presets" && session.user.owner
+        ? "presets"
+        : "employees";
   const [selected, setSelected] = useState<Employee | null>(null);
   function setTab(next: string) {
     setParams((current) => {
@@ -76,7 +91,7 @@ function EmployeeManagementContent() {
         m.permissions.includes("people:manage"),
     );
   const data = useOrganizationList<"EmployeePage">(
-    `/employees?${queryString({ scope, page, pageSize: 20, q: search })}`,
+    `/employees?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search })}`,
     allowed,
   );
   const presets = useOrganizationList<"PermissionPresetPage">(
@@ -123,83 +138,125 @@ function EmployeeManagementContent() {
           >
             초대·승인
           </Tabs.Trigger>
+          {session.user.owner && (
+            <Tabs.Trigger
+              value="presets"
+              className={`tab ${tab === "presets" ? "active" : ""}`}
+            >
+              권한 프리셋
+            </Tabs.Trigger>
+          )}
         </Tabs.List>
         <Tabs.Content value="employees">
           <ContractNotice />
-          <Field label="직원 이름·이메일 검색">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} />
-          </Field>
-          {data.isPending ? (
-            <State loading />
-          ) : !data.data || hasBlockingReadError(data) ? (
-            <ErrorState error={data.error!} retry={() => void data.refetch()} />
-          ) : (
-            <>
-              {!data.data.items.length && (
-                <State title="조회 가능한 직원이 없어요" />
-              )}
-              {data.data.items.map((employee) => (
-                <article className="card my-3 p-4" key={employee.id}>
-                  <div className="flex flex-wrap justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Avatar name={employee.name} src={employee.avatar} />
-                        <h2>
-                          {employee.name} {employee.owner && "(사장님)"}
-                        </h2>
-                      </div>
-                      <p className="help">{employee.email}</p>
-                      <Badge>{employee.status}</Badge>
-                      <p className="help">
-                        {employee.memberships
-                          .map(
-                            (m) =>
-                              `${session.branches.find((b) => b.id === m.branchId)?.name || m.branchId}: ${m.role === "admin" ? "지점 관리자" : "일반 직원"} · ${m.status}`,
-                          )
-                          .join(" / ") || "지점 소속 없음"}
-                      </p>
-                    </div>
-                    <Button onClick={() => setSelected(employee)}>
-                      직원 상세: {employee.name}
-                    </Button>
-                  </div>
-                </article>
-              ))}
-              <Pager
-                page={page}
-                total={data.data.meta.total}
-                onChange={setPage}
+          <ListCard>
+            <ListFilters>
+              <input
+                type="search"
+                aria-label="직원 이름·이메일 검색"
+                placeholder="직원 이름·이메일 검색"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
-            </>
-          )}
-          {presets.error && (
-            <ErrorState
-              error={presets.error}
-              retry={() => void presets.refetch()}
+              <Button
+                variant="quiet"
+                onClick={() =>
+                  setParams(
+                    (current) => {
+                      const next = new URLSearchParams(current);
+                      EMPLOYEE_FILTER_KEYS.forEach((key) => next.delete(key));
+                      return next;
+                    },
+                    { replace: true },
+                  )
+                }
+              >
+                초기화
+              </Button>
+            </ListFilters>
+            <ListTable
+              label="직원 목록"
+              columns={["직원", "이메일", "상태", "소속 지점·역할"]}
+              loading={data.isPending}
+              error={
+                !data.data || hasBlockingReadError(data) ? data.error : null
+              }
+              onRetry={() => void data.refetch()}
+              isEmpty={!data.data?.items.length}
+              empty={{ title: "조회 가능한 직원이 없어요" }}
+            >
+              {data.data?.items.map((employee) => (
+                <tr key={employee.id}>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <Avatar name={employee.name} src={employee.avatar} />
+                      <button
+                        className="cell-link"
+                        onClick={() => setSelected(employee)}
+                      >
+                        {employee.name}
+                      </button>
+                      {employee.owner && <span className="help">사장님</span>}
+                    </div>
+                  </td>
+                  <td>{employee.email}</td>
+                  <td>
+                    <Badge>{employee.status}</Badge>
+                  </td>
+                  <td>
+                    {employee.memberships.length
+                      ? employee.memberships.map((m) => (
+                          <span className="block" key={m.branchId}>
+                            {session.branches.find((b) => b.id === m.branchId)
+                              ?.name || m.branchId}
+                            {" · "}
+                            {m.role === "admin" ? "지점 관리자" : "일반 직원"}
+                            {" · "}
+                            {m.status}
+                          </span>
+                        ))
+                      : "지점 소속 없음"}
+                  </td>
+                </tr>
+              ))}
+            </ListTable>
+            <ListFooter
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={data.data?.meta.total ?? 0}
+              loading={data.isPending}
+              error={!!data.error}
+              onChange={setPage}
             />
-          )}
-          {definitions.error && (
-            <ErrorState
-              error={definitions.error}
-              retry={() => void definitions.refetch()}
-            />
-          )}
-          {session.user.owner && presets.data && (
-            <PresetManagement
-              presets={presets.data.items}
-              adminOnly={[
-                "people:manage",
-                ...(definitions.data
-                  ?.filter((p) => p.adminOnly)
-                  .map((p) => p.code) || []),
-              ]}
-              onSaved={refresh}
-            />
-          )}
+          </ListCard>
+          {/* 직원 상세의 권한 편집이 프리셋·권한 정의를 쓰므로 조회 오류는 이 탭에도 알린다. */}
+          <ReferenceErrors presets={presets} definitions={definitions} />
         </Tabs.Content>
         <Tabs.Content value="invitations">
           <InvitationManagement />
         </Tabs.Content>
+        {session.user.owner && (
+          <Tabs.Content value="presets">
+            <ContractNotice />
+            <ReferenceErrors presets={presets} definitions={definitions} />
+            {presets.isPending ? (
+              <State loading />
+            ) : (
+              presets.data && (
+                <PresetManagement
+                  presets={presets.data.items}
+                  adminOnly={[
+                    "people:manage",
+                    ...(definitions.data
+                      ?.filter((p) => p.adminOnly)
+                      .map((p) => p.code) || []),
+                  ]}
+                  onSaved={refresh}
+                />
+              )
+            )}
+          </Tabs.Content>
+        )}
       </Tabs.Root>
       <Panel
         open={!!selected}
@@ -219,6 +276,30 @@ function EmployeeManagementContent() {
         )}
       </Panel>
     </div>
+  );
+}
+function ReferenceErrors({
+  presets,
+  definitions,
+}: {
+  presets: { error: Error | null; refetch: () => unknown };
+  definitions: { error: Error | null; refetch: () => unknown };
+}) {
+  return (
+    <>
+      {presets.error && (
+        <ErrorState
+          error={presets.error}
+          retry={() => void presets.refetch()}
+        />
+      )}
+      {definitions.error && (
+        <ErrorState
+          error={definitions.error}
+          retry={() => void definitions.refetch()}
+        />
+      )}
+    </>
   );
 }
 export function EmployeeDetail({
