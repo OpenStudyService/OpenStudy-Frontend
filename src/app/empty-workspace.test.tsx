@@ -463,11 +463,9 @@ it("keeps idle reads quiet and refreshes the active menu only on request", async
     }
     return Response.json({});
   });
-  const time = await waitFor(() => {
-    const element = screen.getByText(/마지막 조회/).querySelector("time");
-    expect(element).toHaveAttribute("datetime");
-    return element!.getAttribute("datetime");
-  });
+  await screen.findByText("0/0석");
+  expect(screen.queryByRole("button", { name: "화면 새로고침" })).toBeNull();
+  expect(screen.queryByText(/^마지막 조회$/)).toBeNull();
   expect(reads).toBe(1);
 
   vi.useFakeTimers();
@@ -489,13 +487,11 @@ it("keeps idle reads quiet and refreshes the active menu only on request", async
   expect(
     await screen.findByText(/마지막 조회 결과를 표시합니다/),
   ).toBeVisible();
-  expect(
-    screen.getByText(/^마지막 조회$/).querySelector("time"),
-  ).toHaveAttribute("datetime", time);
+  expect(screen.getByText("0/0석")).toBeVisible();
   expect(reads).toBe(2);
 
   fail = false;
-  await user.click(screen.getByRole("button", { name: "화면 새로고침" }));
+  await user.click(screen.getByRole("link", { name: "대시보드" }));
   await waitFor(() => expect(reads).toBe(3));
   await waitFor(() =>
     expect(screen.queryByText(/마지막 조회 결과를 표시합니다/)).toBeNull(),

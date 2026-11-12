@@ -25,7 +25,7 @@ import {
 import { Icon } from "../shared/ui/Icon";
 import { emptyLookups, normalizeLookups, useSession } from "./context";
 import { isAccessError } from "../shared/api/read-model";
-import { WorkspaceRefresh } from "./WorkspaceRefresh";
+import { WorkspaceReadNotice } from "./WorkspaceReadNotice";
 import { DataNotice } from "../shared/ui/DataNotice";
 import { useUi } from "./store";
 export const navigation = [
@@ -414,7 +414,7 @@ export function Layout() {
         </header>
         <main id="main" className="content" tabIndex={-1}>
           {section !== "settings" && section !== "chat" && (
-            <WorkspaceRefresh userId={activeUser.id} refresh={refresh} />
+            <WorkspaceReadNotice userId={activeUser.id} />
           )}
           {lookups.data?.preview && (
             <p
