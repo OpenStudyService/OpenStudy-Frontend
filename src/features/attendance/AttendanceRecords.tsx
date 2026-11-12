@@ -5,7 +5,12 @@ import { useApp } from "../../app/context";
 import { admin } from "../../shared/domain/schema";
 import { Button, ErrorState, Panel } from "../../shared/ui/primitives";
 import { hasBlockingReadError } from "../../shared/api/read-model";
-import { DataNotice } from "../../shared/ui/DataNotice";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
 import {
   attendanceApi,
   workedTime,
@@ -13,6 +18,17 @@ import {
 } from "./attendance-api";
 import { shiftTime } from "./api";
 import { CorrectionForm } from "./RequestForms";
+
+const PAGE_SIZE = 20;
+// 초기화 대상: 목록 필터와 페이지. tab은 남긴다.
+const RECORD_FILTER_KEYS = [
+  "from",
+  "to",
+  "status",
+  "mine",
+  "employeeId",
+  "page",
+];
 
 export function AttendanceRecords() {
   const { session, scope, lookups } = useApp();
@@ -57,7 +73,7 @@ export function AttendanceRecords() {
           mine: manager ? mine : "true",
           employeeId: manager ? employeeId : undefined,
           page,
-          pageSize: 20,
+          pageSize: PAGE_SIZE,
         },
         signal,
       ),
@@ -65,25 +81,28 @@ export function AttendanceRecords() {
   });
   return (
     <section>
-      <div className="flex flex-wrap items-end gap-3 p-4">
-        <label>
-          출근 시작일
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => filter("from", e.target.value)}
-          />
-        </label>
-        <label>
-          출근 종료일
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => filter("to", e.target.value)}
-          />
-        </label>
-        <label>
-          근태 상태
+      <ListCard>
+        <ListFilters>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="w-full text-xs text-muted sm:w-auto">출근일</span>
+            <input
+              type="date"
+              aria-label="출근 시작일"
+              className="w-full min-w-0 sm:w-auto"
+              value={from}
+              onChange={(e) => filter("from", e.target.value)}
+            />
+            <span aria-hidden="true" className="hidden sm:inline">
+              ~
+            </span>
+            <input
+              type="date"
+              aria-label="출근 종료일"
+              className="w-full min-w-0 sm:w-auto"
+              value={to}
+              onChange={(e) => filter("to", e.target.value)}
+            />
+          </span>
           <select
             aria-label="근태 상태"
             value={status}
@@ -94,11 +113,8 @@ export function AttendanceRecords() {
               <option key={s}>{s}</option>
             ))}
           </select>
-        </label>
-        {manager && (
-          <>
-            <label>
-              조회 대상
+          {manager && (
+            <>
               <select
                 aria-label="조회 대상"
                 value={mine}
@@ -107,9 +123,6 @@ export function AttendanceRecords() {
                 <option value="">권한 범위 전체</option>
                 <option value="true">본인만</option>
               </select>
-            </label>
-            <label>
-              근태 직원
               <select
                 aria-label="근태 직원"
                 value={employeeId}
@@ -122,82 +135,68 @@ export function AttendanceRecords() {
                   </option>
                 ))}
               </select>
-            </label>
-          </>
-        )}
-      </div>
-      <p className="help px-4">
-        실제 출퇴근 기록 · Asia/Seoul · 출근한 날짜 기준 · 실근무 분은 서버
-        계산값입니다.
-      </p>
-      <DataNotice
-        label="근태 목록"
-        loading={rows.isPending}
-        error={rows.error}
-        retry={() => void rows.refetch()}
-      />
-      {!hasBlockingReadError(rows) && (
-        <div className="data-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>직원</th>
-                <th>기록 지점</th>
-                <th>출근</th>
-                <th>퇴근</th>
-                <th>상태</th>
-                <th>실근무 분</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.data?.items.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.employee.name}</td>
-                  <td>
-                    {lookups.branches.find((b) => b.id === r.branchId)?.name ||
-                      r.branchId}
-                  </td>
-                  <td>
-                    <button
-                      onClick={() =>
-                        setParams((p) => {
-                          p.set("detail", r.id);
-                          return p;
-                        })
-                      }
-                    >
-                      {shiftTime(r.clockInAt)}
-                    </button>
-                  </td>
-                  <td>{r.clockOutAt ? shiftTime(r.clockOutAt) : "진행 중"}</td>
-                  <td>{r.status}</td>
-                  <td>{workedTime(r.workedMinutes)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.data?.items.length === 0 && (
-            <p>조건에 맞는 실제 출퇴근 기록이 없습니다.</p>
+            </>
           )}
-        </div>
-      )}
-      <div className="flex gap-3 p-4">
-        <Button
-          disabled={page <= 1}
-          onClick={() => filter("page", String(page - 1))}
+          <Button
+            variant="quiet"
+            onClick={() =>
+              setParams((p) => {
+                RECORD_FILTER_KEYS.forEach((key) => p.delete(key));
+                return p;
+              })
+            }
+          >
+            초기화
+          </Button>
+        </ListFilters>
+        <p className="px-5 py-3 text-xs text-muted">
+          실제 출퇴근 기록 · Asia/Seoul · 출근한 날짜 기준 · 실근무 분은 서버
+          계산값입니다.
+        </p>
+        <ListTable
+          label="출퇴근 기록"
+          columns={["직원", "기록 지점", "출근", "퇴근", "상태", "실근무 분"]}
+          loading={rows.isPending}
+          error={hasBlockingReadError(rows) ? rows.error : null}
+          onRetry={() => void rows.refetch()}
+          isEmpty={!rows.data?.items.length}
+          empty={{ title: "조건에 맞는 실제 출퇴근 기록이 없습니다." }}
         >
-          이전
-        </Button>
-        <span>
-          {page}페이지 · {rows.data?.total ?? 0}건
-        </span>
-        <Button
-          disabled={!rows.data || page * 20 >= rows.data.total}
-          onClick={() => filter("page", String(page + 1))}
-        >
-          다음
-        </Button>
-      </div>
+          {rows.data?.items.map((r) => (
+            <tr key={r.id}>
+              <td>
+                <button
+                  className="cell-link"
+                  onClick={() =>
+                    setParams((p) => {
+                      p.set("detail", r.id);
+                      return p;
+                    })
+                  }
+                >
+                  {r.employee.name}
+                </button>
+              </td>
+              <td>
+                {lookups.branches.find((b) => b.id === r.branchId)?.name ||
+                  r.branchId}
+              </td>
+              <td>{shiftTime(r.clockInAt)}</td>
+              <td>{r.clockOutAt ? shiftTime(r.clockOutAt) : "진행 중"}</td>
+              <td>{r.status}</td>
+              <td>{workedTime(r.workedMinutes)}</td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={rows.data?.total ?? 0}
+          loading={rows.isPending}
+          error={!!rows.error}
+          onChange={(value) => filter("page", String(value))}
+        />
+      </ListCard>
       <Panel
         open={!!detail}
         title="실제 출퇴근 상세"

@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { customerApi } from "../customers/api";
-import { Field, Pager } from "../organization/shared";
+import { Field } from "../organization/shared";
 import { Button, ErrorState } from "../../shared/ui/primitives";
 import { formatDateTime } from "../../shared/domain/format";
 
@@ -41,17 +41,6 @@ export function useSalesSearch() {
       { replace: true },
     );
   return { params, page, update, reset };
-}
-export function SalesPager({
-  page,
-  total,
-  onChange,
-}: {
-  page: number;
-  total: number;
-  onChange: (page: number) => void;
-}) {
-  return <Pager page={page} total={total} onChange={onChange} />;
 }
 export function useSalesClock() {
   const { session } = useApp();

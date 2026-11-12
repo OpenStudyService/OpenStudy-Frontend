@@ -224,8 +224,8 @@ test("real adjustment persists, history reconciles and cross-branch seat history
       }),
     ).toBeVisible();
     await expect(table.getByRole("cell", { name: /지점 1/ })).toBeVisible();
-    await cashier.page
-      .getByRole("button", { name: `${customer.name} 이용 상세`, exact: true })
+    await table
+      .getByRole("button", { name: customer.name, exact: true })
       .click();
     await expect(
       cashier.page.getByRole("dialog").getByText("종료", { exact: true }),
