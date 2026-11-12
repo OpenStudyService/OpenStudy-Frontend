@@ -1,3 +1,4 @@
+import { Tabs } from "radix-ui";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
@@ -60,7 +61,8 @@ function EmployeeManagementContent() {
   function setTab(next: string) {
     setParams((current) => {
       const updated = new URLSearchParams(current);
-      updated.set("tab", next);
+      if (next === "employees") updated.delete("tab");
+      else updated.set("tab", next);
       return updated;
     });
   }
@@ -107,24 +109,22 @@ function EmployeeManagementContent() {
         title="직원 관리"
         description="계정 공통 정보와 지점별 소속·권한을 구분해서 관리해요."
       />
-      <div className="mb-5 flex gap-2">
-        <Button
-          aria-pressed={tab === "employees"}
-          onClick={() => setTab("employees")}
-        >
-          직원 목록
-        </Button>
-        <Button
-          aria-pressed={tab === "invitations"}
-          onClick={() => setTab("invitations")}
-        >
-          초대·승인
-        </Button>
-      </div>
-      {tab === "invitations" ? (
-        <InvitationManagement />
-      ) : (
-        <>
+      <Tabs.Root value={tab} onValueChange={setTab}>
+        <Tabs.List className="tabs" aria-label="직원 관리">
+          <Tabs.Trigger
+            value="employees"
+            className={`tab ${tab === "employees" ? "active" : ""}`}
+          >
+            직원 목록
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            value="invitations"
+            className={`tab ${tab === "invitations" ? "active" : ""}`}
+          >
+            초대·승인
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="employees">
           <ContractNotice />
           <Field label="직원 이름·이메일 검색">
             <input value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -196,8 +196,11 @@ function EmployeeManagementContent() {
               onSaved={refresh}
             />
           )}
-        </>
-      )}
+        </Tabs.Content>
+        <Tabs.Content value="invitations">
+          <InvitationManagement />
+        </Tabs.Content>
+      </Tabs.Root>
       <Panel
         open={!!selected}
         onClose={() => setSelected(null)}

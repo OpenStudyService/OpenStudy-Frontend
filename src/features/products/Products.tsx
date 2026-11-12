@@ -1,3 +1,4 @@
+import { Tabs } from "radix-ui";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
@@ -94,42 +95,43 @@ export function ProductManagement() {
           </Button>
         )}
       </Heading>
-      {tab === "products" && (
-        <Field label="판매 가능 여부">
-          <select
-            value={availability}
-            onChange={(e) => setFilter("productAvailability", e.target.value)}
+      <Tabs.Root
+        value={tab}
+        onValueChange={(value) =>
+          setFilter("tab", value === "products" ? "" : value)
+        }
+      >
+        <Tabs.List className="tabs" aria-label="상품 관리">
+          <Tabs.Trigger
+            value="products"
+            className={`tab ${tab === "products" ? "active" : ""}`}
           >
-            <option value="">전체</option>
-            {saleAvailabilities.map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </Field>
-      )}
-      {MOCK && (
-        <p className="help mb-4">
-          데모 화면입니다. 변경 내용은 실제 상품 정보에 반영되지 않습니다.
-        </p>
-      )}
-      <div className="mb-5 flex gap-2">
-        <Button
-          aria-pressed={tab === "products"}
-          onClick={() => setFilter("tab", "")}
-        >
-          상품 목록
-        </Button>
-        <Button
-          aria-pressed={tab === "categories"}
-          onClick={() => setFilter("tab", "categories")}
-        >
-          분류
-        </Button>
-      </div>
-      {tab === "categories" ? (
-        <CategoryManagement />
-      ) : (
-        <>
+            상품 목록
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            value="categories"
+            className={`tab ${tab === "categories" ? "active" : ""}`}
+          >
+            분류
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="products">
+          <Field label="판매 가능 여부">
+            <select
+              value={availability}
+              onChange={(e) => setFilter("productAvailability", e.target.value)}
+            >
+              <option value="">전체</option>
+              {saleAvailabilities.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </Field>
+          {MOCK && (
+            <p className="help mb-4">
+              데모 화면입니다. 변경 내용은 실제 상품 정보에 반영되지 않습니다.
+            </p>
+          )}
           <p className="help mb-3">
             상품은 삭제할 수 없어요. 더 이상 팔지 않는 상품은 판매를 중지해
             주세요. 기존 구매 내역과 변경 이력은 보존돼요.
@@ -230,8 +232,11 @@ export function ProductManagement() {
               />
             </>
           )}
-        </>
-      )}
+        </Tabs.Content>
+        <Tabs.Content value="categories">
+          <CategoryManagement />
+        </Tabs.Content>
+      </Tabs.Root>
       <Panel
         open={selected !== null}
         onClose={() => setSelected(null)}

@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import type { components } from "../../shared/api/foundation.generated";
 import type {
   CurrentUser,
@@ -15,7 +16,12 @@ import type {
 } from "../../shared/domain/schema";
 import { permissions, can, admin } from "../../shared/domain/schema";
 import { api, ApiError } from "../../shared/api/client";
-import { BranchForm, EmployeeDetail, MembershipForm } from "./Organization";
+import {
+  BranchForm,
+  EmployeeDetail,
+  EmployeeManagement,
+  MembershipForm,
+} from "./Organization";
 import {
   canManageBranch,
   canManageMembership,
@@ -147,6 +153,56 @@ beforeEach(() => {
   setActor("owner");
 });
 afterEach(cleanup);
+
+it("selects employee tabs by click and arrow keys while preserving search", async () => {
+  const user = userEvent.setup();
+  const router = createMemoryRouter(
+    [{ path: "/", element: <EmployeeManagement /> }],
+    { initialEntries: ["/?employeeSearch=staff"] },
+  );
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === "/permissions"
+      ? definitions
+      : { items: [], meta: { page: 1, pageSize: 20, total: 0 } },
+  );
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  const employeesTab = screen.getByRole("tab", { name: "직원 목록" });
+  const invitationsTab = screen.getByRole("tab", { name: "초대·승인" });
+  const searchParams = () => new URLSearchParams(router.state.location.search);
+
+  expect(employeesTab).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByLabelText("직원 이름·이메일 검색")).toHaveValue("staff");
+  expect(
+    screen.queryByRole("button", { name: "초대 이메일 발송 요청" }),
+  ).toBeNull();
+
+  await user.click(invitationsTab);
+  expect(invitationsTab).toHaveAttribute("aria-selected", "true");
+  expect(searchParams().get("tab")).toBe("invitations");
+  expect(screen.queryByLabelText("직원 이름·이메일 검색")).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "초대 이메일 발송 요청" }),
+  ).toBeVisible();
+
+  await user.keyboard("{ArrowLeft}");
+  await waitFor(() =>
+    expect(employeesTab).toHaveAttribute("aria-selected", "true"),
+  );
+  expect(employeesTab).toHaveFocus();
+  expect(searchParams().has("tab")).toBe(false);
+  expect(screen.getByLabelText("직원 이름·이메일 검색")).toHaveValue("staff");
+
+  await user.keyboard("{ArrowRight}");
+  await waitFor(() =>
+    expect(invitationsTab).toHaveAttribute("aria-selected", "true"),
+  );
+  expect(invitationsTab).toHaveFocus();
+  expect(searchParams().get("tab")).toBe("invitations");
+});
 
 describe("organization policies", () => {
   it("checks all seven days, closure and overnight boundaries", () => {
