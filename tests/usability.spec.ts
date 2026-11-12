@@ -306,7 +306,7 @@ test("menus show their controls without dedicated refresh buttons", async ({
     });
   }
   await page.goto("/app/gangnam/sales");
-  await main.getByRole("button", { name: "일별 마감", exact: true }).click();
+  await main.getByRole("tab", { name: "일별 마감", exact: true }).click();
   await expect(main.getByLabel("마감 목록 시작일")).toBeVisible();
   await expect(refreshButtons).toHaveCount(0);
 

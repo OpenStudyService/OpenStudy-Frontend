@@ -361,17 +361,21 @@ it("keeps list columns and filters with an empty canonical task page", async () 
 
 it("shows a missing sales response as an error instead of zero revenue", async () => {
   renderWorkspace(() => new Response(null, { status: 204 }), "sales");
-  expect(
-    (
-      await screen.findAllByRole("heading", {
-        name: "요청을 완료하지 못했어요",
-      })
-    )[0],
-  ).toBeVisible();
-  expect(screen.queryByText("0원")).not.toBeInTheDocument();
-  await waitFor(() =>
-    expect(screen.getAllByText(/매출 응답을 확인할 수 없어요/)).toHaveLength(7),
-  );
+  for (const [tab, count] of [
+    ["요약", 2],
+    ["판매 분석", 2],
+    ["추세", 2],
+    ["원장", 1],
+  ] as const) {
+    await userEvent.click(await screen.findByRole("tab", { name: tab }));
+    const panel = within(screen.getByRole("tabpanel", { name: tab }));
+    await waitFor(() =>
+      expect(panel.getAllByText(/매출 응답을 확인할 수 없어요/)).toHaveLength(
+        count,
+      ),
+    );
+    expect(panel.queryByText("0원")).not.toBeInTheDocument();
+  }
 });
 
 it("clears every former user's scope cache on account changes", async () => {
