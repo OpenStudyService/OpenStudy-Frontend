@@ -86,14 +86,7 @@ export function Tasks() {
       <Heading
         title="업무 관리"
         description="작은 업무도 놓치지 않도록, 우리 팀의 하루를 함께 채워요."
-      >
-        {creatable && (
-          <Button variant="primary" onClick={() => show("new")}>
-            <Icon name="plus" size={16} />
-            업무 등록
-          </Button>
-        )}
-      </Heading>
+      />
       <div className="mb-4 flex flex-wrap gap-4" aria-label="업무 집계">
         {summary.data &&
         !hasBlockingReadError(summary) &&
@@ -240,6 +233,16 @@ export function Tasks() {
           >
             초기화
           </Button>
+          {creatable && (
+            <Button
+              variant="primary"
+              className="ml-auto"
+              onClick={() => show("new")}
+            >
+              <Icon name="plus" size={16} />
+              업무 등록
+            </Button>
+          )}
         </div>
         {rows.data?.items.length &&
         rows.error &&

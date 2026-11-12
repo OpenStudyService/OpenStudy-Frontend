@@ -101,11 +101,6 @@ export function Records({
         description="지점의 운영 정보를 확인하고 처리하세요."
       >
         <Button onClick={() => setRefresh((v) => v + 1)}>새로고침</Button>
-        {creatable && (
-          <Button variant="primary" onClick={() => change("detail", "new")}>
-            {titles[resource]} 등록
-          </Button>
-        )}
       </Heading>
       {resource !== "notices" && (
         <div className="mb-4" aria-label={`${titles[resource]} 집계`}>
@@ -148,6 +143,15 @@ export function Records({
               <option key={s}>{s}</option>
             ))}
           </select>
+          {creatable && (
+            <Button
+              variant="primary"
+              className="ml-auto"
+              onClick={() => change("detail", "new")}
+            >
+              {titles[resource]} 등록
+            </Button>
+          )}
         </div>
         {rows.isPending ? (
           <State loading />

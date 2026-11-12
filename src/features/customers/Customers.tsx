@@ -75,30 +75,21 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
       return next;
     });
   }
-  const create = creatable && (
-    <Button variant="primary" onClick={() => show("new")}>
-      <Icon name="plus" size={16} />
-      회원 등록
-    </Button>
-  );
-  const actions = (
-    <>
-      {create}
-      {canMerge && (
-        <Button onClick={() => setDuplicatesOpen(true)}>중복 고객 확인</Button>
-      )}
-    </>
+  const duplicatesAction = canMerge && (
+    <Button onClick={() => setDuplicatesOpen(true)}>중복 고객 확인</Button>
   );
   return (
     <section className={embedded ? "" : "page"}>
       {embedded ? (
-        <div className="mb-4 flex justify-end">{actions}</div>
+        duplicatesAction && (
+          <div className="mb-4 flex justify-end">{duplicatesAction}</div>
+        )
       ) : (
         <Heading
           title="회원 관리"
           description="회원 정보와 응대 내용을 확인하고 관리해요."
         >
-          {actions}
+          {duplicatesAction}
         </Heading>
       )}
       {MOCK && (
@@ -175,6 +166,16 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
           >
             초기화
           </Button>
+          {creatable && (
+            <Button
+              variant="primary"
+              className="ml-auto"
+              onClick={() => show("new")}
+            >
+              <Icon name="plus" size={16} />
+              회원 등록
+            </Button>
+          )}
         </div>
         <p className="px-5 pb-3 text-xs text-muted">
           이름은 일부 일치, 회원번호는 정확히 일치하며 연락처는 숫자 4자리
