@@ -4010,7 +4010,7 @@ export interface components {
           token: string;
           /** Format: email */
           email: string;
-          /** @description UTF-8 72바이트 이하. 서버에서 검증. */
+          /** @description 영문(A–Z, a–z), 숫자(0–9), ASCII 특수문자 각각 하나 이상 포함, 영문(A–Z, a–z), 숫자(0–9), ASCII 특수문자 각각 하나 이상 포함, 8자 이상, UTF-8 72바이트 이하. 공백을 제거하지 않는다. */
           password: string;
         }
       | {
@@ -7476,7 +7476,7 @@ export interface components {
     PasswordChange: {
       /** @description UTF-8 72바이트 이하. */
       currentPassword: string;
-      /** @description 8자 이상, UTF-8 72바이트 이하. 공백을 제거하지 않는다. */
+      /** @description 영문(A–Z, a–z), 숫자(0–9), ASCII 특수문자 각각 하나 이상 포함, 8자 이상, UTF-8 72바이트 이하. 공백을 제거하지 않는다. */
       newPassword: string;
     };
     /** @description 재설정 링크·토큰은 담지 않는다. */
@@ -7501,7 +7501,7 @@ export interface components {
     };
     PasswordResetComplete: {
       token: string;
-      /** @description 8자 이상, UTF-8 72바이트 이하. 공백을 제거하지 않는다. */
+      /** @description 영문(A–Z, a–z), 숫자(0–9), ASCII 특수문자 각각 하나 이상 포함, 8자 이상, UTF-8 72바이트 이하. 공백을 제거하지 않는다. */
       newPassword: string;
     };
     LoginUnlockResult: {

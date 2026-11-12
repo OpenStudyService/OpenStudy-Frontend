@@ -6,6 +6,10 @@ import { api, ApiError } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
 import type { CurrentUser } from "../../shared/domain/schema";
 import {
+  newPasswordError,
+  newPasswordRequirements,
+} from "../../shared/domain/password";
+import {
   Button,
   ErrorState,
   FieldError,
@@ -47,6 +51,7 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
     [previewError, setPreviewError] = useState<Error | null>(null),
     [previewAttempt, setPreviewAttempt] = useState(0),
     [error, setError] = useState<Error | null>(null),
+    [passwordError, setPasswordError] = useState<string>(),
     [passwordMismatch, setPasswordMismatch] = useState(false),
     [busy, setBusy] = useState(false),
     [accepted, setAccepted] = useState(false);
@@ -94,6 +99,11 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
     const fields = new FormData(form);
     const password = String(fields.get("password") ?? "");
     setError(null);
+    if (preview.acceptanceMode === "NEW_ACCOUNT") {
+      const validation = newPasswordError(password);
+      setPasswordError(validation);
+      if (validation) return;
+    }
     if (
       preview.acceptanceMode === "NEW_ACCOUNT" &&
       password !== fields.get("passwordConfirmation")
@@ -116,14 +126,6 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
         query.clear();
         query.setQueryData(["session"], current);
       } else {
-        if (
-          preview.acceptanceMode === "NEW_ACCOUNT" &&
-          (password.length < 8 ||
-            new TextEncoder().encode(password).length > 72)
-        )
-          throw new Error(
-            "비밀번호는 8자 이상, UTF-8 72바이트 이하로 입력해 주세요.",
-          );
         const result = await api<components["schemas"]["AcceptanceResult"]>(
           "/invitations/accept",
           {
@@ -242,11 +244,27 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
                       needsLogin ? "current-password" : "new-password"
                     }
                     required
-                    minLength={needsLogin ? 1 : 8}
-                    onChange={() => setPasswordMismatch(false)}
+                    aria-invalid={!!passwordError}
+                    aria-describedby={
+                      needsLogin ? undefined : "invite-password-requirements"
+                    }
+                    onChange={() => {
+                      setPasswordError(undefined);
+                      setPasswordMismatch(false);
+                    }}
                   />
                 </label>
               )}
+              {preview.acceptanceMode === "NEW_ACCOUNT" &&
+                (passwordError ? (
+                  <FieldError id="invite-password-requirements">
+                    {passwordError}
+                  </FieldError>
+                ) : (
+                  <p className="help" id="invite-password-requirements">
+                    {newPasswordRequirements}
+                  </p>
+                ))}
               {preview.acceptanceMode === "NEW_ACCOUNT" && (
                 <div>
                   <label className="field">
