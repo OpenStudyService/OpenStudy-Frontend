@@ -375,6 +375,17 @@ export function Layout() {
           <div className="flex items-center gap-3">
             <Badge>{MOCK ? "데모 데이터" : "실제 API 연결"}</Badge>
             {!MOCK && lookups.data?.preview && <Badge>로컬 샘플</Badge>}
+            <NavLink
+              to={`/app/${scope}/settings`}
+              onClick={(event) => menuClick(event, "settings")}
+              className={({ isActive }) =>
+                `btn shrink-0 ${isActive ? "primary" : ""}`
+              }
+              aria-label="개인 설정"
+            >
+              <Icon name="settings" size={16} />
+              설정
+            </NavLink>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
                 <button

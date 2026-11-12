@@ -27,19 +27,22 @@ for (const [account, canManage, owner] of [
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/app/gangnam/home");
-      await expect(page.locator('a[href$="/settings"]')).toHaveCount(0);
+      const settingsLink = page.getByRole("link", { name: "개인 설정" });
+      await expect(settingsLink).toBeVisible();
+      await expect(settingsLink).toHaveText("설정");
       if (width === 390) {
         await page.getByRole("button", { name: "메뉴 열기" }).click();
-        await expect(page.locator('a[href$="/settings"]')).toHaveCount(0);
+        await expect(
+          page.getByRole("dialog").locator('a[href$="/settings"]'),
+        ).toHaveCount(0);
         await page.keyboard.press("Escape");
       }
-      await page.getByRole("button", { name: "사용자 메뉴" }).click();
-      await expect(page.locator('a[href$="/settings"]')).toHaveCount(1);
-      await page.getByRole("menuitem", { name: "개인 설정" }).click();
+      await settingsLink.click();
       await expect(page).toHaveURL(/\/app\/gangnam\/settings$/);
       await expect(
         page.getByRole("heading", { name: "개인 설정" }),
       ).toBeVisible();
+      await expect(settingsLink).toHaveAttribute("aria-current", "page");
       const personalSections = page.locator("main h2");
       await expect(personalSections).toHaveText([
         "화면 테마",
@@ -47,6 +50,9 @@ for (const [account, canManage, owner] of [
         "비밀번호 변경",
       ]);
       await page.getByRole("button", { name: "사용자 메뉴" }).click();
+      await expect(
+        page.getByRole("menuitem", { name: "개인 설정" }),
+      ).toBeVisible();
       await page.getByRole("menuitem", { name: "데모·검증 도구" }).click();
       await expect(page).toHaveURL(/\/app\/gangnam\/demo-tools$/);
       await expect(
