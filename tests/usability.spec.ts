@@ -267,7 +267,7 @@ test("keyboard opens a form, traps focus and restores it; all themes retain visi
   await expect(trigger).toBeFocused();
 });
 
-test("workspace reads follow menu and refresh actions", async ({ page }) => {
+test("workspace reads follow menu actions without a refresh control", async ({ page }) => {
   const reads: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -275,18 +275,21 @@ test("workspace reads follow menu and refresh actions", async ({ page }) => {
       reads.push(url.pathname + url.search);
   });
   await login(page);
+  const nextTaskResponse = () =>
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/tasks" && response.ok(),
+    );
+  const initialResponse = nextTaskResponse();
   await page.goto("/app/gangnam/tasks?q=확인&page=2");
+  await (await initialResponse).finished();
   const menu = page.getByRole("link", { name: "업무 관리", exact: true });
-  const refresh = page.getByRole("button", {
-    name: "화면 새로고침",
-    exact: true,
-  });
+  await expect(menu).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "화면 새로고침", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/^마지막 조회/)).toHaveCount(0);
   const taskReads = () => reads.filter((url) => url.startsWith("/api/tasks?"));
-  await expect(page.getByText(/^마지막 조회/).locator("time")).toHaveAttribute(
-    "datetime",
-    /T/,
-  );
-  await expect(refresh).toBeEnabled();
   const initialReads = taskReads().length;
   expect(initialReads).toBeGreaterThan(0);
   const idleReads = reads.length;
@@ -301,21 +304,10 @@ test("workspace reads follow menu and refresh actions", async ({ page }) => {
   await page.clock.fastForward(60_000);
   expect(reads).toHaveLength(idleReads);
 
-  const nextTaskResponse = () =>
-    page.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === "/api/tasks" && response.ok(),
-    );
   const menuResponse = nextTaskResponse();
   await menu.click();
   await (await menuResponse).finished();
   expect(taskReads()).toHaveLength(initialReads + 1);
-  await expect(refresh).toBeEnabled();
-
-  const refreshResponse = nextTaskResponse();
-  await refresh.click();
-  await (await refreshResponse).finished();
-  expect(taskReads()).toHaveLength(initialReads + 2);
   expect(new Set(taskReads()).size).toBe(1);
   await expect(page).toHaveURL(/page=2/);
 
@@ -324,7 +316,7 @@ test("workspace reads follow menu and refresh actions", async ({ page }) => {
   const entryResponse = nextTaskResponse();
   await menu.click();
   await (await entryResponse).finished();
-  expect(taskReads().length).toBeGreaterThan(initialReads + 2);
+  expect(taskReads().length).toBeGreaterThan(initialReads + 1);
   expect(
     reads.some((url) =>
       /\/workspace\/events|\/requests\/[^/]+\/events/.test(url),
