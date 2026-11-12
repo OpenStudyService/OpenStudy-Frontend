@@ -56,10 +56,8 @@ test("F03 new acceptance and approved limited session requires login", async ({
   await expect(
     page.getByRole("heading", { name: "최종 승인을 기다리고 있어요" }),
   ).toBeVisible();
-  await expect(page.getByText(/^마지막 조회/).locator("time")).toHaveAttribute(
-    "datetime",
-    /T/,
-  );
+  await expect(page.getByText(/^마지막 조회/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "승인 상태 새로고침" })).toHaveCount(0);
   // The fixture changes the manager state through the contract command, without promoting this session.
   await page.evaluate(async () => {
     const { token } = await fetch("/api/auth/csrf").then((r) => r.json());
@@ -88,7 +86,7 @@ test("F03 new acceptance and approved limited session requires login", async ({
     });
     await demo(id);
   });
-  await page.getByRole("button", { name: "승인 상태 새로고침" }).click();
+  await page.reload();
   await expect(
     page.getByRole("heading", { name: "승인이 완료됐어요" }),
   ).toBeVisible();

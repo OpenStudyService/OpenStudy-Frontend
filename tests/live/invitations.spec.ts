@@ -510,7 +510,7 @@ test("a rejected applicant sees the reason in a separate browser", async ({
     await expect(
       manager.page.getByText(/거절 · 발송 완료 · 버전/),
     ).toBeVisible();
-    await page.getByRole("button", { name: "승인 상태 새로고침" }).click();
+    await page.reload();
     await expect(
       page.getByText("반려 사유: 근무 일정 재확인 필요"),
     ).toBeVisible();
