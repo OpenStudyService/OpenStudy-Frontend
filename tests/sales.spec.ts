@@ -79,8 +79,9 @@ test("sales tabs retain filters and fit desktop, tablet and mobile widths", asyn
     );
     await advanced.click();
     const advancedPanel = page.getByRole("dialog", { name: "매출 고급 필터" });
-    await expect(advancedPanel.getByLabel("결제 수단")).toBeVisible();
+    await expect(advancedPanel).toBeVisible();
     for (const [field, choice] of [
+      ["결제 수단", "카드"],
       ["상품 유형", "시간권"],
       ["환불 처리 지점", "강남점"],
     ]) {

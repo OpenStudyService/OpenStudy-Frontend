@@ -287,7 +287,24 @@ it("opens usage by URL and queries only its applicable filters", async () => {
   expect(
     within(advanced).getByRole("button", { name: "상품 유형, 2개 선택" }),
   ).toBeVisible();
-  expect(within(advanced).getByLabelText("결제 수단")).toHaveValue(["카드"]);
+  await userEvent.click(
+    within(advanced).getByRole("button", { name: "결제 수단, 카드" }),
+  );
+  const methods = within(screen.getByRole("dialog", { name: "결제 수단" }));
+  expect(methods.getByRole("checkbox", { name: "카드" })).toBeChecked();
+  await userEvent.click(methods.getByRole("checkbox", { name: "현금" }));
+  expect(methods.getByRole("checkbox", { name: "카드" })).toBeChecked();
+  expect(methods.getByRole("checkbox", { name: "현금" })).toBeChecked();
+  await waitFor(() =>
+    expect(
+      requests.some(
+        (url) =>
+          url.pathname === "/api/sales/ledger" &&
+          url.searchParams.getAll("methods").join(",") === "카드,현금",
+      ),
+    ).toBe(true),
+  );
+  await userEvent.keyboard("{Escape}");
 
   await userEvent.click(
     within(advanced).getByRole("button", { name: "환불 처리 지점, 전체" }),

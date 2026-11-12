@@ -29,26 +29,15 @@ export function SalesAdvancedFilters({
           sideOffset={6}
           className="z-50 grid w-[32rem] max-w-[var(--radix-popover-content-available-width)] max-h-[var(--radix-popover-content-available-height)] gap-4 overflow-auto rounded-lg border border-line bg-surface p-4 shadow-xl sm:grid-cols-2"
         >
-          <label className="field">
-            결제 수단
-            <select
-              multiple
-              value={values.methods}
-              onChange={(e) =>
-                change(
-                  "methods",
-                  Array.from(
-                    e.target.selectedOptions,
-                    (option) => option.value,
-                  ),
-                )
-              }
-            >
-              {["현금", "카드", "계좌이체", "기타"].map((method) => (
-                <option key={method}>{method}</option>
-              ))}
-            </select>
-          </label>
+          <FilterDropdown
+            label="결제 수단"
+            options={["현금", "카드", "계좌이체", "기타"].map((id) => ({
+              id,
+              name: id,
+            }))}
+            values={values.methods}
+            change={(methods) => change("methods", methods)}
+          />
           <SalesProductKindFilter
             values={values.productKinds}
             change={(kinds) => change("productKinds", kinds)}
