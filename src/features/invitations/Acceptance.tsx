@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshControl } from "../../shared/ui/RefreshControl";
 import { useSession } from "../../app/context";
-import { api } from "../../shared/api/client";
+import { api, ApiError } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
 import type { CurrentUser } from "../../shared/domain/schema";
 import {
@@ -45,6 +45,8 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
     () => new URLSearchParams(fragment.slice(1)).get("token") || "",
   );
   const [preview, setPreview] = useState<Preview | null>(null),
+    [previewError, setPreviewError] = useState<Error | null>(null),
+    [previewAttempt, setPreviewAttempt] = useState(0),
     [error, setError] = useState<Error | null>(null),
     [busy, setBusy] = useState(false),
     [accepted, setAccepted] = useState(false);
@@ -58,19 +60,33 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
       "",
       cleanUrl.pathname + cleanUrl.search,
     );
-    const controller = new AbortController();
+  }, [token]);
+  useEffect(() => {
     if (!token) return;
+    const controller = new AbortController();
     api<Preview>("/invitations/preview", {
       method: "POST",
       body: { token },
       signal: controller.signal,
+      scope: "public",
     })
-      .then(setPreview)
+      .then((value) => {
+        if (!controller.signal.aborted) setPreview(value);
+      })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(e as Error);
+        if (!controller.signal.aborted) {
+          setPreviewError(
+            e instanceof ApiError ? e : new Error("초대 링크를 확인하지 못했어요."),
+          );
+        }
       });
     return () => controller.abort();
-  }, [token]);
+  }, [token, previewAttempt]);
+  const canRetryPreview =
+    previewError instanceof ApiError &&
+    (previewError.detail.code === "NETWORK_ERROR" ||
+      previewError.detail.code === "CSRF_INVALID" ||
+      previewError.status >= 500);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget,
@@ -161,8 +177,22 @@ function InvitationAcceptance({ fragment }: { fragment: string }) {
           </p>
         ) : !token ? (
           <FieldError>유효한 이메일 초대 링크를 다시 열어 주세요.</FieldError>
-        ) : !preview && !error ? (
+        ) : previewError ? (
+          <ErrorState
+            error={previewError}
+            retry={
+              canRetryPreview
+                ? () => {
+                    setPreviewError(null);
+                    setPreviewAttempt((attempt) => attempt + 1);
+                  }
+                : undefined
+            }
+          />
+        ) : !preview || session.isFetching ? (
           <State loading />
+        ) : session.error ? (
+          <ErrorState error={session.error} retry={() => void session.refetch()} />
         ) : (
           preview &&
           (needsLogout ? (
