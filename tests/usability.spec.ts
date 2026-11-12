@@ -25,6 +25,51 @@ async function login(page: Page) {
   await page.getByRole("button", { name: "사장님으로 체험" }).click();
   await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
 }
+
+test("registration actions sit at the right edge of their filters", async ({
+  page,
+}) => {
+  const screens = [
+    ["members?tab=members&q=010", "회원 등록", "q", "010"],
+    ["reservations?status=확정", "예약 등록", "status", "확정"],
+    ["spaces?tab=rooms&status=사용+가능", "스터디룸 등록", "status", "사용 가능"],
+    ["facilities?q=점검", "시설 점검 등록", "q", "점검"],
+    ["inquiries?q=문의", "고객 문의 등록", "q", "문의"],
+    ["notices?q=공지", "공지 등록", "q", "공지"],
+  ];
+  await login(page);
+  for (const [route, label, filter, value] of screens) {
+    await test.step(label, async () => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`/app/gangnam/${route}`);
+      const action = page.getByRole("button", { name: label, exact: true });
+      const filters = page.locator(".filters").filter({ has: action });
+      await expect(action).toHaveCount(1);
+      await expect(filters.locator(":scope > :last-child")).toHaveText(label);
+
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expect(action).toBeVisible();
+        expect(
+          await filters.evaluate((bar) => {
+            const padding = Number.parseFloat(getComputedStyle(bar).paddingRight);
+            const right = bar.getBoundingClientRect().right - padding;
+            const button = bar.lastElementChild!.getBoundingClientRect();
+            return Math.abs(button.right - right) <= 1 && button.right <= innerWidth;
+          }),
+        ).toBe(true);
+      }
+
+      await action.click();
+      const panel = page.getByRole("dialog", { name: label });
+      await expect(panel).toBeVisible();
+      await panel.getByRole("button", { name: "닫기" }).click();
+      await expect(panel).not.toBeVisible();
+      expect(new URL(page.url()).searchParams.get(filter)).toBe(value);
+    });
+  }
+});
+
 async function accessible(page: Page) {
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])

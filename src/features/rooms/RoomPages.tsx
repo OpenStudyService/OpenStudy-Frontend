@@ -63,11 +63,6 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
         title="스터디룸 관리"
         description="룸의 정원·시간당 요금과 운영 상태를 관리하세요."
       >
-        {writable && (
-          <Button variant="primary" onClick={() => change("detail", "new")}>
-            스터디룸 등록
-          </Button>
-        )}
         <Button onClick={() => void data.refetch()}>새로고침</Button>
       </Heading>
       <div className="card overflow-hidden">
@@ -81,6 +76,15 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
             <option>사용 가능</option>
             <option>운영 중단</option>
           </select>
+          {writable && (
+            <Button
+              variant="primary"
+              className="ml-auto"
+              onClick={() => change("detail", "new")}
+            >
+              스터디룸 등록
+            </Button>
+          )}
         </div>
         {data.isPending ? (
           <State loading />
@@ -247,11 +251,6 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
         title="스터디룸 예약"
         description="한국 시간 기준의 예약 일정과 실제 이용 상태를 확인하세요."
       >
-        {writable && (
-          <Button variant="primary" onClick={() => show("new")}>
-            예약 등록
-          </Button>
-        )}
         <Button
           onClick={() => {
             void list.refetch();
@@ -333,6 +332,15 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
           >
             목록 보기
           </Button>
+          {writable && (
+            <Button
+              variant="primary"
+              className="ml-auto"
+              onClick={() => show("new")}
+            >
+              예약 등록
+            </Button>
+          )}
         </div>
         {rooms.data && rooms.data.meta.total > 100 && (
           <div className="flex gap-2 px-4">
