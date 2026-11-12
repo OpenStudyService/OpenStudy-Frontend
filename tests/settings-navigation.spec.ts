@@ -122,6 +122,28 @@ for (const [account, canManage, owner] of [
       expect(url.pathname).toBe("/app/gangnam/audit");
       expect(url.searchParams.get("requestId")).toBe("mock-audit-request");
       expect(url.searchParams.has("from")).toBe(true);
+      const filters = page.getByRole("form", { name: "감사 로그 검색 조건" });
+      await filters
+        .getByRole("button", { name: "초기화", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/app\/gangnam\/audit$/);
+      const table = page.getByRole("table", { name: "변경 이력 검색 결과" });
+      for (const width of [1440, 1024, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expect(table).toBeVisible();
+        await expect(
+          filters.getByRole("button", { name: "검색", exact: true }),
+        ).toBeVisible();
+        const viewport = await page.evaluate(() => ({
+          width: document.documentElement.clientWidth,
+          contentWidth: document.documentElement.scrollWidth,
+        }));
+        expect(viewport.contentWidth).toBeLessThanOrEqual(viewport.width);
+      }
+      await table
+        .getByRole("button", { name: "감사 기록 1 상세: PROFILE_UPDATED" })
+        .click();
+      await expect(detail).toBeVisible();
     } else {
       const auditRequests: string[] = [];
       page.on("request", (request) => {

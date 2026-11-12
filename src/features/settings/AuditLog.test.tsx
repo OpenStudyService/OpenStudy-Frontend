@@ -227,6 +227,31 @@ it("updates URL search conditions and uses the response meta for pagination", as
   );
 });
 
+it("opens details from the action cell and resets only audit search parameters", async () => {
+  const { router } = show(
+    "/app/all/audit?action=UPDATE_PROFILE&page=2&pageSize=2&scope=all",
+  );
+  const table = screen.getByRole("table", { name: "변경 이력 검색 결과" });
+  fireEvent.click(
+    await within(table).findByRole("button", {
+      name: "감사 기록 5 상세: UPDATE_PROFILE",
+    }),
+  );
+  expect(
+    await screen.findByRole("dialog", { name: "변경 이력 상세" }),
+  ).toBeVisible();
+  await act(() =>
+    router.navigate(
+      "/app/all/audit?action=UPDATE_PROFILE&page=2&pageSize=2&scope=all",
+    ),
+  );
+  expect(screen.getByLabelText("행위")).toHaveValue("UPDATE_PROFILE");
+  fireEvent.click(screen.getByRole("button", { name: "초기화" }));
+  await waitFor(() => expect(router.state.location.search).toBe("?scope=all"));
+  expect(screen.getByLabelText("행위")).toHaveValue("");
+  expect(screen.getByLabelText("페이지당 항목 수")).toHaveValue(20);
+});
+
 it("links details and searches the same request using the displayed period", async () => {
   const { router } = show("/app/all/audit?action=UPDATE_PROFILE&detail=5");
   const dialog = await screen.findByRole("dialog", { name: "변경 이력 상세" });
