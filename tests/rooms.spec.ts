@@ -62,7 +62,7 @@ test("Mock branch closure appears on home and disables reservation time selectio
   page,
 }) => {
   await login(page);
-  await page.goto("/app/gangnam/settings");
+  await page.goto("/app/gangnam/branches");
   await page.getByRole("button", { name: "휴무일 관리: 강남점" }).click();
   const panel = page.getByRole("dialog");
   const date = await panel.getByLabel("휴무 날짜 (한국 시간)").inputValue();

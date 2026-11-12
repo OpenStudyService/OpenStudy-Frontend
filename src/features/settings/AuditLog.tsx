@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { api, ApiError } from "../../shared/api/client";
 import { formatBusinessDate, formatDateTime } from "../../shared/domain/format";
-import { Button, FieldError, State } from "../../shared/ui/primitives";
+import { Button, Heading, FieldError, State } from "../../shared/ui/primitives";
 import { Field, Pager } from "../organization/shared";
 import {
   auditPeriodError,
@@ -25,12 +25,22 @@ export function AuditLog() {
   const { session } = useApp();
   if (!session.user.owner || session.user.status !== "활성")
     return (
-      <State
-        title="변경 이력을 볼 권한이 없어요"
-        message="OWNER만 변경 이력을 조회할 수 있습니다."
-      />
+      <div className="page">
+        <State
+          title="변경 이력을 볼 권한이 없어요"
+          message="OWNER만 변경 이력을 조회할 수 있습니다."
+        />
+      </div>
     );
-  return <AuditSearch key={session.user.id} ownerId={session.user.id} />;
+  return (
+    <div className="page">
+      <Heading
+        title="변경 이력"
+        description="작업자와 변경 전후 내용을 확인해요."
+      />
+      <AuditSearch key={session.user.id} ownerId={session.user.id} />
+    </div>
+  );
 }
 
 function AuditSearch({ ownerId }: { ownerId: string }) {
@@ -58,7 +68,6 @@ function AuditSearch({ ownerId }: { ownerId: string }) {
   }
   function sameRequest(event: AuditDetail) {
     const next = new URLSearchParams({
-      tab: "audit",
       requestId: event.requestId!,
     });
     const period = data.data?.period;

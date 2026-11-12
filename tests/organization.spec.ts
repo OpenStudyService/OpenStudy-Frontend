@@ -11,7 +11,7 @@ test("owner creates a branch with structured overnight hours", async ({
   page,
 }) => {
   await login(page);
-  await page.goto("/app/all/settings");
+  await page.goto("/app/all/branches");
   await page.getByRole("button", { name: "지점 등록", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog

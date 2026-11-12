@@ -43,7 +43,7 @@ test("the rail and home open AI chat, legacy links replace in scope, and channel
 
   await page.goto("/app/gangnam/settings?tab=channels");
   await expect(
-    page.getByRole("heading", { name: "공간·운영 환경" }),
+    page.getByRole("heading", { name: "개인 설정" }),
   ).toBeVisible();
   await expect(page.getByRole("tab", { name: "채널 관리" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "채널 등록" })).toHaveCount(0);

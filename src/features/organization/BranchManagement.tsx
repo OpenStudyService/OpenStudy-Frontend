@@ -53,7 +53,7 @@ function BranchManagementContent() {
   return (
     <section className="card mb-5 p-5">
       <Heading
-        title="지점 설정"
+        title="지점 관리"
         description="7요일 운영시간과 지점 정보를 관리해요."
       >
         {session.user.owner && (

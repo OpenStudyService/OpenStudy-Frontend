@@ -28,14 +28,7 @@ vi.mock("../../shared/api/client", async (original) => ({
   MOCK: false,
 }));
 vi.mock("./ProfileForm", () => ({ ProfileForm: () => <div>프로필 폼</div> }));
-vi.mock("../organization/Organization", () => ({
-  BranchManagement: () => <div>지점 관리</div>,
-}));
 vi.mock("../auth/Login", () => ({ ThemePicker: () => <div>테마 선택</div> }));
-vi.mock("../rooms/RoomPages", () => ({
-  Rooms: () => <div>스터디룸 목록</div>,
-  Reservations: () => <div />,
-}));
 
 const item: AuditEvent = {
   id: "5",
@@ -94,14 +87,25 @@ afterEach(() => {
   vi.mocked(api).mockReset();
 });
 
-function show(path = "/settings?tab=audit", settings = false) {
+function show(path = "/app/all/audit") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   clients.push(client);
   const router = createMemoryRouter(
-    [{ path: "/settings", element: settings ? <Settings /> : <AuditLog /> }],
-    { initialEntries: [path] },
+    [
+      {
+        path: "/app/:scope",
+        children: [
+          { path: "home", element: <div>홈</div> },
+          { path: "settings", element: <Settings /> },
+          { path: "audit", element: <AuditLog /> },
+          { path: "spaces", element: <div>공간 관리</div> },
+          { path: "branches", element: <div>지점 관리</div> },
+        ],
+      },
+    ],
+    { initialEntries: ["/app/1/home", path] },
   );
   render(
     <QueryClientProvider client={client}>
@@ -112,9 +116,8 @@ function show(path = "/settings?tab=audit", settings = false) {
 }
 
 it.each(["manager", "staff"])(
-  "hides the menu and denies direct links for %s",
+  "denies old and new audit links for %s",
   async (role) => {
-    context.scope = "1";
     context.session.user.owner = false;
     context.session.user.memberships = [
       {
@@ -123,36 +126,62 @@ it.each(["manager", "staff"])(
         permissions: [],
       },
     ];
-    const { router } = show("/settings", true);
-    expect(screen.queryByRole("tab", { name: "변경 이력" })).toBeNull();
-    expect(api).not.toHaveBeenCalled();
-    await act(() => router.navigate("/settings?tab=audit&detail=5"));
+    const { router } = show("/app/1/settings?tab=audit&detail=5");
+    expect(screen.getByText("변경 이력을 볼 권한이 없어요")).toBeVisible();
+    expect(router.state.location.pathname).toBe("/app/1/settings");
+    await act(() => router.navigate("/app/1/audit?detail=5"));
     expect(screen.getByText("변경 이력을 볼 권한이 없어요")).toBeVisible();
     expect(api).not.toHaveBeenCalled();
   },
 );
 
-it("uses the custom audit screen in the existing settings tab", async () => {
-  show("/settings?tab=audit", true);
-  expect(screen.getByRole("tab", { name: "변경 이력" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  expect(
-    await screen.findByRole("table", { name: "변경 이력 검색 결과" }),
-  ).toBeVisible();
+it("keeps personal controls at the plain settings address", () => {
+  show("/app/1/settings");
+  expect(screen.getByRole("heading", { name: "개인 설정" })).toBeVisible();
   expect(screen.getByText("프로필 폼")).toBeVisible();
   expect(screen.getByRole("heading", { name: "비밀번호 변경" })).toBeVisible();
-  expect(
-    vi
-      .mocked(api)
-      .mock.calls.every(([path]) => path.startsWith("/audit-events")),
-  ).toBe(true);
+  expect(screen.queryByRole("heading", { name: "알림 범위" })).toBeNull();
+  expect(api).not.toHaveBeenCalled();
 });
+
+it.each([
+  [
+    "tab=audit&requestId=req-fixture&detail=5&page=2&status=unused&branchSearch=ignored",
+    "/app/1/audit",
+    { requestId: "req-fixture", page: "2", detail: "5" },
+  ],
+  [
+    "tab=rooms&status=ready&page=3&detail=room-1&branchSearch=ignored&requestId=ignored",
+    "/app/1/spaces",
+    { tab: "rooms", status: "ready", page: "3", detail: "room-1" },
+  ],
+  [
+    "branchSearch=강남&branchPage=2&status=unused&detail=ignored",
+    "/app/1/branches",
+    { branchSearch: "강남", branchPage: "2" },
+  ],
+])(
+  "replaces a legacy settings entry and keeps destination parameters (%s)",
+  async (query, pathname, expected) => {
+    const { router } = show("/app/1/settings?" + query);
+    await waitFor(() => expect(router.state.location.pathname).toBe(pathname));
+    expect(
+      Object.fromEntries(new URLSearchParams(router.state.location.search)),
+    ).toEqual(expected);
+    expect(router.state.historyAction).toBe("REPLACE");
+    if (pathname === "/app/1/audit") {
+      expect(
+        await screen.findByRole("dialog", { name: "변경 이력 상세" }),
+      ).toBeVisible();
+    }
+    await act(() => router.navigate(-1));
+    expect(router.state.location.pathname).toBe("/app/1/home");
+  },
+);
 
 it("restores filters from the address, excludes UI queries, and displays the response period", async () => {
   show(
-    "/settings?tab=audit&scope=all&sort=name&q=ignored&from=2026-11-07&action=UPDATE_PROFILE&entityType=employee&entityId=20&actorEmployeeId=10&branchId=1&result=SUCCESS&requestId=req-fixture&pageSize=2",
+    "/app/all/audit?scope=all&sort=name&q=ignored&from=2026-11-07&action=UPDATE_PROFILE&entityType=employee&entityId=20&actorEmployeeId=10&branchId=1&result=SUCCESS&requestId=req-fixture&pageSize=2",
   );
   expect(
     await screen.findByText(/적용 기간.*2026-11-05 ~ 2026-11-11/),
@@ -179,7 +208,7 @@ it("updates URL search conditions and uses the response meta for pagination", as
       meta: { ...page.meta, page: Number(query.get("page") || 1) },
     };
   });
-  const { router } = show("/settings?tab=audit&pageSize=2");
+  const { router } = show("/app/all/audit?pageSize=2");
   await screen.findByText("변경 내용 있음");
   fireEvent.change(screen.getByLabelText("행위"), {
     target: { value: "LOGIN_FAILED" },
@@ -199,7 +228,7 @@ it("updates URL search conditions and uses the response meta for pagination", as
 });
 
 it("links details and searches the same request using the displayed period", async () => {
-  const { router } = show("/settings?tab=audit&action=UPDATE_PROFILE&detail=5");
+  const { router } = show("/app/all/audit?action=UPDATE_PROFILE&detail=5");
   const dialog = await screen.findByRole("dialog", { name: "변경 이력 상세" });
   expect(await within(dialog).findByText("profile › name")).toBeVisible();
   expect(within(dialog).getByText("추가")).toBeVisible();
@@ -217,6 +246,8 @@ it("links details and searches the same request using the displayed period", asy
   expect(query.get("to")).toBe(page.period.to);
   expect(query.has("action")).toBe(false);
   expect(query.has("detail")).toBe(false);
+  expect(query.has("tab")).toBe(false);
+  expect(router.state.location.pathname).toBe("/app/all/audit");
 });
 
 it.each([
@@ -249,7 +280,7 @@ it("validates long periods and dependent entity filters before sending a search"
   fireEvent.click(screen.getByRole("button", { name: "검색" }));
   expect(screen.getByRole("alert")).toHaveTextContent("92일");
   expect(api).not.toHaveBeenCalled();
-  expect(router.state.location.search).toBe("?tab=audit");
+  expect(router.state.location.search).toBe("");
   fireEvent.change(screen.getByLabelText("시작일"), { target: { value: "" } });
   fireEvent.change(screen.getByLabelText("종료일"), { target: { value: "" } });
   fireEvent.change(screen.getByLabelText("대상 ID"), {
@@ -291,6 +322,6 @@ it("reports a missing record in a directly linked detail", async () => {
       throw new ApiError(404, { code: "NOT_FOUND", message: "없음" });
     return page;
   });
-  show("/settings?tab=audit&detail=999");
+  show("/app/all/audit?detail=999");
   expect(await screen.findByText("감사 기록을 찾을 수 없어요")).toBeVisible();
 });

@@ -53,6 +53,12 @@ export const navigation = [
   },
   { path: "spaces", title: "공간 관리", icon: "seats", group: "매장 운영" },
   {
+    path: "branches",
+    title: "지점 관리",
+    icon: "settings",
+    group: "매장 운영",
+  },
+  {
     path: "facilities",
     title: "시설 관리",
     icon: "facility",
@@ -81,7 +87,13 @@ export const navigation = [
     group: "업무 분석",
     permission: "sales:read" as const,
   },
-  { path: "settings", title: "설정", icon: "settings", group: "환경설정" },
+  {
+    path: "audit",
+    title: "변경 이력",
+    icon: "clock",
+    group: "운영 관리",
+    owner: true,
+  },
 ];
 export function Layout() {
   const confirmLeave = useConfirmDiscard();
@@ -205,6 +217,7 @@ export function Layout() {
   };
   const menu = navigation.filter(
     (n) =>
+      (!n.owner || activeUser.owner) &&
       (!n.admin || admin(activeUser, scope)) &&
       (!n.permission || can(activeUser, scope, n.permission)),
   );
@@ -217,7 +230,11 @@ export function Layout() {
     title =
       section === "chat"
         ? "AI 채팅"
-        : navigation.find((n) => n.path === section)?.title || "OpenStudy";
+        : section === "settings"
+          ? "개인 설정"
+          : MOCK && section === "demo-tools"
+            ? "데모·검증 도구"
+            : navigation.find((n) => n.path === section)?.title || "OpenStudy";
   async function logout() {
     if (!confirmLeave()) return;
     await api("/auth/logout", { method: "POST", body: {} });
@@ -333,14 +350,6 @@ export function Layout() {
           </NavLink>
         ))}
         <div className="flex-1" />
-        <NavLink
-          className="rail-link"
-          to={`/app/${scope}/settings`}
-          onClick={(event) => menuClick(event, "settings")}
-        >
-          <Icon name="settings" />
-          설정
-        </NavLink>
         <Avatar
           name={activeUser.nickname || activeUser.name}
           src={activeUser.avatar}
@@ -398,9 +407,19 @@ export function Layout() {
                       to={`/app/${scope}/settings`}
                       onClick={(event) => menuClick(event, "settings")}
                     >
-                      내 프로필·테마
+                      개인 설정
                     </Link>
                   </DropdownMenu.Item>
+                  {MOCK && (
+                    <DropdownMenu.Item className="nav-link" asChild>
+                      <Link
+                        to={`/app/${scope}/demo-tools`}
+                        onClick={(event) => menuClick(event, "demo-tools")}
+                      >
+                        데모·검증 도구
+                      </Link>
+                    </DropdownMenu.Item>
+                  )}
                   <DropdownMenu.Item
                     className="nav-link"
                     onSelect={() => void logout()}
@@ -456,21 +475,19 @@ export function Layout() {
         </main>
       </div>
       <nav className="bottom-nav" aria-label="모바일 빠른 탐색">
-        {[...quickLinks, ["settings", "settings", "설정"]].map(
-          ([p, icon, label]) => (
-            <NavLink
-              key={p}
-              to={`/app/${scope}/${p}`}
-              onClick={(event) => menuClick(event, p)}
-              className={({ isActive }) =>
-                `rail-link ${isActive ? "active" : ""}`
-              }
-            >
-              <Icon name={icon} />
-              {label}
-            </NavLink>
-          ),
-        )}
+        {quickLinks.map(([p, icon, label]) => (
+          <NavLink
+            key={p}
+            to={`/app/${scope}/${p}`}
+            onClick={(event) => menuClick(event, p)}
+            className={({ isActive }) =>
+              `rail-link ${isActive ? "active" : ""}`
+            }
+          >
+            <Icon name={icon} />
+            {label}
+          </NavLink>
+        ))}
       </nav>
       <Panel
         open={navOpen}
