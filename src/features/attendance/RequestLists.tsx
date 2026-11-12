@@ -57,9 +57,6 @@ export function RequestList<T extends Row>({
 
   return (
     <section className="grid gap-3 p-4" aria-label={title}>
-      <Button onClick={() => void rows.refetch()} disabled={rows.isFetching}>
-        목록 새로고침
-      </Button>
       <DataNotice
         label={title}
         loading={rows.isPending}

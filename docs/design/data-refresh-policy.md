@@ -2,7 +2,7 @@
 
 - 결정일: 2026-11-06
 - 상태: **사용자 확정**
-- 정본: [Backend ADR-COM-001](https://github.com/OpenStudyService/OpenStudy-Backend/blob/docs/explicit-refresh-policy/docs/db/ADR-COM-001.md), SRS v1.15 POL-52·POL-53
+- 정본: [Backend ADR-COM-001](https://github.com/OpenStudyService/OpenStudy-Backend/blob/main/docs/db/ADR-COM-001.md), SRS v1.15 POL-52·POL-53
 
 ## 화면 동작
 
@@ -21,7 +21,7 @@
 
 ## 구현
 
-공통 SSE 연결, 창 포커스·재연결 재조회, 근태·승인 대기·팀 채팅의 상태 주기 조회를 제거했다. 공통 업무 화면의 재조회는 현재 메뉴 재클릭으로 제공한다. 조회에 실패해 이전 결과를 표시할 때는 안내를 표시한다. AI는 기존 JSON 요청·응답과 대화 기록을 사용한다.
+공통 SSE 연결, 창 포커스·재연결 재조회, 근태·승인 대기·팀 채팅의 상태 주기 조회를 제거했다. 업무 화면은 현재 메뉴 재클릭과 브라우저 새로고침으로 다시 조회할 수 있다. 공간 관리·스터디룸 예약·시설 관리·고객 문의·공지사항·매출 조회·근무 관리·직원 초대·변경 이력의 메뉴별 새로고침 버튼과 좌석 이동 패널의 일반 새로고침 버튼을 제거했다. 조회에 실패해 이전 결과를 표시할 때는 안내를 표시한다. 오류 복구와 AI 결과처럼 특정 작업에 필요한 다시 조회는 유지한다.
 
 메뉴 재클릭은 같은 URL로 navigate하는 것만으로 재조회된다고 가정하지 않는다. 캐시 staleTime과 데이터 갱신 시점을 구분한다. 정기 `/me` 조회도 넣지 않는다. 로컬 시계·입력 debounce·사용자 요청에 따른 페이지 조회는 화면 상태 polling이 아니다.
 

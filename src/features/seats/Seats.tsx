@@ -185,9 +185,6 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
                   ))}
                 </select>
               </Field>
-              <Button onClick={() => void board.refetch()}>
-                현황 새로고침
-              </Button>
               <Button
                 aria-expanded={showTrend}
                 onClick={() => update("seatTrend", showTrend ? "" : "true")}
@@ -1116,9 +1113,6 @@ function SessionAction({
                 </select>
               </Field>
             )}
-            <Button type="button" onClick={() => void board.refetch()}>
-              이동 가능 좌석 새로고침
-            </Button>
           </>
         ) : (
           <p className="tip">

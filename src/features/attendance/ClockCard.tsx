@@ -167,12 +167,6 @@ export function ClockCard() {
             휴게 종료
           </Button>
         )}
-        <Button
-          disabled={busy || current.isFetching}
-          onClick={() => void current.refetch()}
-        >
-          현재 상태 새로고침
-        </Button>
       </div>
       {current.isSuccess && !record && branches.length === 0 && (
         <p className="help">출근 가능한 활성 소속 지점이 없습니다.</p>

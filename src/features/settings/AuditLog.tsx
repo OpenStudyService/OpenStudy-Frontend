@@ -125,13 +125,6 @@ function AuditSearch({ ownerId }: { ownerId: string }) {
             적용 기간 (서울 날짜) · {data.data.period.from} ~{" "}
             {data.data.period.to}
           </p>
-          <Button
-            type="button"
-            onClick={() => void data.refetch()}
-            disabled={data.isFetching}
-          >
-            새로고침
-          </Button>
           {data.data.items.length ? (
             <div className="overflow-x-auto">
               <table className="data-table">

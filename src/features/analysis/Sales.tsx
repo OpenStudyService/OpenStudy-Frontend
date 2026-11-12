@@ -237,16 +237,7 @@ function SalesWorkspace() {
       <Heading
         title="매출 조회"
         description="원결제 지점의 승인·환불·순매출과 집계 근거를 확인해요. 이용권 소비 차감은 매출에 더하지 않아요."
-      >
-        <Button
-          onClick={() => {
-            reads.forEach((read) => void read.refetch());
-          }}
-          disabled={!enabled}
-        >
-          새로고침
-        </Button>
-      </Heading>
+      />
       <Button
         aria-expanded={showClosings}
         onClick={() => setShowClosings(!showClosings)}

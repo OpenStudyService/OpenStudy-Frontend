@@ -8,6 +8,7 @@ import {
   vi,
 } from "vitest";
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -321,7 +322,12 @@ it("shows an empty result, then clears it when a manual refresh receives 403", a
   );
   expect(region("매출 요약").getAllByText("0원").length).toBeGreaterThan(0);
   store.scenario = "forbidden";
-  await userEvent.click(screen.getByRole("button", { name: "새로고침" }));
+  await act(() =>
+    client.refetchQueries({
+      queryKey: ["data", store.activeUser().id],
+      type: "active",
+    }),
+  );
   expect(
     await screen.findByRole("heading", { name: "매출 조회 권한이 필요해요" }),
   ).toBeVisible();

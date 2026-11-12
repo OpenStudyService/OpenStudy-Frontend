@@ -438,16 +438,13 @@ it("hides management on denied access and ignores a late response after scope ch
     screen.queryByText("Mock 결제가 적용되었습니다."),
   ).not.toBeInTheDocument();
 });
-it("bulk-applies a selected branch rate with no assignment amount and refreshes occupancy alongside the list", async () => {
+it("bulk-applies a selected branch rate with no assignment amount", async () => {
   vi.mocked(lockerApi.applyRate).mockResolvedValue({
     updated: 8,
     ratePer4WeeksKrw: 15000,
   });
   const { user } = mount(<Lockers />);
   await screen.findByRole("button", { name: "L-01" });
-  await user.click(screen.getByRole("button", { name: "새로고침" }));
-  await waitFor(() => expect(lockerApi.occupancy).toHaveBeenCalledTimes(2));
-  expect(lockerApi.lockers).toHaveBeenCalledTimes(2);
   await user.click(screen.getByRole("button", { name: "지점 요금 일괄 적용" }));
   await user.clear(screen.getByLabelText("4주 요금 (원)"));
   await user.type(screen.getByLabelText("4주 요금 (원)"), "15000");

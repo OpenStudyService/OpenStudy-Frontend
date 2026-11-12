@@ -1,5 +1,4 @@
 import { hasBlockingReadError } from "../../shared/api/read-model";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -38,7 +37,6 @@ export function Records({
 }) {
   const { session, scope } = useApp(),
     [params, setParams] = useSearchParams();
-  const [refresh, setRefresh] = useState(0);
   const search = new URLSearchParams();
   for (const key of ["q", "status", "page"])
     if (params.get(key)) search.set(key, params.get(key)!);
@@ -52,14 +50,13 @@ export function Records({
       resource,
       "list",
       search.toString(),
-      refresh,
     ],
     queryFn: ({ signal }) =>
       recordApi.list(resource, scope, search.toString(), signal),
     retry: false,
   });
   const summary = useQuery({
-    queryKey: ["data", session.user.id, scope, resource, "summary", q, refresh],
+    queryKey: ["data", session.user.id, scope, resource, "summary", q],
     queryFn: ({ signal }) =>
       recordApi.summary(
         resource as "facilities" | "inquiries",
@@ -99,9 +96,7 @@ export function Records({
       <Heading
         title={resource === "facilities" ? "시설 관리" : titles[resource]}
         description="지점의 운영 정보를 확인하고 처리하세요."
-      >
-        <Button onClick={() => setRefresh((v) => v + 1)}>새로고침</Button>
-      </Heading>
+      />
       {resource !== "notices" && (
         <div className="mb-4" aria-label={`${titles[resource]} 집계`}>
           {summary.data && !hasBlockingReadError(summary) ? (

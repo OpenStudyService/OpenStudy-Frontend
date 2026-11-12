@@ -239,7 +239,7 @@ test("a committed clock-in with a lost response recovers current and does not du
       (await (await api(staff.context, "/me/attendance/current")).json())
         .attendance,
     ).toBeNull();
-    await card.getByRole("button", { name: "현재 상태 새로고침" }).click();
+    await staff.page.getByRole("link", { name: "근무 관리", exact: true }).click();
     await expect(card.getByRole("button", { name: "휴게 시작" })).toHaveCount(
       0,
     );
@@ -276,7 +276,7 @@ test("two real state commands cannot both start a break and the browser reloads 
     ]);
     expect(responses.map((r) => r.status()).sort()).toEqual([200, 409]);
     await staff.page
-      .getByRole("button", { name: "현재 상태 새로고침" })
+      .getByRole("link", { name: "근무 관리", exact: true })
       .click();
     await expect(
       staff.page.getByRole("button", { name: "휴게 종료" }),
@@ -684,7 +684,9 @@ test("M12 real leave grant, request, approval, restoration and refusal", async (
       return result.json();
     };
     const conflicting = await make();
-    await manager.page.getByRole("button", { name: "목록 새로고침" }).click();
+    await manager.page
+      .getByRole("link", { name: "근무 관리", exact: true })
+      .click();
     const conflictCard = manager.page
       .getByRole("article")
       .filter({ hasText: `#${conflicting.id} ·` });

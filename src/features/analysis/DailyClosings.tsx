@@ -153,15 +153,6 @@ export function DailyClosings({
             }}
           />
         </Field>
-        <Button
-          disabled={!validPeriod}
-          onClick={() => {
-            void list.refetch();
-            if (id) void detail.refetch();
-          }}
-        >
-          마감 새로고침
-        </Button>
       </div>
       {!validPeriod ? (
         <p className="help">시작일과 종료일을 순서대로 선택해 주세요.</p>
