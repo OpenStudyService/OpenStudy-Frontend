@@ -117,12 +117,6 @@ export function InvitationManagement() {
       {leave.guard}
       {rejection.guard}
       <h2>초대·승인 관리</h2>
-      <Button
-        disabled={busy || rows.isFetching || detail.isFetching}
-        onClick={() => void refresh()}
-      >
-        초대 상태 새로고침
-      </Button>
       {MOCK && (
         <p className="help">데모에서는 이메일을 실제 발송하지 않습니다.</p>
       )}

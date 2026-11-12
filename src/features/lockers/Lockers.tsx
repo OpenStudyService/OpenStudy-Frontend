@@ -88,14 +88,6 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
             </Button>
           </>
         )}
-        <Button
-          onClick={() => {
-            void list.refetch();
-            void occupancy.refetch();
-          }}
-        >
-          새로고침
-        </Button>
       </Heading>
       {occupancy.isPending ? (
         <State loading title="점유 현황을 불러오고 있어요" />

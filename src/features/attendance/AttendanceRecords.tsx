@@ -125,9 +125,6 @@ export function AttendanceRecords() {
             </label>
           </>
         )}
-        <Button disabled={rows.isFetching} onClick={() => void rows.refetch()}>
-          근태 목록 새로고침
-        </Button>
       </div>
       <p className="help px-4">
         실제 출퇴근 기록 · Asia/Seoul · 출근한 날짜 기준 · 실근무 분은 서버

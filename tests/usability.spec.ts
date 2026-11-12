@@ -269,6 +269,113 @@ test("keyboard opens a form, traps focus and restores it; all themes retain visi
   await expect(trigger).toBeFocused();
 });
 
+test("menus show their controls without dedicated refresh buttons", async ({
+  page,
+}) => {
+  const screens = [
+    ["spaces?tab=rooms", "룸 운영 상태 필터"],
+    ["spaces?tab=lockers", "사물함 점유 상태 필터"],
+    ["spaces?tab=seats", "좌석 상태 필터"],
+    ["reservations", "예약 상태 필터"],
+    ["facilities", "시설 점검 검색"],
+    ["inquiries", "고객 문의 검색"],
+    ["notices", "공지 검색"],
+    ["attendance?tab=attendance", "근태 상태"],
+    ["attendance?tab=corrections", "기록 정정"],
+    ["attendance?tab=substitutions", "대체근무"],
+    ["attendance?tab=leaveRequests", "휴가 신청·승인"],
+    ["employees?tab=invitations", "초대 이름·이메일 검색"],
+  ];
+  const main = page.locator("main#main");
+  const refreshButtons = main.getByRole("button", { name: /새로고침$/ });
+  const requestLists = ["기록 정정", "대체근무", "휴가 신청·승인"];
+  await login(page);
+  for (const [route, control] of screens) {
+    await test.step(route, async () => {
+      await page.goto(`/app/gangnam/${route}`);
+      const content = requestLists.includes(control)
+        ? main.getByRole("region", { name: control, exact: true })
+        : main.getByLabel(control);
+      await expect(content).toBeVisible();
+      if (route === "attendance?tab=attendance") {
+        await expect(
+          main.getByRole("heading", { name: "나의 출퇴근" }),
+        ).toBeVisible();
+      }
+      await expect(refreshButtons).toHaveCount(0);
+    });
+  }
+  await page.goto("/app/gangnam/sales");
+  await main.getByRole("button", { name: "일별 마감", exact: true }).click();
+  await expect(main.getByLabel("마감 목록 시작일")).toBeVisible();
+  await expect(refreshButtons).toHaveCount(0);
+
+  await page.goto("/app/gangnam/settings?tab=rooms");
+  await expect(main.getByLabel("룸 운영 상태 필터")).toBeVisible();
+  await expect(refreshButtons).toHaveCount(0);
+
+  await page.goto("/app/gangnam/settings?tab=audit");
+  await expect(main.getByText(/적용 기간 \(서울 날짜\)/)).toBeVisible();
+  await expect(refreshButtons).toHaveCount(0);
+});
+
+test("space menu reselect and browser reload requery the current locker filters", async ({
+  page,
+}) => {
+  const route = "/app/gangnam/spaces?tab=lockers&assignmentState=사용+가능";
+  const lockerReads = () =>
+    ["/api/lockers", "/api/lockers/occupancy"].map((path) =>
+      page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return (
+          url.pathname === path &&
+          (path !== "/api/lockers" ||
+            url.searchParams.get("assignmentState") === "사용 가능") &&
+          response.request().method() === "GET" &&
+          response.ok()
+        );
+      }),
+    );
+  await login(page);
+  await Promise.all([...lockerReads(), page.goto(route)]);
+  const currentUrl = page.url();
+  await Promise.all([
+    ...lockerReads(),
+    page.getByRole("link", { name: "공간 관리", exact: true }).click(),
+  ]);
+  await expect(page).toHaveURL(currentUrl);
+  await Promise.all([...lockerReads(), page.reload()]);
+  await expect(page).toHaveURL(currentUrl);
+});
+
+test("room list can retry a failed read from its error message", async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto("/app/gangnam/spaces?tab=rooms");
+  const status = page.getByLabel("룸 운영 상태 필터");
+  await expect(status).toBeVisible();
+  const scenario = (value: "error" | "normal") =>
+    page.evaluate(async (value) => {
+      const url = "/src/mocks/store.ts";
+      const { store } = await import(/* @vite-ignore */ url);
+      store.scenario = value;
+    }, value);
+  await scenario("error");
+  await status.selectOption("운영 중단");
+  const retry = page.getByRole("button", { name: "다시 시도", exact: true });
+  await expect(retry).toBeVisible();
+  await scenario("normal");
+  const retryResponse = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/rooms" && response.ok(),
+  );
+  await retry.click();
+  await retryResponse;
+  await expect(retry).toHaveCount(0);
+  await expect(status).toHaveValue("운영 중단");
+});
+
 test("workspace reads follow menu actions without a refresh control", async ({ page }) => {
   const reads: string[] = [];
   page.on("request", (request) => {
