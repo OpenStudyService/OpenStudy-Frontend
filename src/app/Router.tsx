@@ -15,7 +15,10 @@ import {
 } from "../features/auth/Login";
 import { ResourceGroup, ResourcePage } from "../features/records/ResourcePage";
 import { ErrorState, State } from "../shared/ui/primitives";
-import { EmployeeManagement } from "../features/organization/Organization";
+import {
+  BranchManagement,
+  EmployeeManagement,
+} from "../features/organization/Organization";
 import { ProductManagement } from "../features/products/Products";
 function RouteError() {
   const error = useRouteError();
@@ -131,11 +134,36 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: "branches",
+        element: (
+          <div className="page">
+            <BranchManagement />
+          </div>
+        ),
+      },
+      {
+        path: "audit",
+        lazy: async () => ({
+          Component: (await import("../features/settings/AuditLog")).AuditLog,
+        }),
+      },
+      {
         path: "settings",
         lazy: async () => ({
           Component: (await import("../features/settings/Settings")).Settings,
         }),
       },
+      ...(import.meta.env.VITE_API_MODE === "mock"
+        ? [
+            {
+              path: "demo-tools",
+              lazy: async () => ({
+                Component: (await import("../features/settings/DemoControls"))
+                  .DemoControls,
+              }),
+            },
+          ]
+        : []),
       {
         path: "*",
         element: (

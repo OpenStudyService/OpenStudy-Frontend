@@ -549,7 +549,7 @@ test("real closure warns about existing bookings and blocks new bookings", async
     );
     const date = kstDate(bookingBody.startAt);
     const path = "/branches/1/closures";
-    await owner.page.goto("/app/1/settings");
+    await owner.page.goto("/app/1/branches");
     await owner.page.getByRole("button", { name: /휴무일 관리:/ }).click();
     const panel = owner.page.getByRole("dialog");
     await panel.getByLabel("휴무 날짜 (한국 시간)").fill(date);
@@ -597,7 +597,7 @@ test("real closure warns about existing bookings and blocks new bookings", async
         canDelete: false,
       }),
     );
-    await staff.page.goto("/app/1/settings");
+    await staff.page.goto("/app/1/branches");
     await expect(
       staff.page.getByRole("button", { name: /휴무일 관리:/ }),
     ).toHaveCount(0);
@@ -612,7 +612,7 @@ test("real closure warns about existing bookings and blocks new bookings", async
       reservation.getByRole("combobox", { name: "시작 시각 (한국 시간)" }),
     ).toBeDisabled();
 
-    await owner.page.goto("/app/1/settings");
+    await owner.page.goto("/app/1/branches");
     await owner.page.getByRole("button", { name: /휴무일 관리:/ }).click();
     owner.page.once("dialog", (dialog) => dialog.accept());
     const row = panel.getByRole("article").filter({

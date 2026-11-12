@@ -160,7 +160,7 @@ test("live build surfaces real API failures without activating MSW or demo login
   await expectNoMockRuntime(page, loaded);
 });
 
-test("authenticated live list failures stay errors and lazy settings have no demo controls", async ({
+test("authenticated live list failures stay errors and demo tools are unavailable in live mode", async ({
   page,
 }) => {
   const fixture = await authenticatedFixture(page);
@@ -181,7 +181,7 @@ test("authenticated live list failures stay errors and lazy settings have no dem
   ).toBeVisible();
   await page.goto(`${liveOrigin}/app/all/settings`);
   await expect(
-    page.getByRole("heading", { name: "설정", exact: true }),
+    page.getByRole("heading", { name: "개인 설정", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "데모·검증 도구" }),
@@ -195,6 +195,14 @@ test("authenticated live list failures stay errors and lazy settings have no dem
   await expect(
     page.getByRole("button", { name: "세션 만료 재현" }),
   ).toHaveCount(0);
+  await page.getByRole("button", { name: "사용자 메뉴" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "데모·검증 도구" }),
+  ).toHaveCount(0);
+  await page.goto(`${liveOrigin}/app/all/demo-tools`);
+  await expect(
+    page.getByText("이 화면을 찾을 수 없어요", { exact: true }),
+  ).toBeVisible();
   await expectNoMockRuntime(page, fixture.requests);
 });
 
@@ -260,7 +268,9 @@ test("demo production build logs in through its bundled MSW worker", async ({
   await expect(
     page.getByRole("textbox", { name: "AI에게 질문", exact: true }),
   ).toBeVisible();
-  await page.goto(`${mockOrigin}/app/all/settings`);
+  await page.getByRole("button", { name: "사용자 메뉴" }).click();
+  await page.getByRole("menuitem", { name: "데모·검증 도구" }).click();
+  await expect(page).toHaveURL(`${mockOrigin}/app/gangnam/demo-tools`);
   await expect(
     page.getByRole("heading", { name: "데모·검증 도구" }),
   ).toBeVisible();
