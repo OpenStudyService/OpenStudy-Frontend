@@ -211,7 +211,10 @@ function AiChat() {
         setNotReady(true);
         void checkReadiness();
       }
-      if (res.httpStatus === 403 && isAccessFailure(res.errorCode)) {
+      if (
+        res.context?.resetReason === "PERMISSION_LOST" ||
+        (res.httpStatus === 403 && isAccessFailure(res.errorCode))
+      ) {
         setTurns([turn]);
       }
       patch(id, {
