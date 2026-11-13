@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { useUi } from "../../app/store";
 import { ApiError } from "../../shared/api/client";
+import { formatPhone } from "../../shared/domain/format";
 import { displayDate } from "../../shared/domain/schema";
 import {
   Badge,
@@ -142,7 +143,7 @@ function CustomerPanelSession({
               {[
                 ["회원번호", customer.memberNo],
                 ["회원 이름", customer.name],
-                ["연락처", customer.phone],
+                ["연락처", formatPhone(customer.phone)],
                 ["이메일", customer.email ?? "없음"],
                 [
                   "등록 지점",

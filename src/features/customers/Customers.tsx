@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
+import { formatPhone } from "../../shared/domain/format";
 import { displayDate } from "../../shared/domain/schema";
 import {
   hasBlockingReadError,
@@ -223,7 +224,7 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
                   {customer.name}
                 </button>
               </td>
-              <td>{customer.phone}</td>
+              <td>{formatPhone(customer.phone)}</td>
               <td>
                 <Badge>{customer.status}</Badge>
               </td>

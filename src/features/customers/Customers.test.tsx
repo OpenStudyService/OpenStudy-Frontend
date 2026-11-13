@@ -231,6 +231,7 @@ it("shows minimal list information and keeps detail closing separate from URL fi
   );
   const table = await screen.findByRole("table", { name: "회원 목록" });
   await within(table).findByRole("button", { name: "기존 회원" });
+  expect(within(table).getByText("010-1234-5678")).toBeVisible();
   expect(within(table).queryByText(current.email!)).toBeNull();
   expect(within(table).queryByText(current.memo!)).toBeNull();
   expect(vi.mocked(customerApi.list).mock.calls[0][1]).toMatchObject({
@@ -244,6 +245,9 @@ it("shows minimal list information and keeps detail closing separate from URL fi
     within(table).getByRole("button", { name: "기존 회원" }),
   );
   expect(await screen.findByText(current.memo!)).toBeVisible();
+  expect(
+    within(screen.getByRole("dialog")).getByText("010-1234-5678"),
+  ).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "닫기" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(router.state.location.search).toContain("q=");

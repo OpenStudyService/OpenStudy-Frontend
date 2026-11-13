@@ -39,6 +39,16 @@ export function formatKrw(
   return number === "—" ? number : `${number}원`;
 }
 
+export function formatPhone(phone: string) {
+  if (phone.startsWith("02")) {
+    return phone.replace(/^(02)(\d{3,4})(\d{4})$/, "$1-$2-$3");
+  }
+  if (phone.startsWith("050")) {
+    return phone.replace(/^(050\d)(\d{3,4})(\d{4})$/, "$1-$2-$3");
+  }
+  return phone.replace(/^(0\d{2})(\d{3,4})(\d{4})$/, "$1-$2-$3");
+}
+
 export function formatPercent(rate: number | null | undefined, digits = 1) {
   if (rate === null) return "해당 없음";
   if (typeof rate !== "number" || !Number.isFinite(rate)) return "—";
