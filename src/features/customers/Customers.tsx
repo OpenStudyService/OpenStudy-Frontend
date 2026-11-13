@@ -24,6 +24,7 @@ import {
   customerListStatuses,
   parseCustomerFilters,
 } from "./model";
+import type { CustomerFilters } from "./model";
 import { CustomerPanel } from "./CustomerPanel";
 import { CustomerDuplicates } from "./CustomerDuplicates";
 
@@ -77,6 +78,33 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
       next.delete("action");
       return next;
     });
+  }
+  function sortableColumn(label: string, sort: CustomerFilters["sort"]) {
+    const direction = filters.sort === sort ? filters.direction : undefined;
+    return {
+      label,
+      direction,
+      onSort: () => {
+        const nextDirection =
+          direction === undefined
+            ? sort === "name"
+              ? "asc"
+              : "desc"
+            : direction === "asc"
+              ? "desc"
+              : "asc";
+        setParams(
+          (previous) => {
+            const next = new URLSearchParams(previous);
+            next.set("sort", sort);
+            next.set("direction", nextDirection);
+            next.delete("page");
+            return next;
+          },
+          { replace: true },
+        );
+      },
+    };
   }
   function close() {
     setParams((previous) => {
@@ -142,22 +170,6 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
             ))}
           </select>
           <select
-            aria-label="회원 정렬"
-            value={filters.sort}
-            onChange={(event) => filter("sort", event.target.value)}
-          >
-            <option value="registeredAt">등록일 순</option>
-            <option value="name">이름 순</option>
-          </select>
-          <select
-            aria-label="정렬 방향"
-            value={filters.direction}
-            onChange={(event) => filter("direction", event.target.value)}
-          >
-            <option value="desc">내림차순</option>
-            <option value="asc">오름차순</option>
-          </select>
-          <select
             aria-label="페이지당 항목 수"
             value={filters.pageSize}
             onChange={(event) => filter("pageSize", event.target.value)}
@@ -199,11 +211,11 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
           label="회원 목록"
           columns={[
             "회원번호",
-            "회원 이름",
+            sortableColumn("회원 이름", "name"),
             "연락처",
             "상태",
             "등록 지점",
-            "등록일",
+            sortableColumn("등록일", "registeredAt"),
           ]}
           loading={rows.isPending}
           error={hasBlockingReadError(rows) ? rows.error : null}

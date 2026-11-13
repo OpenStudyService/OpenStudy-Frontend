@@ -1,5 +1,12 @@
 import type { ReactNode } from "react";
+import { Icon } from "./Icon";
 import { Button, ErrorState, State } from "./primitives";
+
+type SortableColumn = {
+  label: string;
+  direction?: "asc" | "desc";
+  onSort: () => void;
+};
 
 // 목록 화면의 기준 형태(회원 목록): 카드 하나 안에 필터 바 → 표 → footer.
 // 화면마다 필요한 필터·열·행은 호출하는 쪽이 채우고, 배치와 상태 표시만 공통으로 맞춘다.
@@ -39,7 +46,7 @@ export function ListTable({
   children,
 }: {
   label: string;
-  columns: string[];
+  columns: (string | SortableColumn)[];
   /** 로딩·오류보다 먼저 보여 줄 안내(예: 잘못된 조건). */
   state?: ReactNode;
   loading?: boolean;
@@ -64,11 +71,45 @@ export function ListTable({
       <table className="data-table" aria-label={label}>
         <thead>
           <tr>
-            {columns.map((column) => (
-              <th key={column} scope="col">
-                {column}
-              </th>
-            ))}
+            {columns.map((column) => {
+              if (typeof column === "string") {
+                return (
+                  <th key={column} scope="col">
+                    {column}
+                  </th>
+                );
+              }
+              const { label, direction, onSort } = column;
+              const ariaSort =
+                direction === "asc"
+                  ? "ascending"
+                  : direction === "desc"
+                    ? "descending"
+                    : undefined;
+              return (
+                <th
+                  key={label}
+                  scope="col"
+                  aria-sort={ariaSort}
+                  className="sort-column"
+                >
+                  <button type="button" onClick={onSort}>
+                    {label}
+                    <Icon
+                      name={direction ? "arrow" : "sort"}
+                      size={14}
+                      className={
+                        direction === "asc"
+                          ? "-rotate-90"
+                          : direction === "desc"
+                            ? "rotate-90"
+                            : undefined
+                      }
+                    />
+                  </button>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>

@@ -255,6 +255,45 @@ it("shows minimal list information and keeps detail closing separate from URL fi
   expect(router.state.location.search).not.toContain("detail=");
 });
 
+it("sorts the full member query from the column headers and resets pagination", async () => {
+  const { router } = mount("?q=기존&status=정상&page=2&pageSize=50");
+  const table = await screen.findByRole("table", { name: "회원 목록" });
+  const name = within(table).getByRole("button", { name: "회원 이름" });
+  const registeredAt = within(table).getByRole("button", { name: "등록일" });
+  expect(registeredAt.closest("th")).toHaveAttribute("aria-sort", "descending");
+
+  await userEvent.click(name);
+  await waitFor(() =>
+    expect(vi.mocked(customerApi.list).mock.lastCall?.[1]).toMatchObject({
+      q: "기존",
+      status: "정상",
+      sort: "name",
+      direction: "asc",
+      page: 1,
+      pageSize: 50,
+    }),
+  );
+  expect(name.closest("th")).toHaveAttribute("aria-sort", "ascending");
+  expect(registeredAt.closest("th")).not.toHaveAttribute("aria-sort");
+  expect(new URLSearchParams(router.state.location.search).has("page")).toBe(
+    false,
+  );
+
+  await userEvent.keyboard("{Enter}");
+  await waitFor(() =>
+    expect(vi.mocked(customerApi.list).mock.lastCall?.[1]).toMatchObject({
+      sort: "name",
+      direction: "desc",
+    }),
+  );
+  expect(name.closest("th")).toHaveAttribute("aria-sort", "descending");
+
+  await userEvent.click(registeredAt);
+  expect(registeredAt.closest("th")).toHaveAttribute("aria-sort", "descending");
+  await userEvent.click(registeredAt);
+  expect(registeredAt.closest("th")).toHaveAttribute("aria-sort", "ascending");
+});
+
 it("requires an explicit registration branch in all scope and submits only canonical fields", async () => {
   context.value.scope = "all";
   mount("?detail=new");
