@@ -7,7 +7,6 @@ import { ApiError } from "../../shared/api/client";
 import { formatPhone } from "../../shared/domain/format";
 import { displayDate } from "../../shared/domain/schema";
 import {
-  Badge,
   Button,
   ErrorState,
   FieldError,
@@ -23,6 +22,7 @@ import {
   useCustomerWrite,
 } from "./hooks";
 import { CustomerForm, LatestCustomer } from "./CustomerForm";
+import { CustomerStatusBadge } from "./CustomerStatusBadge";
 import { CustomerHistory } from "../pass-history/CustomerHistory";
 import { CustomerSpaceHistory } from "./CustomerSpaceHistory";
 import { CustomerMergeHistory } from "./CustomerMergeHistory";
@@ -166,7 +166,7 @@ function CustomerPanelSession({
               <div>
                 <dt className="text-muted">상태</dt>
                 <dd>
-                  <Badge>{customer.status}</Badge>
+                  <CustomerStatusBadge status={customer.status} />
                 </dd>
               </div>
             </dl>

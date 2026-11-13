@@ -9,7 +9,7 @@ import {
   isAccessError,
 } from "../../shared/api/read-model";
 import { MOCK } from "../../shared/api/client";
-import { Badge, Button, Heading } from "../../shared/ui/primitives";
+import { Button, Heading } from "../../shared/ui/primitives";
 import {
   ListCard,
   ListFilters,
@@ -27,6 +27,7 @@ import {
 import type { CustomerFilters } from "./model";
 import { CustomerPanel } from "./CustomerPanel";
 import { CustomerDuplicates } from "./CustomerDuplicates";
+import { CustomerStatusBadge } from "./CustomerStatusBadge";
 
 export function Customers({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp(),
@@ -238,7 +239,7 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
               </td>
               <td>{formatPhone(customer.phone)}</td>
               <td>
-                <Badge>{customer.status}</Badge>
+                <CustomerStatusBadge status={customer.status} />
               </td>
               <td>
                 {customer.registeredBranchId

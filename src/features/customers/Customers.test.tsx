@@ -255,6 +255,16 @@ it("shows minimal list information and keeps detail closing separate from URL fi
   expect(router.state.location.search).not.toContain("detail=");
 });
 
+it("shows an inactive member with the warning badge in the list and detail", async () => {
+  current.status = "비활성";
+  mount();
+  const table = await screen.findByRole("table", { name: "회원 목록" });
+  expect(await within(table).findByText("비활성")).toHaveClass("badge", "warn");
+  await userEvent.click(within(table).getByRole("button", { name: "기존 회원" }));
+  const panel = await screen.findByRole("dialog");
+  expect(await within(panel).findByText("비활성")).toHaveClass("badge", "warn");
+});
+
 it("sorts the full member query from the column headers and resets pagination", async () => {
   const { router } = mount("?q=기존&status=정상&page=2&pageSize=50");
   const table = await screen.findByRole("table", { name: "회원 목록" });
