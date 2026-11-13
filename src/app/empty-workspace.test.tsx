@@ -501,9 +501,12 @@ it("keeps idle reads quiet and refreshes the active menu only on request", async
   fail = false;
   await user.click(screen.getByRole("button", { name: "메뉴 열기" }));
   await user.click(
-    within(screen.getByRole("dialog", { name: "메뉴" })).getByRole("link", {
-      name: "대시보드",
-    }),
+    within(screen.getByRole("complementary", { name: "운영 메뉴" })).getByRole(
+      "link",
+      {
+        name: "대시보드",
+      },
+    ),
   );
   await waitFor(() => expect(reads).toBe(3));
   await waitFor(() =>

@@ -363,13 +363,11 @@
   .bottom-nav {
     @apply hidden;
   }
-  @media (min-width: 1100px) {
-    .workspace.sidebar-collapsed {
-      grid-template-columns: 70px minmax(0, 1fr);
-    }
-    .sidebar-collapsed .mobile-menu {
-      display: inline-flex;
-    }
+  .workspace.sidebar-collapsed {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+  .sidebar-toggleable .mobile-menu {
+    display: inline-flex;
   }
   .skip-link {
     @apply fixed -top-24 left-4 z-[100] rounded bg-primary px-4 py-3 text-white focus:top-3;
@@ -694,4 +692,16 @@
 }
 .panel-body:has(.drawer-sidebar) {
   padding: 0;
+}
+.panel:has(.left-menu) {
+  left: 70px;
+  right: auto;
+  max-width: 300px;
+  border-left: 0;
+  border-right: 1px solid var(--line);
+}
+@media (max-width: 640px) {
+  .panel:has(.left-menu) {
+    left: 0;
+  }
 }

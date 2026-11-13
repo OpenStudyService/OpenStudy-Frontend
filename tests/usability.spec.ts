@@ -42,7 +42,8 @@ for (const width of [1100, 1099, 390]) {
     const quickNav = width === 390 ? bottomNav : rail;
     const fixedSidebar = page.locator(".workspace > .sidebar");
     const openMenu = page.getByRole("button", { name: "메뉴 열기" });
-    const menu = page.getByRole("dialog", { name: "메뉴", exact: true });
+    const dialog = page.getByRole("dialog", { name: "메뉴", exact: true });
+    const menu = width === 1100 ? fixedSidebar : dialog;
 
     await page.goto("/app/gangnam/home");
     await expect(quickNav).toBeVisible();
@@ -56,6 +57,19 @@ for (const width of [1100, 1099, 390]) {
     await page.keyboard.press("Enter");
     await expect(menu.getByLabel("현재 지점")).toHaveValue("gangnam");
     await expect(menu.getByRole("link", { name: "회원 관리" })).toBeVisible();
+    await expect
+      .poll(async () => (await menu.boundingBox())?.x)
+      .toBe(width === 390 ? 0 : 70);
+    if (width === 1100) {
+      await expect(dialog).toHaveCount(0);
+      await expect(page.locator(".main-shell")).toHaveCSS("width", "808px");
+      const closeMenu = page.getByRole("button", { name: "메뉴 접기" });
+      await expect(closeMenu).toHaveAttribute("aria-expanded", "true");
+      await closeMenu.click();
+      await expect(menu).toBeHidden();
+      await openMenu.click();
+      await expect(fixedSidebar).toBeFocused();
+    }
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
     await expect(openMenu).toBeFocused();
