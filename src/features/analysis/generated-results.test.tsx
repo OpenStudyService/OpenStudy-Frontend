@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { ViewSpecRenderer } from "./Charts";
+import { AiCsvExports } from "./AiExports";
 import { parseAiResult, periodOf } from "./domainlens";
 import { generatedResponse } from "./generated-results.fixture";
 
@@ -68,5 +69,27 @@ describe("AI-generated results (OpenStudy-Frontend#122)", () => {
     const parsed = parseAiResult({ ...response, querySpec: [{ ...response.querySpec, filter: null }] });
     expect(parsed.generated?.period).toBeNull();
     expect(periodOf({ kind: "leaf", field: "x", operator: "EQ", values: ["a"] })).toBeNull();
+  });
+});
+
+describe("CSV export names of AI-generated results", () => {
+  it("names a generated dataset after the result instead of its compiler ID", () => {
+    render(<AiCsvExports executionId="exec-g" parsed={parseAiResult(generatedResponse())} accessDenied={false} />);
+    expect(screen.getByRole("heading", { name: "지점별 결제 승인액" })).toBeInTheDocument();
+    expect(screen.queryByText("q0")).not.toBeInTheDocument();
+  });
+
+  it("keeps a registered result's own component title", () => {
+    const response = generatedResponse();
+    const registered = {
+      ...response,
+      querySpec: { ...response.querySpec, mode: "REGISTERED_ANALYSIS" },
+      viewSpec: {
+        ...response.viewSpec,
+        components: [{ ...response.viewSpec.components[0], componentRef: { id: "DATA_TABLE", version: "1.0.0" }, options: { title: "지점별 매출 상세" }, events: [] }],
+      },
+    };
+    render(<AiCsvExports executionId="exec-r" parsed={parseAiResult(registered)} accessDenied={false} />);
+    expect(screen.getByRole("heading", { name: "지점별 매출 상세" })).toBeInTheDocument();
   });
 });
