@@ -678,7 +678,7 @@ it("shows an AI-generated answer with its own conditions and no condition editin
   );
   show();
   await ask("이번 달 지점별 결제 금액 합계 보여줘");
-  expect(await screen.findByRole("heading", { name: "지점별 결제 승인액" })).toBeVisible();
+  expect(await screen.findByRole("heading", { name: "지점별 결제 승인액", level: 3 })).toBeVisible();
   const conditions = screen.getByText("적용 조건").parentElement!;
   expect(within(conditions).getByText("AI 생성 조회")).toBeVisible();
   expect(within(conditions).getByText("결제 승인액")).toBeVisible();
@@ -719,7 +719,7 @@ it("shows a generated answer whose context is empty, as the backend first sent i
   );
   show();
   await ask("이번 달 지점별 결제 금액 합계 보여줘");
-  expect(await screen.findByRole("heading", { name: "지점별 결제 승인액" })).toBeVisible();
+  expect(await screen.findByRole("heading", { name: "지점별 결제 승인액", level: 3 })).toBeVisible();
   expect(screen.getAllByText("가온점").length).toBeGreaterThan(0);
 });
 

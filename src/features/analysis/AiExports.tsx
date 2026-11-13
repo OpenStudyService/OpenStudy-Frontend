@@ -24,7 +24,15 @@ export function AiCsvExports({
             component.datasetId === dataset.id &&
             typeof component.options.title === "string",
         )?.options.title;
-        const title = typeof name === "string" ? name : dataset.id;
+        // A generated view names no titles and its dataset IDs are the compiler's (q0): use the result's own title.
+        const title =
+          typeof name === "string"
+            ? name
+            : parsed.generated
+              ? parsed.datasetList.length > 1
+                ? `${parsed.title} (${parsed.datasetList.indexOf(dataset) + 1})`
+                : parsed.title
+              : dataset.id;
         return (
           <li key={dataset.id} className="flex flex-wrap items-start gap-2">
             <h4 className="text-xs font-semibold">{title}</h4>
