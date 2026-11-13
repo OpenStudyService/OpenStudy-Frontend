@@ -13,6 +13,7 @@ import { Ai } from "./Ai";
 import { ApiError } from "../../shared/api/client";
 import type { CurrentUser } from "../../shared/domain/schema";
 import type { AiQueryResponseDto } from "./domainlens";
+import { generatedResponse } from "./generated-results.fixture";
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
@@ -643,4 +644,81 @@ it("uses server page metadata and resets the page and sort when switching data k
   );
   expect(await screen.findByText("1페이지 · 총 21개")).toBeVisible();
   expect(screen.getByText(/표 기준 시각/)).toHaveTextContent("09:01");
+});
+
+it("shows an AI-generated answer with its own conditions and no condition editing (#122)", async () => {
+  const generated = {
+    ...generatedResponse(),
+    conversationId: "conv-g",
+    traceId: "trc-g",
+    httpStatus: 200,
+    message: null,
+    stages: [],
+    clarificationOptions: [],
+    retrievedCandidates: [],
+    securityGate: {},
+    summary: {},
+    conditions: {
+      analysisId: null,
+      period: null,
+      periodSource: null,
+      branchIds: ["1"],
+      productIds: [],
+      refundBasis: "processed",
+      zeroFill: null,
+    },
+    context: { inherited: [], changed: [], reset: false, resetReason: null },
+    editableFilters: { period: null, branches: { single: false }, products: false },
+  } as unknown as AiQueryResponseDto;
+  mocks.execute.mockResolvedValue(generated);
+  mocks.api.mockImplementation(async (path: string) =>
+    path.startsWith("/ai/executions/")
+      ? { ...generated, id: "exec-g", querySpec: [generated.querySpec] }
+      : { ready: true },
+  );
+  show();
+  await ask("이번 달 지점별 결제 금액 합계 보여줘");
+  expect(await screen.findByRole("heading", { name: "지점별 결제 승인액" })).toBeVisible();
+  const conditions = screen.getByText("적용 조건").parentElement!;
+  expect(within(conditions).getByText("AI 생성 조회")).toBeVisible();
+  expect(within(conditions).getByText("결제 승인액")).toBeVisible();
+  expect(within(conditions).getByText("2026-11-01 ~ 2026-11-30")).toBeVisible();
+  expect(within(conditions).getByText("강남점")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "조건 변경" })).not.toBeInTheDocument();
+  expect(screen.getAllByText("가온점").length).toBeGreaterThan(0);
+  expect(screen.queryByText("지원하는 결과 표시 명세가 없어요.")).not.toBeInTheDocument();
+});
+
+it("shows a generated answer whose context is empty, as the backend first sent it (#122 browser check)", async () => {
+  const generated = {
+    ...generatedResponse(),
+    conversationId: "conv-g",
+    traceId: "trc-g",
+    httpStatus: 200,
+    message: null,
+    stages: [],
+    clarificationOptions: [],
+    retrievedCandidates: [],
+    securityGate: {},
+    summary: {},
+    conditions: {
+      analysisId: null,
+      period: null,
+      periodSource: null,
+      branchIds: ["1"],
+      productIds: [],
+      refundBasis: "processed",
+      zeroFill: null,
+    },
+    context: {},
+    editableFilters: { period: null, branches: { single: false }, products: false },
+  } as unknown as AiQueryResponseDto;
+  mocks.execute.mockResolvedValue(generated);
+  mocks.api.mockImplementation(async (path: string) =>
+    path.startsWith("/ai/executions/") ? generated : { ready: true },
+  );
+  show();
+  await ask("이번 달 지점별 결제 금액 합계 보여줘");
+  expect(await screen.findByRole("heading", { name: "지점별 결제 승인액" })).toBeVisible();
+  expect(screen.getAllByText("가온점").length).toBeGreaterThan(0);
 });

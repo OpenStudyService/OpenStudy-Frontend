@@ -855,6 +855,7 @@ function Answer({
             {turn.conditions && (
               <AppliedConditions
                 conditions={turn.conditions}
+                generated={parsed.generated}
                 editable={turn.editableFilters}
                 disabled={disabled}
                 onRefine={executionId ? apply : undefined}

@@ -55,7 +55,7 @@ export function AiChartResults({
   scope: string;
   conditions?: AiConditions | null;
 }) {
-  const entries = useAiConditionEntries(conditions);
+  const entries = useAiConditionEntries(conditions, parsed.generated);
   return (
     <ViewSpecRenderer
       parsed={parsed}

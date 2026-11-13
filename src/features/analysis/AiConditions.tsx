@@ -11,7 +11,7 @@ import type {
   AiEditableFilters,
   AiRefinement,
 } from "./ai-reuse-api";
-import { POC_QUESTIONS } from "./domainlens";
+import { POC_QUESTIONS, type GeneratedConditions } from "./domainlens";
 
 const CONDITION_NAMES: Record<AiContext["changed"][number], string> = {
   ANALYSIS: "분석 종류",
@@ -68,7 +68,9 @@ export function ReuseError({ error }: { error: unknown }) {
 }
 
 export function ContextSummary({ context }: { context?: AiContext | null }) {
-  if (!context) return null;
+  // The response is untrusted: an answer built on no earlier result may carry an empty context ({}).
+  if (!context || !Array.isArray(context.inherited) || !Array.isArray(context.changed))
+    return null;
   const reset =
     context.reset &&
     (context.resetReason === "SCOPE_CHANGED"
@@ -95,7 +97,10 @@ export function ContextSummary({ context }: { context?: AiContext | null }) {
   );
 }
 
-export function useAiConditionEntries(conditions?: AiConditions | null) {
+export function useAiConditionEntries(
+  conditions?: AiConditions | null,
+  generated?: GeneratedConditions,
+) {
   const { session, lookups } = useApp();
   if (!conditions) return [];
   const productNames = new Map(
@@ -103,14 +108,29 @@ export function useAiConditionEntries(conditions?: AiConditions | null) {
   );
   const branches = session.branches.filter(({ id }) => can(session.user, id));
   const branchNames = new Map(branches.map(({ id, name }) => [id, name]));
+  const branchText = conditions.branchIds
+    .map((id) => branchNames.get(id) ?? "현재 볼 수 없는 지점")
+    .join(", ");
+  // OpenStudy-Frontend#122: a generated result has no registered analysis; its conditions come from its QuerySpec.
+  if (generated)
+    return [
+      [CONDITION_NAMES.ANALYSIS, "AI 생성 조회"],
+      ["지표", generated.metrics.join(", ") || "없음"],
+      ["묶음", generated.dimensions.join(", ") || "없음"],
+      [
+        CONDITION_NAMES.PERIOD,
+        generated.period
+          ? `${generated.period.from} ~ ${generated.period.to}`
+          : "기간 조건 없음",
+      ],
+      [CONDITION_NAMES.BRANCHES, branchText],
+    ] as const;
   const values = {
     ANALYSIS: analysisName(conditions.analysisId),
     PERIOD: conditions.period
       ? `${conditions.period.from} ~ ${conditions.period.to}${conditions.periodSource === "EDITED" ? " · 변경한 기간" : conditions.periodSource === "DEFAULT" ? " · 기본 기간" : ""}`
       : "실시간",
-    BRANCHES: conditions.branchIds
-      .map((id) => branchNames.get(id) ?? "현재 볼 수 없는 지점")
-      .join(", "),
+    BRANCHES: branchText,
     PRODUCTS:
       conditions.productIds
         .map((id) => productNames.get(id) ?? id)
@@ -139,14 +159,18 @@ export function AppliedConditions({
   editable,
   disabled,
   onRefine,
+  generated,
 }: {
   conditions: AiConditions;
   editable?: AiEditableFilters | null;
   disabled: boolean;
   onRefine?: (body: AiRefinement) => Promise<void>;
+  /** A generated result shows its QuerySpec conditions and offers no condition editing (first scope of #122). */
+  generated?: GeneratedConditions;
 }) {
   const [editing, setEditing] = useState(false);
-  const entries = useAiConditionEntries(conditions);
+  const entries = useAiConditionEntries(conditions, generated);
+  const refinable = generated ? null : editable;
   return (
     <div className="grid gap-2">
       <h4 className="text-xs font-semibold">적용 조건</h4>
@@ -158,12 +182,12 @@ export function AppliedConditions({
           </div>
         ))}
       </dl>
-      {editable &&
+      {refinable &&
         onRefine &&
         (editing ? (
           <RefinementForm
             conditions={conditions}
-            editable={editable}
+            editable={refinable}
             disabled={disabled}
             onCancel={() => setEditing(false)}
             onRefine={async (body) => {
