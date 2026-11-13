@@ -1,3 +1,4 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
 import { ListColumnHeader } from "../../shared/ui/ListLayout";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +18,7 @@ import {
   isAccessError,
 } from "../../shared/api/read-model";
 import { canCreateTask } from "./model";
-import { taskApi } from "./api";
+import { taskApi, type TaskListItem } from "./api";
 import { TaskPanel } from "./TaskPanel";
 import { useTaskAssignees } from "./hooks";
 
@@ -39,10 +40,42 @@ export function Tasks() {
   ["detail", "edit", "action", "thread", "tab"].forEach((key) =>
     requestParams.delete(key),
   );
+  const clientSort = sorting.fallback({
+    title: (task: TaskListItem) => task.title,
+    branch: (task: TaskListItem) =>
+      session.branches.find((b) => b.id === task.branchId)?.name ??
+      task.branchId,
+    assignee: (task: TaskListItem) => task.assignee.name,
+    status: (task: TaskListItem) => task.status,
+  });
+  if (clientSort) requestParams.delete("sort");
   const search = requestParams.toString();
+  const requestedPage = Number(params.get("page") || 1);
+  const requestedSize = Number(params.get("pageSize") || 20);
   const rows = useQuery({
-    queryKey: ["data", session.user.id, scope, "tasks", "list", search],
-    queryFn: ({ signal }) => taskApi.list(scope, search, signal),
+    queryKey: [
+      "data",
+      session.user.id,
+      scope,
+      "tasks",
+      "list",
+      clientSort ? sorting.value.sort : null,
+      search,
+    ],
+    queryFn: ({ signal }) =>
+      readListPage<Awaited<ReturnType<typeof taskApi.list>>>(
+        (page, pageSize) => {
+          if (!clientSort) return taskApi.list(scope, search, signal);
+          const batch = new URLSearchParams(search);
+          batch.set("page", String(page));
+          batch.set("pageSize", String(pageSize));
+          return taskApi.list(scope, batch.toString(), signal);
+        },
+        requestedPage,
+        requestedSize,
+        sorting.value.direction,
+        clientSort,
+      ),
     retry: false,
   });
   const summary = useQuery({
@@ -195,9 +228,14 @@ export function Tasks() {
           </Button>
           <select
             aria-label="정렬"
-            value={params.get("sort") ?? "createdAt"}
+            value={clientSort ? "" : sorting.value.sort}
             onChange={(e) => filter("sort", e.target.value)}
           >
+            {clientSort && (
+              <option value="" disabled>
+                열 제목으로 정렬 중
+              </option>
+            )}
             <option value="createdAt">등록일 순</option>
             <option value="updatedAt">수정일 순</option>
             <option value="priority">우선순위 순</option>
@@ -261,12 +299,12 @@ export function Tasks() {
             <thead>
               <tr>
                 {[
-                  "업무 제목",
-                  "지점",
-                  "담당자",
+                  sorting.column("업무 제목", "title"),
+                  sorting.column("지점", "branch"),
+                  sorting.column("담당자", "assignee"),
                   sorting.column("기한", "dueAt"),
                   sorting.column("우선순위", "priority", "desc"),
-                  "상태",
+                  sorting.column("상태", "status"),
                 ].map((column) => (
                   <ListColumnHeader
                     key={typeof column === "string" ? column : column.label}

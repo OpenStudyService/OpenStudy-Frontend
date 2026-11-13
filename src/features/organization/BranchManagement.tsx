@@ -53,8 +53,22 @@ function BranchManagementContent() {
   );
   const [selected, setSelected] = useState<Branch | "new" | null>(null);
   const [closureBranch, setClosureBranch] = useState<Branch | null>(null);
+  const clientSort = sorting.fallback({
+    address: (branch: Branch) => branch.address,
+    phone: (branch: Branch) => branch.phone,
+    hours: (branch: Branch) => branch.hours,
+    status: (branch: Branch) => branch.status,
+  });
   const data = useOrganizationList<"BranchPage">(
-    `/branches?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, ...sorting.value })}`,
+    `/branches?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, ...(!clientSort && sorting.value) })}`,
+    true,
+    clientSort && {
+      sort: sorting.value.sort,
+      page,
+      pageSize: PAGE_SIZE,
+      direction: sorting.value.direction,
+      value: clientSort,
+    },
   );
   const refresh = useRefreshOrganization();
   return (
@@ -104,10 +118,10 @@ function BranchManagementContent() {
           label="지점 목록"
           columns={[
             sorting.column("지점명", "name"),
-            "주소",
-            "연락처",
-            "운영시간",
-            "상태",
+            sorting.column("주소", "address"),
+            sorting.column("연락처", "phone"),
+            sorting.column("운영시간", "hours"),
+            sorting.column("상태", "status"),
             "휴무일",
           ]}
           loading={data.isPending}

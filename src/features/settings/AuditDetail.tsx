@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../../shared/api/client";
 import { formatDateTime } from "../../shared/domain/format";
@@ -120,6 +122,10 @@ export function AuditEventDetail({
     ["요청 ID", event.requestId ?? "—"],
   ];
   const changes = auditChanges(event.before, event.after);
+  const sorting = useLocalTableSort<(typeof changes)[number]>([
+    { label: "항목", value: (change) => change.path.join(" › ") },
+    { label: "구분", value: (change) => changeLabels[change.kind] },
+  ]);
   return (
     <div className="grid gap-4">
       <dl className="grid gap-2">
@@ -141,14 +147,15 @@ export function AuditEventDetail({
           <table className="data-table">
             <thead>
               <tr>
-                <th scope="col">항목</th>
-                <th scope="col">구분</th>
+                {sorting.columns.map((column) => (
+                  <ListColumnHeader key={column.label} column={column} />
+                ))}
                 {event.before !== null && <th scope="col">변경 전</th>}
                 {event.after !== null && <th scope="col">변경 후</th>}
               </tr>
             </thead>
             <tbody>
-              {changes.map(({ path, kind, before, after }) => (
+              {sorting.order(changes).map(({ path, kind, before, after }) => (
                 <tr key={JSON.stringify(path)}>
                   <th scope="row" className="break-all">
                     {path.join(" › ") || "전체"}

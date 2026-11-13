@@ -1,3 +1,4 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { formatKrw } from "../../shared/domain/format";
 import { hasBlockingReadError } from "../../shared/api/read-model";
@@ -24,7 +25,7 @@ import {
   dateTime,
   useSalesSearch,
 } from "../payments/shared";
-import { seatApi } from "../seats/api";
+import { seatApi, type SeatSession } from "../seats/api";
 import { RangeFilter } from "./RangeFilter";
 import { timeRange } from "./model";
 import type { SessionFilters } from "./model";
@@ -88,6 +89,18 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
     customerId: params.get("customerId") || undefined,
     ...range,
   };
+  const branchName = (id: string) =>
+    session.branches.find((b) => b.id === id)?.name ?? `지점 ${id}`;
+  const clientSort = sorting.fallback({
+    customer: (row: SeatSession) => row.customer.name,
+    seat: (row: SeatSession) =>
+      `${branchName(row.branchId)} · ${row.seat.zone} · ${row.seat.seatNo}`,
+    product: (row: SeatSession) =>
+      `${branchName(row.pass.purchaseBranchId)} · ${row.pass.productName}`,
+    status: (row: SeatSession) => row.status,
+    duration: (row: SeatSession) =>
+      row.status === "종료" ? row.usedMinutes : null,
+  });
   const rows = useQuery({
     queryKey: [
       "data",
@@ -96,8 +109,17 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
       "seat-sessions",
       "list",
       filters,
+      sorting.value.sort,
     ],
-    queryFn: ({ signal }) => seatApi.history(filters, signal),
+    queryFn: ({ signal }) =>
+      readListPage<Awaited<ReturnType<typeof seatApi.history>>>(
+        (page, pageSize) =>
+          seatApi.history({ ...filters, page, pageSize }, signal),
+        page,
+        PAGE_SIZE,
+        sorting.value.direction,
+        clientSort,
+      ),
     enabled: !validation,
     retry: false,
   });
@@ -114,8 +136,6 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
     enabled: branchId !== "all",
     retry: false,
   });
-  const branchName = (id: string) =>
-    session.branches.find((b) => b.id === id)?.name ?? `지점 ${id}`;
   const selected = params.get("detail") || "";
   const detail = useQuery({
     queryKey: [
@@ -242,12 +262,12 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
         <ListTable
           label="입퇴실 이력"
           columns={[
-            "고객",
-            "이용 지점·좌석",
-            "구매 지점·상품",
+            sorting.column("고객", "customer"),
+            sorting.column("이용 지점·좌석", "seat"),
+            sorting.column("구매 지점·상품", "product"),
             sorting.column("입실·퇴실", "checkedInAt", "desc"),
-            "상태",
-            "이용·차감·초과",
+            sorting.column("상태", "status"),
+            sorting.column("이용·차감·초과", "duration"),
           ]}
           state={validation && <State title={validation} />}
           loading={rows.isPending}

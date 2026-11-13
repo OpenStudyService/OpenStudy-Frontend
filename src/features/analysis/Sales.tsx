@@ -1,3 +1,8 @@
+import {
+  readListPage,
+  readSortedPages,
+} from "../../shared/api/read-sorted-pages";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { ListColumnHeader } from "../../shared/ui/ListLayout";
 import { useLocalTableSort } from "../../shared/ui/table-sort";
 import type { ReactNode } from "react";
@@ -180,17 +185,57 @@ function SalesWorkspace() {
     enabled: enabled && view === "summary",
     retry: false,
   });
+  const ledgerSorting = useTableSort(
+    { sort: "basisAt", direction: ledgerOptions.direction },
+    "ledger",
+    "page",
+  );
+  const productSorting = useTableSort(
+    { sort: "rank", direction: "asc" },
+    "product",
+  );
+  type LedgerRow = Awaited<ReturnType<typeof salesApi.ledger>>["items"][number];
+  type ProductRow = Awaited<
+    ReturnType<typeof salesApi.products>
+  >["items"][number];
+  const ledgerSortValue = ledgerSorting.fallback({
+    entryType: (row: LedgerRow) => row.entryType,
+    branch: (row: LedgerRow) =>
+      session.branches.find((branch) => branch.id === row.branchId)?.name ??
+      row.branchId,
+    product: (row: LedgerRow) => `${row.purpose} · ${row.productName ?? ""}`,
+    amount: (row: LedgerRow) => row.amountKrw,
+  });
+  const productSortValue = productSorting.fallback({
+    rank: (row: ProductRow) => row.rank,
+    productName: (row: ProductRow) => row.productName,
+    category: (row: ProductRow) => row.categoryName,
+    kind: (row: ProductRow) => row.kind,
+    paymentCount: (row: ProductRow) => row.paymentCount,
+    soldQuantity: (row: ProductRow) => row.soldQuantity,
+    refundedQuantity: (row: ProductRow) => row.refundedQuantity,
+    netSoldQuantity: (row: ProductRow) => row.netSoldQuantity,
+    issuedCount: (row: ProductRow) => row.issuedCount,
+  });
   const ledger = useQuery({
-    queryKey: [...key, "ledger", page, entryType, ledgerDirection],
+    queryKey: [...key, "ledger", page, entryType, ledgerSorting.value],
     queryFn: ({ signal }) =>
-      salesApi.ledger(
-        condition,
-        {
-          page,
-          pageSize: 20,
-          ...ledgerOptions,
-        },
-        signal,
+      readListPage<Awaited<ReturnType<typeof salesApi.ledger>>>(
+        (page, pageSize) =>
+          salesApi.ledger(
+            condition,
+            {
+              ...ledgerOptions,
+              page,
+              pageSize,
+              direction: ledgerSorting.value.direction,
+            },
+            signal,
+          ),
+        page,
+        20,
+        ledgerSorting.value.direction,
+        ledgerSortValue,
       ),
     enabled: enabled && view === "ledger",
     retry: false,
@@ -202,8 +247,37 @@ function SalesWorkspace() {
     enabled: enabled && view === "sales" && passApplicable,
   });
   const products = useQuery({
-    queryKey: [...key, "products", productPage],
-    queryFn: ({ signal }) => salesApi.products(condition, productPage, signal),
+    queryKey: [
+      ...key,
+      "products",
+      productPage,
+      params.get("productSort"),
+      productSorting.value.direction,
+    ],
+    queryFn: async ({ signal }) => {
+      if (!params.has("productSort") || !productSortValue)
+        return salesApi.products(condition, productPage, signal);
+      const first = await salesApi.products(condition, 1, signal, 100);
+      const items = await readSortedPages(
+        async (index, size) => {
+          const response =
+            index === 1
+              ? first
+              : await salesApi.products(condition, index, signal, size);
+          return { items: response.items, total: response.meta.total };
+        },
+        productPage,
+        20,
+        productSorting.value.direction,
+        productSortValue,
+        (row) => String(row.rank),
+      );
+      return {
+        ...first,
+        items,
+        meta: { ...first.meta, page: productPage, pageSize: 20 },
+      };
+    },
     enabled: enabled && view === "sales" && passApplicable,
   });
   const trend = useQuery({
@@ -648,17 +722,38 @@ function SalesWorkspace() {
                               <thead>
                                 <tr>
                                   {[
-                                    "순위",
-                                    "판매 당시 상품",
-                                    "분류",
-                                    "유형",
-                                    "결제 건수",
-                                    "판매 수량",
-                                    "환불 수량",
-                                    "순판매량",
-                                    "발급 건수",
-                                  ].map((title) => (
-                                    <th key={title}>{title}</th>
+                                    productSorting.column("순위", "rank"),
+                                    productSorting.column(
+                                      "판매 당시 상품",
+                                      "productName",
+                                    ),
+                                    productSorting.column("분류", "category"),
+                                    productSorting.column("유형", "kind"),
+                                    productSorting.column(
+                                      "결제 건수",
+                                      "paymentCount",
+                                    ),
+                                    productSorting.column(
+                                      "판매 수량",
+                                      "soldQuantity",
+                                    ),
+                                    productSorting.column(
+                                      "환불 수량",
+                                      "refundedQuantity",
+                                    ),
+                                    productSorting.column(
+                                      "순판매량",
+                                      "netSoldQuantity",
+                                    ),
+                                    productSorting.column(
+                                      "발급 건수",
+                                      "issuedCount",
+                                    ),
+                                  ].map((column) => (
+                                    <ListColumnHeader
+                                      key={column.label}
+                                      column={column}
+                                    />
                                   ))}
                                 </tr>
                               </thead>
@@ -819,18 +914,6 @@ function SalesWorkspace() {
                         <option>환불</option>
                       </select>
                     </label>
-                    <label className="field">
-                      원장 시간순
-                      <select
-                        value={ledgerDirection}
-                        onChange={(e) =>
-                          change("ledgerDirection", e.target.value)
-                        }
-                      >
-                        <option value="desc">최신순</option>
-                        <option value="asc">오래된순</option>
-                      </select>
-                    </label>
                   </div>
                 </header>
                 {ledger.isPending ? (
@@ -859,11 +942,36 @@ function SalesWorkspace() {
                             </caption>
                             <thead>
                               <tr>
-                                <th>집계 기준 시각</th>
-                                <th>항목</th>
-                                <th>귀속 지점</th>
-                                <th>용도·판매 당시 상품</th>
-                                <th>금액</th>
+                                <ListColumnHeader
+                                  column={ledgerSorting.column(
+                                    "집계 기준 시각",
+                                    "basisAt",
+                                  )}
+                                />
+                                <ListColumnHeader
+                                  column={ledgerSorting.column(
+                                    "항목",
+                                    "entryType",
+                                  )}
+                                />
+                                <ListColumnHeader
+                                  column={ledgerSorting.column(
+                                    "귀속 지점",
+                                    "branch",
+                                  )}
+                                />
+                                <ListColumnHeader
+                                  column={ledgerSorting.column(
+                                    "용도·판매 당시 상품",
+                                    "product",
+                                  )}
+                                />
+                                <ListColumnHeader
+                                  column={ledgerSorting.column(
+                                    "금액",
+                                    "amount",
+                                  )}
+                                />
                                 <th>결제 상세</th>
                               </tr>
                             </thead>

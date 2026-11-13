@@ -1,3 +1,6 @@
+import { useTableSort } from "../../shared/ui/table-sort";
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -30,6 +33,7 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
     [params, setParams] = useSearchParams();
   const raw = Number(params.get("page") || 1),
     page = Number.isSafeInteger(raw) && raw > 0 ? raw : 1;
+  const sorting = useTableSort({ sort: "lockerNo", direction: "asc" });
   const assignmentState = params.get("assignmentState") || "";
   const change = (name: string, value: string) =>
     setParams((p) => {
@@ -47,13 +51,39 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
       "list",
       page,
       assignmentState,
+      params.get("sort"),
+      sorting.value.direction,
     ],
-    queryFn: ({ signal }) =>
-      lockerApi.lockers(
-        scope,
-        { page, assignmentState: assignmentState as Locker["assignmentState"] },
-        signal,
-      ),
+    queryFn: ({ signal }) => {
+      const value = params.has("sort")
+        ? sorting.fallback({
+            lockerNo: (r: Locker) => r.lockerNo,
+            branch: (r: Locker) =>
+              session.branches.find((b) => b.id === r.branchId)?.name ??
+              r.branchId,
+            rate: (r: Locker) => r.ratePer4WeeksKrw,
+            status: (r: Locker) => r.status,
+            assignment: (r: Locker) => r.assignmentState,
+            customer: (r: Locker) => r.activeAssignment?.customer.name,
+          })
+        : undefined;
+      return readListPage<Awaited<ReturnType<typeof lockerApi.lockers>>>(
+        (page, pageSize) =>
+          lockerApi.lockers(
+            scope,
+            {
+              page,
+              pageSize,
+              assignmentState: assignmentState as Locker["assignmentState"],
+            },
+            signal,
+          ),
+        page,
+        20,
+        sorting.value.direction,
+        value,
+      );
+    },
     retry: false,
   });
   const occupancy = useQuery({
@@ -136,12 +166,22 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
             <table className="min-w-[650px]">
               <thead>
                 <tr>
-                  <th>사물함 번호</th>
-                  <th>지점</th>
-                  <th>4주 요금</th>
-                  <th>운영 상태</th>
-                  <th>점유 상태</th>
-                  <th>현재 이용</th>
+                  <ListColumnHeader
+                    column={sorting.column("사물함 번호", "lockerNo")}
+                  />
+                  <ListColumnHeader column={sorting.column("지점", "branch")} />
+                  <ListColumnHeader
+                    column={sorting.column("4주 요금", "rate")}
+                  />
+                  <ListColumnHeader
+                    column={sorting.column("운영 상태", "status")}
+                  />
+                  <ListColumnHeader
+                    column={sorting.column("점유 상태", "assignment")}
+                  />
+                  <ListColumnHeader
+                    column={sorting.column("현재 이용", "customer")}
+                  />
                 </tr>
               </thead>
               <tbody>

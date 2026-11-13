@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryString } from "../../shared/api/client";
@@ -33,13 +35,29 @@ export function PassUsage({
       ),
     retry: false,
   });
+  const branchName = (id: string) =>
+    branches.find((b) => b.id === id)?.name ?? id;
+  type UsageRow = Schemas["PassUsageByBranch"]["items"][number];
+  const sorting = useLocalTableSort<UsageRow>([
+    { label: "이용 지점", value: (row) => branchName(row.branchId) },
+    { label: "입실 수", value: (row) => row.sessionCount },
+    { label: "차감 분", value: (row) => row.usedMinutes },
+    { label: "차감액", value: (row) => row.usedCreditKrw },
+  ]);
+  const salesSorting = useLocalTableSort<UsageRow["bySaleBranch"][number]>([
+    {
+      label: "판매 지점",
+      value: (row) =>
+        row.visible && row.saleBranchId
+          ? branchName(row.saleBranchId)
+          : row.label,
+    },
+  ]);
   if (read.isPending) return <State loading />;
   if (hasBlockingReadError(read))
     return <ErrorState error={read.error!} retry={() => void read.refetch()} />;
   if (!read.data) return null;
   const { aggregation, totals, items } = read.data;
-  const branchName = (id: string) =>
-    branches.find((b) => b.id === id)?.name ?? id;
   function amounts(row: Schemas["PassUsageAmounts"]) {
     return (
       <>
@@ -77,22 +95,22 @@ export function PassUsage({
         <table className="data-table">
           <thead>
             <tr>
-              <th>이용 지점</th>
-              <th>판매 지점</th>
-              <th>입실 수</th>
-              <th>차감 분</th>
-              <th>차감액</th>
+              <ListColumnHeader column={sorting.columns[0]} />
+              <ListColumnHeader column={salesSorting.columns[0]} />
+              {sorting.columns.slice(1).map((column) => (
+                <ListColumnHeader key={column.label} column={column} />
+              ))}
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
+            {sorting.order(items).map((item) => (
               <Fragment key={item.branchId}>
                 <tr>
                   <th scope="row">{branchName(item.branchId)}</th>
                   <td>소계</td>
                   {amounts(item)}
                 </tr>
-                {item.bySaleBranch.map((sale) => (
+                {salesSorting.order(item.bySaleBranch).map((sale) => (
                   <tr key={sale.saleBranchId ?? "hidden"}>
                     <td>{branchName(item.branchId)}</td>
                     <td>

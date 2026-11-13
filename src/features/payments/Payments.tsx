@@ -1,3 +1,4 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
@@ -125,6 +126,14 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
       (scope === "all" || b.id === scope) &&
       can(session.user, b.id, "payments:write"),
   );
+  const clientSort = sorting.fallback({
+    customer: (payment: Payment) => payment.customer.name,
+    product: (payment: Payment) => payment.productName ?? payment.purpose,
+    branch: (payment: Payment) =>
+      session.branches.find((b) => b.id === payment.branchId)?.name ??
+      payment.branchId,
+    status: (payment: Payment) => payment.status,
+  });
   const payments = useQuery({
     queryKey: [
       "data",
@@ -133,8 +142,17 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
       "payments",
       "list",
       filters,
+      sorting.value.sort,
     ],
-    queryFn: ({ signal }) => listPayments(filters, signal),
+    queryFn: ({ signal }) =>
+      readListPage<Awaited<ReturnType<typeof listPayments>>>(
+        (page, pageSize) =>
+          listPayments({ ...filters, page, pageSize }, signal),
+        page,
+        PAGE_SIZE,
+        sorting.value.direction,
+        clientSort,
+      ),
     enabled: readable && !invalidRange,
     retry: false,
   });
@@ -285,11 +303,11 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
           <ListTable
             label="결제 목록"
             columns={[
-              "고객",
-              "구매 상품",
-              "결제 지점",
+              sorting.column("고객", "customer"),
+              sorting.column("구매 상품", "product"),
+              sorting.column("결제 지점", "branch"),
               sorting.column("서버 산정 금액", "amountKrw"),
-              "상태",
+              sorting.column("상태", "status"),
               sorting.column("결제 일시", "createdAt", "desc"),
             ]}
             state={

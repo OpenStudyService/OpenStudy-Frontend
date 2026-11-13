@@ -100,9 +100,27 @@ function EmployeeManagementContent() {
         (!m.status || m.status === "활성") &&
         m.permissions.includes("people:manage"),
     );
+  const clientSort = sorting.fallback({
+    email: (employee: Employee) => employee.email,
+    status: (employee: Employee) => employee.status,
+    membership: (employee: Employee) =>
+      employee.memberships
+        .map(
+          (m) =>
+            `${session.branches.find((b) => b.id === m.branchId)?.name ?? m.branchId} · ${m.role}`,
+        )
+        .join(", "),
+  });
   const data = useOrganizationList<"EmployeePage">(
-    `/employees?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, ...sorting.value })}`,
+    `/employees?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, ...(!clientSort && sorting.value) })}`,
     allowed,
+    clientSort && {
+      sort: sorting.value.sort,
+      page,
+      pageSize: PAGE_SIZE,
+      direction: sorting.value.direction,
+      value: clientSort,
+    },
   );
   const presets = useOrganizationList<"PermissionPresetPage">(
     "/permission-presets?pageSize=100",
@@ -188,9 +206,9 @@ function EmployeeManagementContent() {
               label="직원 목록"
               columns={[
                 sorting.column("직원", "name"),
-                "이메일",
-                "상태",
-                "소속 지점·역할",
+                sorting.column("이메일", "email"),
+                sorting.column("상태", "status"),
+                sorting.column("소속 지점·역할", "membership"),
               ]}
               loading={data.isPending}
               error={

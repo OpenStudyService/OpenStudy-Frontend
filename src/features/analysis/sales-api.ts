@@ -566,17 +566,18 @@ export const salesApi = {
     condition: SalesCondition,
     page: number,
     signal?: AbortSignal,
+    pageSize = 20,
   ) {
     const result = parse(
       productsSchema,
       await api(
-        `/sales/passes/products?${params(passSalesCondition(condition), { page, pageSize: 20 })}`,
+        `/sales/passes/products?${params(passSalesCondition(condition), { page, pageSize })}`,
         { signal },
       ),
       condition,
       "passes",
     );
-    if (result.meta.page !== page || result.meta.pageSize !== 20)
+    if (result.meta.page !== page || result.meta.pageSize !== pageSize)
       throw new ApiError(0, {
         code: "INVALID_RESPONSE",
         message: "상품 순위 페이지 조건을 확인할 수 없어요.",

@@ -1,3 +1,4 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
@@ -65,6 +66,13 @@ export function InvitationManagement() {
         ),
     )
     .filter((b) => scope === "all" || b.id === scope);
+  const clientSort = sorting.fallback({
+    email: (invitation: Invitation) => invitation.email,
+    branch: (invitation: Invitation) =>
+      `${session.branches.find((b) => b.id === invitation.branchId)?.name ?? invitation.branchId} · ${invitation.role}`,
+    status: (invitation: Invitation) => invitation.status,
+    delivery: (invitation: Invitation) => invitation.delivery,
+  });
   const rows = useQuery({
     queryKey: [
       "data",
@@ -77,9 +85,16 @@ export function InvitationManagement() {
       sorting.value,
     ],
     queryFn: ({ signal }) =>
-      api<components["schemas"]["InvitationPage"]>(
-        `/invitations?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status: filter, ...sorting.value })}`,
-        { signal },
+      readListPage<components["schemas"]["InvitationPage"]>(
+        (page, pageSize) =>
+          api<components["schemas"]["InvitationPage"]>(
+            `/invitations?${queryString({ scope, page, pageSize, q: search, status: filter, ...(!clientSort && sorting.value) })}`,
+            { signal },
+          ),
+        page,
+        PAGE_SIZE,
+        sorting.value.direction,
+        clientSort,
       ),
     retry: false,
     enabled: managed.length > 0,
@@ -214,10 +229,10 @@ export function InvitationManagement() {
           label="초대 목록"
           columns={[
             sorting.column("초대 이름", "name"),
-            "이메일",
-            "지점·역할",
-            "초대 상태",
-            "발송 상태",
+            sorting.column("이메일", "email"),
+            sorting.column("지점·역할", "branch"),
+            sorting.column("초대 상태", "status"),
+            sorting.column("발송 상태", "delivery"),
             sorting.column("수락 기한", "expiresAt"),
           ]}
           loading={rows.isPending}

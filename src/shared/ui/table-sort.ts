@@ -54,6 +54,8 @@ export function useTableSort(
   }
   return {
     value,
+    fallback: <Row>(values: Record<string, (row: Row) => SortValue>) =>
+      Object.hasOwn(values, sort) ? values[sort] : undefined,
     column: (label: string, key: string, initial?: SortDirection) =>
       sortColumn(label, key, value, change, initial),
   };
@@ -61,6 +63,24 @@ export function useTableSort(
 
 type SortValue = string | number | null | undefined;
 const collator = new Intl.Collator("ko", { numeric: true });
+
+export function sortRows<Row>(
+  rows: Row[],
+  value: (row: Row) => SortValue,
+  direction: SortDirection,
+) {
+  return rows.toSorted((a, b) => {
+    const left = value(a);
+    const right = value(b);
+    if (left == null || right == null)
+      return Number(left == null) - Number(right == null);
+    const comparison =
+      typeof left === "number" && typeof right === "number"
+        ? left - right
+        : collator.compare(String(left), String(right));
+    return direction === "asc" ? comparison : -comparison;
+  });
+}
 
 export function useLocalTableSort<Row>(
   columns: { label: string; value: (row: Row) => SortValue }[],
@@ -73,17 +93,7 @@ export function useLocalTableSort<Row>(
     order: (rows: Row[]) => {
       if (!sort) return rows;
       const value = columns[Number(sort.sort)].value;
-      return rows.toSorted((a, b) => {
-        const left = value(a);
-        const right = value(b);
-        if (left == null || right == null)
-          return Number(left == null) - Number(right == null);
-        const comparison =
-          typeof left === "number" && typeof right === "number"
-            ? left - right
-            : collator.compare(String(left), String(right));
-        return sort.direction === "asc" ? comparison : -comparison;
-      });
+      return sortRows(rows, value, sort.direction);
     },
   };
 }
