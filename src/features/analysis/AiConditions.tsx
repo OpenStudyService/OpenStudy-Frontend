@@ -68,7 +68,9 @@ export function ReuseError({ error }: { error: unknown }) {
 }
 
 export function ContextSummary({ context }: { context?: AiContext | null }) {
-  if (!context) return null;
+  // The response is untrusted: an answer built on no earlier result may carry an empty context ({}).
+  if (!context || !Array.isArray(context.inherited) || !Array.isArray(context.changed))
+    return null;
   const reset =
     context.reset &&
     (context.resetReason === "SCOPE_CHANGED"

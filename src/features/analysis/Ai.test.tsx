@@ -688,3 +688,37 @@ it("shows an AI-generated answer with its own conditions and no condition editin
   expect(screen.getAllByText("가온점").length).toBeGreaterThan(0);
   expect(screen.queryByText("지원하는 결과 표시 명세가 없어요.")).not.toBeInTheDocument();
 });
+
+it("shows a generated answer whose context is empty, as the backend first sent it (#122 browser check)", async () => {
+  const generated = {
+    ...generatedResponse(),
+    conversationId: "conv-g",
+    traceId: "trc-g",
+    httpStatus: 200,
+    message: null,
+    stages: [],
+    clarificationOptions: [],
+    retrievedCandidates: [],
+    securityGate: {},
+    summary: {},
+    conditions: {
+      analysisId: null,
+      period: null,
+      periodSource: null,
+      branchIds: ["1"],
+      productIds: [],
+      refundBasis: "processed",
+      zeroFill: null,
+    },
+    context: {},
+    editableFilters: { period: null, branches: { single: false }, products: false },
+  } as unknown as AiQueryResponseDto;
+  mocks.execute.mockResolvedValue(generated);
+  mocks.api.mockImplementation(async (path: string) =>
+    path.startsWith("/ai/executions/") ? generated : { ready: true },
+  );
+  show();
+  await ask("이번 달 지점별 결제 금액 합계 보여줘");
+  expect(await screen.findByRole("heading", { name: "지점별 결제 승인액" })).toBeVisible();
+  expect(screen.getAllByText("가온점").length).toBeGreaterThan(0);
+});
