@@ -544,6 +544,32 @@ it("drops the page on pass filter change and resets only filter params", async (
   expect([...search().keys()]).toEqual(["tab"]);
 });
 
+it("sorts payments on the server and keeps filters when returning to page one", async () => {
+  const user = userEvent.setup();
+  mount(
+    <>
+      <Payments />
+      <LocationProbe />
+    </>,
+    "?page=3&status=승인",
+  );
+  const table = await screen.findByRole("table", { name: "결제 목록" });
+  const amount = within(table).getByRole("button", { name: "서버 산정 금액" });
+  await user.click(amount);
+  expect(search().get("sort")).toBe("amountKrw");
+  expect(search().get("direction")).toBe("asc");
+  expect(search().get("status")).toBe("승인");
+  expect(search().has("page")).toBe(false);
+  await waitFor(() =>
+    expect(listPayments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sort: "amountKrw", direction: "asc", page: 1 }),
+      expect.any(AbortSignal),
+    ),
+  );
+  await user.keyboard("{Enter}");
+  expect(amount.closest("th")).toHaveAttribute("aria-sort", "descending");
+});
+
 it("resets payment filters including advanced filters but keeps unrelated params", async () => {
   const user = userEvent.setup();
   mount(

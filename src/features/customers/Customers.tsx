@@ -25,6 +25,7 @@ import {
   parseCustomerFilters,
 } from "./model";
 import type { CustomerFilters } from "./model";
+import { sortColumn } from "../../shared/ui/table-sort";
 import { CustomerPanel } from "./CustomerPanel";
 import { CustomerDuplicates } from "./CustomerDuplicates";
 import { CustomerStatusBadge } from "./CustomerStatusBadge";
@@ -81,31 +82,24 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
     });
   }
   function sortableColumn(label: string, sort: CustomerFilters["sort"]) {
-    const direction = filters.sort === sort ? filters.direction : undefined;
-    return {
+    return sortColumn(
       label,
-      direction,
-      onSort: () => {
-        const nextDirection =
-          direction === undefined
-            ? sort === "registeredAt"
-              ? "desc"
-              : "asc"
-            : direction === "asc"
-              ? "desc"
-              : "asc";
+      sort,
+      filters,
+      ({ sort, direction }) => {
         setParams(
           (previous) => {
             const next = new URLSearchParams(previous);
             next.set("sort", sort);
-            next.set("direction", nextDirection);
+            next.set("direction", direction);
             next.delete("page");
             return next;
           },
           { replace: true },
         );
       },
-    };
+      sort === "registeredAt" ? "desc" : "asc",
+    );
   }
   function close() {
     setParams((previous) => {

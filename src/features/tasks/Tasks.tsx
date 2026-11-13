@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -32,6 +34,7 @@ function localDateTime(value: string | null) {
 export function Tasks() {
   const { session, scope, lookups } = useApp(),
     [params, setParams] = useSearchParams();
+  const sorting = useTableSort({ sort: "createdAt", direction: "desc" });
   const requestParams = new URLSearchParams(params);
   ["detail", "edit", "action", "thread", "tab"].forEach((key) =>
     requestParams.delete(key),
@@ -261,13 +264,14 @@ export function Tasks() {
                   "업무 제목",
                   "지점",
                   "담당자",
-                  "기한",
-                  "우선순위",
+                  sorting.column("기한", "dueAt"),
+                  sorting.column("우선순위", "priority", "desc"),
                   "상태",
-                ].map((label) => (
-                  <th key={label} scope="col">
-                    {label}
-                  </th>
+                ].map((column) => (
+                  <ListColumnHeader
+                    key={typeof column === "string" ? column : column.label}
+                    column={column}
+                  />
                 ))}
               </tr>
             </thead>

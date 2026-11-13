@@ -1,3 +1,4 @@
+import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
@@ -83,6 +84,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
   const query = useQueryClient();
   const { params, page, update, reset } = useSalesSearch();
   const [, setParams] = useSearchParams();
+  const sorting = useTableSort({ sort: "createdAt", direction: "desc" });
   const advanced = readAdvancedFilters(params);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Payment>();
@@ -210,22 +212,6 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
                 onChange={(e) => update("to", e.target.value)}
               />
             </span>
-            <select
-              aria-label="결제 정렬"
-              value={filters.sort}
-              onChange={(e) => update("sort", e.target.value)}
-            >
-              <option value="createdAt">결제일 순</option>
-              <option value="amountKrw">금액 순</option>
-            </select>
-            <select
-              aria-label="결제 정렬 방향"
-              value={filters.direction}
-              onChange={(e) => update("direction", e.target.value)}
-            >
-              <option value="desc">내림차순</option>
-              <option value="asc">오름차순</option>
-            </select>
             <Button variant="quiet" onClick={() => reset(PAYMENT_FILTER_KEYS)}>
               초기화
             </Button>
@@ -302,9 +288,9 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
               "고객",
               "구매 상품",
               "결제 지점",
-              "서버 산정 금액",
+              sorting.column("서버 산정 금액", "amountKrw"),
               "상태",
-              "결제 일시",
+              sorting.column("결제 일시", "createdAt", "desc"),
             ]}
             state={
               invalidRange && (

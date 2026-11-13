@@ -1,3 +1,4 @@
+import { useTableSort } from "../../shared/ui/table-sort";
 import { Tabs } from "radix-ui";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
@@ -45,7 +46,12 @@ import {
 
 const PAGE_SIZE = 20;
 // 초기화 대상: 직원 목록 검색과 페이지. tab은 남긴다.
-const EMPLOYEE_FILTER_KEYS = ["employeeSearch", "employeePage"];
+const EMPLOYEE_FILTER_KEYS = [
+  "employeeSearch",
+  "employeePage",
+  "employeeSort",
+  "employeeDirection",
+];
 
 export function EmployeeManagement() {
   const { session, scope } = useApp();
@@ -65,6 +71,10 @@ function EmployeeManagementContent() {
   const { session, scope } = useApp();
   const { page, search, setPage, setSearch } = useListSearch("employee");
   const [params, setParams] = useSearchParams();
+  const sorting = useTableSort(
+    { sort: "createdAt", direction: "desc" },
+    "employee",
+  );
   // 권한 프리셋은 사장님만 관리하므로 그 외 사용자가 tab=presets로 들어오면 직원 목록을 보여 준다.
   const tab =
     params.get("tab") === "invitations"
@@ -91,7 +101,7 @@ function EmployeeManagementContent() {
         m.permissions.includes("people:manage"),
     );
   const data = useOrganizationList<"EmployeePage">(
-    `/employees?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search })}`,
+    `/employees?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, ...sorting.value })}`,
     allowed,
   );
   const presets = useOrganizationList<"PermissionPresetPage">(
@@ -176,7 +186,12 @@ function EmployeeManagementContent() {
             </ListFilters>
             <ListTable
               label="직원 목록"
-              columns={["직원", "이메일", "상태", "소속 지점·역할"]}
+              columns={[
+                sorting.column("직원", "name"),
+                "이메일",
+                "상태",
+                "소속 지점·역할",
+              ]}
               loading={data.isPending}
               error={
                 !data.data || hasBlockingReadError(data) ? data.error : null

@@ -345,16 +345,31 @@ const handlers = (["facilities", "inquiries", "notices"] as R[]).flatMap(
                 .toLowerCase()
                 .includes(q)),
         );
-        rows.sort((a, b) =>
-          "pinned" in a && "pinned" in b
-            ? Number(b.pinned) - Number(a.pinned) ||
+        const sort = p.get("sort");
+        const direction =
+          p.get("direction") ??
+          (r === "facilities" && sort !== "createdAt" ? "asc" : "desc");
+        function sortValue(row: (typeof rows)[number]) {
+          if ("nextInspectionOn" in row) {
+            if (sort === "name") return row.name;
+            if (sort !== "createdAt") return row.nextInspectionOn;
+          }
+          return sort === "updatedAt" ? row.updatedAt : row.createdAt;
+        }
+        rows.sort((a, b) => {
+          if ("pinned" in a && "pinned" in b) {
+            return (
+              Number(b.pinned) - Number(a.pinned) ||
               (b.publishedAt ?? b.createdAt).localeCompare(
                 a.publishedAt ?? a.createdAt,
               )
-            : "nextInspectionOn" in a && "nextInspectionOn" in b
-              ? a.nextInspectionOn.localeCompare(b.nextInspectionOn)
-              : b.createdAt.localeCompare(a.createdAt),
-        );
+            );
+          }
+          const order =
+            sortValue(a).localeCompare(sortValue(b), "ko") ||
+            a.id.localeCompare(b.id);
+          return direction === "asc" ? order : -order;
+        });
         return paginate(a, rows);
       }),
     ),

@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -37,7 +39,19 @@ export function Records({
 }) {
   const { session, scope } = useApp(),
     [params, setParams] = useSearchParams();
+  const sorting = useTableSort(
+    {
+      sort: resource === "facilities" ? "nextInspectionOn" : "createdAt",
+      direction: resource === "facilities" ? "asc" : "desc",
+    },
+    resource,
+    "page",
+  );
   const search = new URLSearchParams();
+  if (resource !== "notices") {
+    search.set("sort", sorting.value.sort);
+    search.set("direction", sorting.value.direction);
+  }
   for (const key of ["q", "status", "page"])
     if (params.get(key)) search.set(key, params.get(key)!);
   const q = params.get("q") ?? "",
@@ -157,7 +171,13 @@ export function Records({
             <table className="min-w-[640px]">
               <thead>
                 <tr>
-                  <th>제목</th>
+                  <ListColumnHeader
+                    column={
+                      resource === "facilities"
+                        ? sorting.column("제목", "name")
+                        : "제목"
+                    }
+                  />
                   <th>상태</th>
                   <th>
                     {resource === "facilities"
@@ -166,9 +186,15 @@ export function Records({
                         ? "고객 · 담당자"
                         : "대상"}
                   </th>
-                  <th>
-                    {resource === "facilities" ? "다음 점검일" : "등록일"}
-                  </th>
+                  <ListColumnHeader
+                    column={
+                      resource === "facilities"
+                        ? sorting.column("다음 점검일", "nextInspectionOn")
+                        : resource === "inquiries"
+                          ? sorting.column("등록일", "createdAt", "desc")
+                          : "등록일"
+                    }
+                  />
                 </tr>
               </thead>
               <tbody>

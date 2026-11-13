@@ -1,3 +1,4 @@
+import { useTableSort } from "../../shared/ui/table-sort";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
@@ -27,7 +28,12 @@ import { rolePermissions } from "../organization/model";
 type Invitation = components["schemas"]["Invitation"];
 const PAGE_SIZE = 20;
 // 초기화 대상: URL의 검색어·페이지(상태 필터는 화면 상태). tab은 남긴다.
-const INVITATION_FILTER_KEYS = ["invitationSearch", "invitationPage"];
+const INVITATION_FILTER_KEYS = [
+  "invitationSearch",
+  "invitationPage",
+  "invitationSort",
+  "invitationDirection",
+];
 const expiry = (value: string) => new Date(value).toLocaleString("ko-KR");
 export function InvitationManagement() {
   const { session, scope } = useApp(),
@@ -35,6 +41,10 @@ export function InvitationManagement() {
     { page, search, setPage, setSearch } = useListSearch("invitation"),
     key = useIdempotency(),
     [, setParams] = useSearchParams();
+  const sorting = useTableSort(
+    { sort: "createdAt", direction: "desc" },
+    "invitation",
+  );
   const [error, setError] = useState<Error | null>(null),
     [busy, setBusy] = useState(false),
     [selectedId, setSelectedId] = useState<string | null>(null),
@@ -64,10 +74,11 @@ export function InvitationManagement() {
       page,
       search,
       filter,
+      sorting.value,
     ],
     queryFn: ({ signal }) =>
       api<components["schemas"]["InvitationPage"]>(
-        `/invitations?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status: filter })}`,
+        `/invitations?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status: filter, ...sorting.value })}`,
         { signal },
       ),
     retry: false,
@@ -202,12 +213,12 @@ export function InvitationManagement() {
         <ListTable
           label="초대 목록"
           columns={[
-            "초대 이름",
+            sorting.column("초대 이름", "name"),
             "이메일",
             "지점·역할",
             "초대 상태",
             "발송 상태",
-            "수락 기한",
+            sorting.column("수락 기한", "expiresAt"),
           ]}
           loading={rows.isPending}
           error={rows.error}

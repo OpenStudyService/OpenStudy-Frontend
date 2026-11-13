@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useLocalTableSort } from "../../shared/ui/table-sort";
 import type { ReactNode } from "react";
 import { ApiError } from "../../shared/api/client";
 import { hasBlockingReadError } from "../../shared/api/read-model";
@@ -1040,6 +1042,11 @@ function TrendResults({
     noData: (item.revenue ?? item.passes)?.dataStatus === "noData",
     partial: item.partial,
   }));
+  const sorting = useLocalTableSort<(typeof rows)[number]>([
+    { label: "구간", value: (row) => row.label },
+    { label, value: (row) => row.value },
+    { label: "데이터", value: (row) => Number(!row.noData) },
+  ]);
   return (
     <>
       {trend.aggregation.dataStatus === "noData" ? (
@@ -1061,13 +1068,13 @@ function TrendResults({
           <caption className="sr-only">{label} 추세 상세</caption>
           <thead>
             <tr>
-              <th>구간</th>
-              <th>{label}</th>
-              <th>데이터</th>
+              {sorting.columns.map((column) => (
+                <ListColumnHeader key={column.label} column={column} />
+              ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {sorting.order(rows).map((row) => (
               <tr key={row.label}>
                 <th scope="row">
                   {row.label}
@@ -1124,23 +1131,28 @@ function AmountsTable({
   rows: (Amounts & { label: string })[];
   caption: string;
 }) {
+  const sorting = useLocalTableSort<(typeof rows)[number]>([
+    { label: "구분", value: (row) => row.label },
+    { label: "승인액", value: (row) => row.approvedAmountKrw },
+    { label: "환불액", value: (row) => row.refundAmountKrw },
+    { label: "순매출", value: (row) => row.netAmountKrw },
+    { label: "승인 결제 건수", value: (row) => row.approvedPaymentCount },
+    { label: "환불 건수", value: (row) => row.refundCount },
+    { label: "데이터", value: (row) => row.dataStatus },
+  ]);
   return (
     <div className="data-scroll" tabIndex={0}>
       <table className="data-table">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
-            <th>구분</th>
-            <th>승인액</th>
-            <th>환불액</th>
-            <th>순매출</th>
-            <th>승인 결제 건수</th>
-            <th>환불 건수</th>
-            <th>데이터</th>
+            {sorting.columns.map((column) => (
+              <ListColumnHeader key={column.label} column={column} />
+            ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, index) => (
+          {sorting.order(rows).map((r, index) => (
             <tr key={`${index}:${r.label}`}>
               <th scope="row" className="px-5 py-4 text-left font-medium">
                 {r.label}

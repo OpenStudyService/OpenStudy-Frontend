@@ -1,3 +1,4 @@
+import { useTableSort } from "../../shared/ui/table-sort";
 import { formatKrw } from "../../shared/domain/format";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ const PAGE_SIZE = 20;
 const HISTORY_FILTER_KEYS = [
   "status",
   "seatId",
+  "sort",
   "direction",
   "customerId",
   "from",
@@ -58,6 +60,7 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
   const { session, scope } = useApp();
   const { params, page, update, reset } = useSalesSearch();
   const [, setParams] = useSearchParams();
+  const sorting = useTableSort({ sort: "checkedInAt", direction: "desc" });
   const branchId =
     scope === "all" ? params.get("historyBranch") || "all" : scope;
   const from = params.get("from") || "",
@@ -188,14 +191,6 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
                 </option>
               ))}
           </select>
-          <select
-            aria-label="입실 일시 정렬"
-            value={filters.direction}
-            onChange={(e) => update("direction", e.target.value)}
-          >
-            <option value="desc">최신순</option>
-            <option value="asc">오래된 순</option>
-          </select>
           <Button
             variant="quiet"
             onClick={() =>
@@ -250,7 +245,7 @@ function HistoryWorkspace({ embedded }: { embedded: boolean }) {
             "고객",
             "이용 지점·좌석",
             "구매 지점·상품",
-            "입실·퇴실",
+            sorting.column("입실·퇴실", "checkedInAt", "desc"),
             "상태",
             "이용·차감·초과",
           ]}

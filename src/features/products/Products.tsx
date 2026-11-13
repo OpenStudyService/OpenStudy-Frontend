@@ -1,3 +1,4 @@
+import { useTableSort } from "../../shared/ui/table-sort";
 import { Tabs } from "radix-ui";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
@@ -37,6 +38,8 @@ const PRODUCT_FILTER_KEYS = [
   "productCategory",
   "productAvailability",
   "productPage",
+  "productSort",
+  "productDirection",
 ];
 const PAGE_SIZE = 20;
 
@@ -47,6 +50,7 @@ export function ProductManagement() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "categories" ? "categories" : "products";
   const { page, search, setPage, setSearch } = useListSearch("product");
+  const sorting = useTableSort({ sort: "name", direction: "asc" }, "product");
   const status = params.get("productStatus") || "";
   const availability = params.get("productAvailability") ?? "";
   const kind = params.get("productKind") || "";
@@ -76,10 +80,11 @@ export function ProductManagement() {
       kind,
       categoryId,
       availability,
+      sorting.value,
     ],
     queryFn: ({ signal }) =>
       api<ProductPage>(
-        `/products?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status, kind, categoryId, availability, sort: "name", direction: "asc" })}`,
+        `/products?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status, kind, categoryId, availability, ...sorting.value })}`,
         { signal },
       ),
     enabled: tab === "products",
@@ -209,10 +214,10 @@ export function ProductManagement() {
             <ListTable
               label="상품 목록"
               columns={[
-                "상품명",
+                sorting.column("상품명", "name"),
                 "유형",
                 "분류",
-                "판매 금액",
+                sorting.column("판매 금액", "priceKrw"),
                 "이용 조건",
                 "판매 지점",
                 "상태",

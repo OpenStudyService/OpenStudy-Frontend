@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { formatKrw, formatNumber } from "../../shared/domain/format";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useState } from "react";
@@ -62,6 +64,10 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
   const from = params.get("historyFrom") || "",
     to = params.get("historyTo") || "";
   const [visible, setVisible] = useState(false);
+  const sorting = useLocalTableSort<Ledger>([
+    { label: "상품", value: (pass) => pass.productName },
+    { label: "상태", value: (pass) => pass.status },
+  ]);
   let range = {},
     validation = "";
   try {
@@ -141,20 +147,20 @@ export function CustomerHistory({ customerId }: { customerId: string }) {
                   >
                     <thead>
                       <tr>
-                        {[
-                          "상품",
-                          "상태",
-                          "발급량",
-                          "전체 변경량",
-                          "현재 잔량",
-                          "대조",
-                        ].map((label) => (
-                          <th key={label}>{label}</th>
+                        {sorting.columns.map((column) => (
+                          <ListColumnHeader
+                            key={column.label}
+                            column={column}
+                          />
                         ))}
+                        <th scope="col">발급량</th>
+                        <th scope="col">전체 변경량</th>
+                        <th scope="col">현재 잔량</th>
+                        <th scope="col">대조</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {query.data.passes.map((pass) => (
+                      {sorting.order(query.data.passes).map((pass) => (
                         <LedgerRow key={pass.passId} pass={pass} />
                       ))}
                     </tbody>

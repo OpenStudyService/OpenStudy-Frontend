@@ -1,3 +1,4 @@
+import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -34,6 +35,7 @@ const PAGE_SIZE = 20;
 export function Passes({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp();
   const { params, page, update, reset } = useSalesSearch();
+  const sorting = useTableSort({ sort: "createdAt", direction: "desc" });
   const branch = params.get("branchId") || "";
   const requestedScope =
     scope === "all" && session.branches.some((b) => b.id === branch)
@@ -140,7 +142,7 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
             "이용권",
             "잔량·이용 기간",
             "시작 일시",
-            "만료 일시",
+            sorting.column("만료 일시", "expiresAt"),
             "상태",
           ]}
           loading={passes.isPending}
