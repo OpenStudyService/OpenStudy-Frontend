@@ -34,7 +34,7 @@ import {
   executeAiQuery,
   parseAiResult,
   normalizeComponentType,
-  POC_QUESTIONS,
+  SUGGESTED_QUESTIONS,
   toViewMode,
 } from "./domainlens";
 import type {
@@ -417,7 +417,7 @@ function AiChat() {
     !historyAccessDenied,
   );
   const pending = busy || reopening || reuseBusy;
-  const examples = POC_QUESTIONS.filter(
+  const examples = SUGGESTED_QUESTIONS.filter(
     (q) => domain === "전체" || q.domain === domain,
   );
   return (
@@ -1000,7 +1000,7 @@ function Suggestions({
       aria-label="추천 질문"
       className="mb-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto border-b border-line pb-3"
     >
-      {POC_QUESTIONS.map((q) => {
+      {SUGGESTED_QUESTIONS.map((q) => {
         const blocked = q.requiresSalesRead && !salesAllowed;
         return (
           <li key={q.code}>
@@ -1013,7 +1013,7 @@ function Suggestions({
               }
               onClick={() => onPick(q)}
             >
-              {q.shortLabel}
+              {q.label}
             </button>
           </li>
         );

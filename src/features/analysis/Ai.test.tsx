@@ -644,3 +644,32 @@ it("uses server page metadata and resets the page and sort when switching data k
   expect(await screen.findByText("1페이지 · 총 21개")).toBeVisible();
   expect(screen.getByText(/표 기준 시각/)).toHaveTextContent("09:01");
 });
+
+it("offers last month's branch sales right beside this month's in the suggestions", async () => {
+  mocks.execute
+    .mockResolvedValueOnce(response({ message: "첫 답변이에요." }))
+    .mockResolvedValueOnce(response({ message: "지난 달 답변이에요." }));
+  show();
+  const user = await ask("이번 달 매출");
+  expect(await screen.findByText("첫 답변이에요.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "추천 질문" }));
+  const chips = within(screen.getByRole("list", { name: "추천 질문" }))
+    .getAllByRole("button")
+    .map((button) => button.textContent);
+  const thisMonth = chips.indexOf("이번 달 지점별 매출 비교");
+  expect(thisMonth).toBeGreaterThanOrEqual(0);
+  expect(chips[thisMonth + 1]).toBe("지난 달 지점별 매출 비교");
+  await user.click(screen.getByRole("button", { name: "지난 달 지점별 매출 비교" }));
+  expect(await screen.findByText("지난 달 답변이에요.")).toBeInTheDocument();
+  expect(mocks.execute).toHaveBeenLastCalledWith(
+    expect.objectContaining({ question: "지난 달 지점별 매출을 비교해줘" }),
+    expect.any(AbortSignal),
+  );
+});
+
+it("shows last month's branch sales among the starter questions", async () => {
+  show();
+  const thisMonth = await screen.findByRole("button", { name: /이번 달 지점별 매출을 비교해줘/ });
+  const lastMonth = screen.getByRole("button", { name: /지난 달 지점별 매출을 비교해줘/ });
+  expect(thisMonth.closest("li")?.nextElementSibling).toBe(lastMonth.closest("li"));
+});
