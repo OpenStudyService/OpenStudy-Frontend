@@ -272,7 +272,11 @@ export function ProductManagement() {
                   </td>
                   <td>{product.branchIds.map(branchName).join(", ")}</td>
                   <td>
-                    <Badge>{product.status}</Badge>
+                    <Badge
+                      tone={product.status === "판매 중지" ? "warn" : undefined}
+                    >
+                      {product.status}
+                    </Badge>
                     {!product.canEdit && (
                       <span
                         className="help block"

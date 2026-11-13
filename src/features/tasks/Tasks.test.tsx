@@ -176,6 +176,26 @@ function mount(search = "?detail=task-2&edit=1") {
   );
   return { client, router, user: userEvent.setup() };
 }
+it.each([
+  ["높음", "warn"],
+  ["긴급", "bad"],
+] as const)(
+  "shows %s priority and the overdue badge in the list and detail",
+  async (priority, tone) => {
+    current = { ...current, priority, overdue: true };
+    const { user } = mount("");
+    const taskLink = await screen.findByRole("button", { name: current.title });
+    const row = within(taskLink.closest("tr")!);
+    expect(row.getByText(priority)).toHaveClass("badge", tone);
+    expect(row.getByText("기한 초과")).toHaveClass("badge", "bad");
+
+    await user.click(taskLink);
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(await dialog.findByText(priority)).toHaveClass("badge", tone);
+    expect(dialog.getByText("기한 초과")).toHaveClass("badge", "bad");
+  },
+);
+
 it("allows staff creation and resets assignee when the creation branch changes", async () => {
   context.value.session.user = structuredClone(store.get("employees", "owner"));
   context.value.scope = "all";

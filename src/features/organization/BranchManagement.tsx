@@ -158,7 +158,11 @@ function BranchManagementContent() {
                 <td>{branch.phone}</td>
                 <td>{branch.hours}</td>
                 <td>
-                  <Badge>{branch.status}</Badge>
+                  <Badge
+                    tone={branch.status === "운영 중" ? "good" : undefined}
+                  >
+                    {branch.status}
+                  </Badge>
                 </td>
                 <td>
                   {can(session.user, branch.id) && (

@@ -195,8 +195,10 @@ export function ProductDetail({
         <p>{termsLabel(product.terms)}</p>
         {saleLabel(product) && <p className="help">{saleLabel(product)}</p>}
         <p>
-          <Badge>{product.status}</Badge> 판매 지점:{" "}
-          {product.branchIds.map(branchName).join(", ")} · 버전{" "}
+          <Badge tone={product.status === "판매 중지" ? "warn" : undefined}>
+            {product.status}
+          </Badge>{" "}
+          판매 지점: {product.branchIds.map(branchName).join(", ")} · 버전{" "}
           {product.version}
         </p>
         {notice && (

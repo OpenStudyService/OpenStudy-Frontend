@@ -11,12 +11,27 @@ export function Button({
 }: ComponentPropsWithRef<"button"> & { variant?: string }) {
   return <button className={`btn ${variant} ${className}`} {...props} />;
 }
+type BadgeTone = "good" | "bad" | "warn" | "neutral";
+
+const exactBadgeTones = new Map<string, BadgeTone>([
+  ["승인 대기", "warn"],
+  ["비활성", "warn"],
+  ["사용 가능", "good"],
+  ["사용 중", "warn"],
+  ["운영 중단", "bad"],
+  ["기한 지남", "bad"],
+  ["기한 초과", "bad"],
+  ["긴급", "bad"],
+  ["높음", "warn"],
+  ["환불", "warn"],
+]);
+
 export function Badge({
   children,
   tone,
 }: {
   children: ReactNode;
-  tone?: "good" | "bad" | "warn" | "neutral";
+  tone?: BadgeTone;
 }) {
   const s = String(children);
   const inferredTone = /완료|승인|정상|활성|퇴근|판매 중|이용 가능/.test(s)
@@ -26,7 +41,11 @@ export function Badge({
       : /진행|대기|신청|근무|중|필요|만료/.test(s)
         ? "warn"
         : "neutral";
-  return <span className={`badge ${tone ?? inferredTone}`}>{children}</span>;
+  return (
+    <span className={`badge ${tone ?? exactBadgeTones.get(s) ?? inferredTone}`}>
+      {children}
+    </span>
+  );
 }
 export function Avatar({
   name,

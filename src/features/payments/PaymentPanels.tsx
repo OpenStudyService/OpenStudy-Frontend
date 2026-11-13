@@ -315,7 +315,9 @@ function PaymentPanelSession({
               <div>
                 <dt>상태</dt>
                 <dd>
-                  <Badge>{p.status}</Badge>
+                  <Badge tone={p.status === "환불" ? "warn" : undefined}>
+                    {p.status}
+                  </Badge>
                 </dd>
               </div>
               <div>
