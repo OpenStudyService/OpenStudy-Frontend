@@ -569,8 +569,9 @@ it.each([
   },
 );
 
-it("shows a reset reason independently of inherited and changed conditions", async () => {
-  mocks.execute.mockResolvedValue(
+it("clears earlier results when a successful response reports permission loss", async () => {
+  mocks.execute.mockResolvedValueOnce(response({}));
+  mocks.execute.mockResolvedValueOnce(
     response({
       context: {
         basedOnExecutionId: null,
@@ -583,6 +584,10 @@ it("shows a reset reason independently of inherited and changed conditions", asy
   );
   show();
   await ask("지점별 매출");
+  await screen.findByText("순매출");
+  await ask("다시 조회");
+  await screen.findByText(/이전 결과의 지점 권한이 바뀌어/);
+  expect(screen.queryByText("지점별 매출")).not.toBeInTheDocument();
   const answer = await screen.findByRole("region", {
     name: "지점별 매출 비교 결과",
   });
