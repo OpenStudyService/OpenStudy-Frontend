@@ -416,11 +416,10 @@ export function Layout() {
       <div className="main-shell">
         <header className="topbar">
           <div className="flex min-w-0 items-center gap-3">
-            <button
+            <Button
               type="button"
-              className={
-                navOpen ? "btn mobile-menu primary" : "btn mobile-menu"
-              }
+              className="mobile-menu"
+              variant={navOpen ? "primary" : undefined}
               aria-label={inlineMenuOpen ? "메뉴 접기" : "메뉴 열기"}
               aria-expanded={navOpen}
               aria-controls={inlineMenuOpen ? "workspace-sidebar" : undefined}
@@ -430,7 +429,7 @@ export function Layout() {
               onClick={() => setNav(!inlineMenuOpen)}
             >
               <Icon name={navOpen ? "close" : "menu"} />
-            </button>
+            </Button>
             <span className="hidden text-xs text-muted sm:block">
               워크스페이스
             </span>
@@ -561,14 +560,9 @@ export function Layout() {
         onClose={() => setNav(false)}
         title="메뉴"
         description="업무 공간과 운영 메뉴를 선택하세요."
+        closeButtonVariant="primary"
       >
-        <div
-          className={
-            collapsibleSidebar ? "drawer-sidebar left-menu" : "drawer-sidebar"
-          }
-        >
-          {sidebar(true)}
-        </div>
+        <div className="drawer-sidebar">{sidebar(true)}</div>
       </Panel>
     </div>
   );

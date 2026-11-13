@@ -124,6 +124,31 @@ for (const width of [1100, 1099, 390]) {
       } else {
         await expect(fixedSidebar).toBeHidden();
         await expect(openMenu).toBeVisible();
+        await openMenu.click();
+        await expect(dialog.getByLabel("현재 지점")).toHaveValue("gangnam");
+        await expect
+          .poll(async () => (await dialog.boundingBox())?.x)
+          .toBe(width === 390 ? 0 : 70);
+        const closeMenu = dialog.getByRole("button", {
+          name: "닫기",
+          exact: true,
+        });
+        const topbarButton = page.locator(".mobile-menu");
+        await expect(topbarButton).toHaveAttribute("aria-expanded", "true");
+        await expect(closeMenu).not.toHaveCSS(
+          "background-color",
+          closedBackground,
+        );
+        const closeBackground = await closeMenu.evaluate(
+          (button) => getComputedStyle(button).backgroundColor,
+        );
+        await expect(topbarButton).toHaveCSS(
+          "background-color",
+          closeBackground,
+        );
+        await closeMenu.click();
+        await expect(dialog).toBeHidden();
+        await expect(openMenu).toBeFocused();
       }
     }
   });

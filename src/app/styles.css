@@ -693,7 +693,7 @@
 .panel-body:has(.drawer-sidebar) {
   padding: 0;
 }
-.panel:has(.left-menu) {
+.panel:has(.drawer-sidebar) {
   left: 70px;
   right: auto;
   max-width: 300px;
@@ -701,7 +701,7 @@
   border-right: 1px solid var(--line);
 }
 @media (max-width: 640px) {
-  .panel:has(.left-menu) {
+  .panel:has(.drawer-sidebar) {
     left: 0;
   }
 }
