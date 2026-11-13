@@ -1,3 +1,6 @@
+import { useTableSort } from "../../shared/ui/table-sort";
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import type { AuditEvent } from "./audit-model";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -53,15 +56,51 @@ export function AuditLog() {
 
 function AuditSearch({ ownerId }: { ownerId: string }) {
   const [params, setParams] = useSearchParams();
+  const sorting = useTableSort({ sort: "occurredAt", direction: "desc" });
   const query = auditSearchParams(params);
   const periodError = auditPeriodError(
     query.get("from") || "",
     query.get("to") || "",
   );
   const data = useQuery({
-    queryKey: ["data", ownerId, "audit-events", query.toString()],
-    queryFn: ({ signal }) =>
-      api<AuditPage>(`/audit-events?${query}`, { signal }),
+    queryKey: [
+      "data",
+      ownerId,
+      "audit-events",
+      query.toString(),
+      params.get("sort"),
+      sorting.value.direction,
+    ],
+    queryFn: ({ signal }) => {
+      const value = params.has("sort")
+        ? sorting.fallback({
+            occurredAt: (event: AuditEvent) => Date.parse(event.occurredAt),
+            action: (event: AuditEvent) => event.action,
+            result: (event: AuditEvent) => event.result,
+            target: auditTarget,
+            actor: (event: AuditEvent) =>
+              auditRef(event.actor, "시스템 / 알 수 없음"),
+            branch: (event: AuditEvent) =>
+              auditRef(event.branch, "지점 없음 / 알 수 없음"),
+            reason: (event: AuditEvent) => event.reason,
+            requestId: (event: AuditEvent) => event.requestId,
+            changes: (event: AuditEvent) => Number(event.hasChanges),
+          })
+        : undefined;
+      if (!value) return api<AuditPage>(`/audit-events?${query}`, { signal });
+      return readListPage<AuditPage>(
+        (page, pageSize) => {
+          const batch = new URLSearchParams(query);
+          batch.set("page", String(page));
+          batch.set("pageSize", String(pageSize));
+          return api<AuditPage>(`/audit-events?${batch}`, { signal });
+        },
+        Number(query.get("page") || 1),
+        Number(query.get("pageSize") || DEFAULT_PAGE_SIZE),
+        sorting.value.direction,
+        value,
+      );
+    },
     enabled: !periodError,
     retry: false,
   });
@@ -157,15 +196,15 @@ function AuditSearch({ ownerId }: { ownerId: string }) {
         <ListTable
           label="변경 이력 검색 결과"
           columns={[
-            "시각",
-            "행위",
-            "결과",
-            "대상",
-            "작업자",
-            "지점",
-            "사유",
-            "요청 ID",
-            "변경 내용",
+            sorting.column("시각", "occurredAt"),
+            sorting.column("행위", "action"),
+            sorting.column("결과", "result"),
+            sorting.column("대상", "target"),
+            sorting.column("작업자", "actor"),
+            sorting.column("지점", "branch"),
+            sorting.column("사유", "reason"),
+            sorting.column("요청 ID", "requestId"),
+            sorting.column("변경 내용", "changes"),
           ]}
           state={tableState}
           loading={data.isPending}

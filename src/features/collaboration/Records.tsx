@@ -1,3 +1,6 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -37,7 +40,37 @@ export function Records({
 }) {
   const { session, scope } = useApp(),
     [params, setParams] = useSearchParams();
+  const sorting = useTableSort(
+    {
+      sort: resource === "facilities" ? "nextInspectionOn" : "createdAt",
+      direction: resource === "facilities" ? "asc" : "desc",
+    },
+    resource,
+    "page",
+  );
+  const assigneeOrTarget = (row: Item) =>
+    "openWork" in row
+      ? `${row.openWork.status} · ${row.openWork.assignee?.name ?? "미지정"}`
+      : "customer" in row
+        ? `${row.customer.name} · ${row.assignee?.name ?? "미지정"}`
+        : row.target === "전체"
+          ? "전체"
+          : row.branchIds
+              .map(
+                (id) => session.branches.find((b) => b.id === id)?.name ?? id,
+              )
+              .join(", ");
+  const clientSort = sorting.fallback({
+    title: itemTitle,
+    status: (row: Item) => row.status,
+    target: assigneeOrTarget,
+    noticeDate: (row: Item) => Date.parse(row.createdAt),
+  });
   const search = new URLSearchParams();
+  if (resource !== "notices" && !clientSort) {
+    search.set("sort", sorting.value.sort);
+    search.set("direction", sorting.value.direction);
+  }
   for (const key of ["q", "status", "page"])
     if (params.get(key)) search.set(key, params.get(key)!);
   const q = params.get("q") ?? "",
@@ -50,9 +83,23 @@ export function Records({
       resource,
       "list",
       search.toString(),
+      sorting.value,
     ],
     queryFn: ({ signal }) =>
-      recordApi.list(resource, scope, search.toString(), signal),
+      readListPage<Awaited<ReturnType<typeof recordApi.list>>>(
+        (page, pageSize) => {
+          if (!clientSort)
+            return recordApi.list(resource, scope, search.toString(), signal);
+          const batch = new URLSearchParams(search);
+          batch.set("page", String(page));
+          batch.set("pageSize", String(pageSize));
+          return recordApi.list(resource, scope, batch.toString(), signal);
+        },
+        Number(search.get("page") || 1),
+        20,
+        sorting.value.direction,
+        clientSort,
+      ),
     retry: false,
   });
   const summary = useQuery({
@@ -157,18 +204,33 @@ export function Records({
             <table className="min-w-[640px]">
               <thead>
                 <tr>
-                  <th>제목</th>
-                  <th>상태</th>
-                  <th>
-                    {resource === "facilities"
-                      ? "처리 상태 · 담당자"
-                      : resource === "inquiries"
-                        ? "고객 · 담당자"
-                        : "대상"}
-                  </th>
-                  <th>
-                    {resource === "facilities" ? "다음 점검일" : "등록일"}
-                  </th>
+                  <ListColumnHeader
+                    column={
+                      resource === "facilities"
+                        ? sorting.column("제목", "name")
+                        : sorting.column("제목", "title")
+                    }
+                  />
+                  <ListColumnHeader column={sorting.column("상태", "status")} />
+                  <ListColumnHeader
+                    column={sorting.column(
+                      resource === "facilities"
+                        ? "처리 상태 · 담당자"
+                        : resource === "inquiries"
+                          ? "고객 · 담당자"
+                          : "대상",
+                      "target",
+                    )}
+                  />
+                  <ListColumnHeader
+                    column={
+                      resource === "facilities"
+                        ? sorting.column("다음 점검일", "nextInspectionOn")
+                        : resource === "inquiries"
+                          ? sorting.column("등록일", "createdAt", "desc")
+                          : sorting.column("등록일", "noticeDate", "desc")
+                    }
+                  />
                 </tr>
               </thead>
               <tbody>

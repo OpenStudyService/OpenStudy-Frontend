@@ -4,9 +4,9 @@ import { Link, useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { useUi } from "../../app/store";
 import { ApiError } from "../../shared/api/client";
+import { formatPhone } from "../../shared/domain/format";
 import { displayDate } from "../../shared/domain/schema";
 import {
-  Badge,
   Button,
   ErrorState,
   FieldError,
@@ -22,6 +22,7 @@ import {
   useCustomerWrite,
 } from "./hooks";
 import { CustomerForm, LatestCustomer } from "./CustomerForm";
+import { CustomerStatusBadge } from "./CustomerStatusBadge";
 import { CustomerHistory } from "../pass-history/CustomerHistory";
 import { CustomerSpaceHistory } from "./CustomerSpaceHistory";
 import { CustomerMergeHistory } from "./CustomerMergeHistory";
@@ -142,7 +143,7 @@ function CustomerPanelSession({
               {[
                 ["회원번호", customer.memberNo],
                 ["회원 이름", customer.name],
-                ["연락처", customer.phone],
+                ["연락처", formatPhone(customer.phone)],
                 ["이메일", customer.email ?? "없음"],
                 [
                   "등록 지점",
@@ -165,7 +166,7 @@ function CustomerPanelSession({
               <div>
                 <dt className="text-muted">상태</dt>
                 <dd>
-                  <Badge>{customer.status}</Badge>
+                  <CustomerStatusBadge status={customer.status} />
                 </dd>
               </div>
             </dl>

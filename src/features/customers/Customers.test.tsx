@@ -231,6 +231,7 @@ it("shows minimal list information and keeps detail closing separate from URL fi
   );
   const table = await screen.findByRole("table", { name: "회원 목록" });
   await within(table).findByRole("button", { name: "기존 회원" });
+  expect(within(table).getByText("010-1234-5678")).toBeVisible();
   expect(within(table).queryByText(current.email!)).toBeNull();
   expect(within(table).queryByText(current.memo!)).toBeNull();
   expect(vi.mocked(customerApi.list).mock.calls[0][1]).toMatchObject({
@@ -244,11 +245,83 @@ it("shows minimal list information and keeps detail closing separate from URL fi
     within(table).getByRole("button", { name: "기존 회원" }),
   );
   expect(await screen.findByText(current.memo!)).toBeVisible();
+  expect(
+    within(screen.getByRole("dialog")).getByText("010-1234-5678"),
+  ).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "닫기" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(router.state.location.search).toContain("q=");
   expect(router.state.location.search).toContain("pageSize=50");
   expect(router.state.location.search).not.toContain("detail=");
+});
+
+it("shows an inactive member with the warning badge in the list and detail", async () => {
+  current.status = "비활성";
+  mount();
+  const table = await screen.findByRole("table", { name: "회원 목록" });
+  expect(await within(table).findByText("비활성")).toHaveClass("badge", "warn");
+  await userEvent.click(within(table).getByRole("button", { name: "기존 회원" }));
+  const panel = await screen.findByRole("dialog");
+  expect(await within(panel).findByText("비활성")).toHaveClass("badge", "warn");
+});
+
+it("sorts the full member query from the column headers and resets pagination", async () => {
+  const { router } = mount("?q=기존&status=정상&page=2&pageSize=50");
+  const table = await screen.findByRole("table", { name: "회원 목록" });
+  const name = within(table).getByRole("button", { name: "회원 이름" });
+  const registeredAt = within(table).getByRole("button", { name: "등록일" });
+  expect(registeredAt.closest("th")).toHaveAttribute("aria-sort", "descending");
+
+  await userEvent.click(name);
+  await waitFor(() =>
+    expect(vi.mocked(customerApi.list).mock.lastCall?.[1]).toMatchObject({
+      q: "기존",
+      status: "정상",
+      sort: "name",
+      direction: "asc",
+      page: 1,
+      pageSize: 50,
+    }),
+  );
+  expect(name.closest("th")).toHaveAttribute("aria-sort", "ascending");
+  expect(registeredAt.closest("th")).not.toHaveAttribute("aria-sort");
+  expect(new URLSearchParams(router.state.location.search).has("page")).toBe(
+    false,
+  );
+
+  await userEvent.keyboard("{Enter}");
+  await waitFor(() =>
+    expect(vi.mocked(customerApi.list).mock.lastCall?.[1]).toMatchObject({
+      sort: "name",
+      direction: "desc",
+    }),
+  );
+  expect(name.closest("th")).toHaveAttribute("aria-sort", "descending");
+
+  await userEvent.click(registeredAt);
+  expect(registeredAt.closest("th")).toHaveAttribute("aria-sort", "descending");
+  await userEvent.click(registeredAt);
+  expect(registeredAt.closest("th")).toHaveAttribute("aria-sort", "ascending");
+});
+
+it.each([
+  ["회원번호", "memberNo"],
+  ["연락처", "phone"],
+  ["상태", "status"],
+  ["등록 지점", "registeredBranch"],
+])("requests both sorting directions for %s", async (label, sort) => {
+  mount();
+  const table = await screen.findByRole("table", { name: "회원 목록" });
+  const button = within(table).getByRole("button", { name: label });
+  for (const direction of ["asc", "desc"]) {
+    await userEvent.click(button);
+    await waitFor(() =>
+      expect(vi.mocked(customerApi.list).mock.lastCall?.[1]).toMatchObject({
+        sort,
+        direction,
+      }),
+    );
+  }
 });
 
 it("requires an explicit registration branch in all scope and submits only canonical fields", async () => {

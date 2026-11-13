@@ -1,3 +1,6 @@
+import { readFlatListPage } from "../../shared/api/read-sorted-pages";
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState } from "react";
@@ -39,6 +42,19 @@ export function Shifts() {
       return p;
     });
   }
+  const sorting = useTableSort(
+    { sort: "startsAt", direction: "asc" },
+    "shift",
+    "page",
+  );
+  const value = params.has("shiftSort")
+    ? sorting.fallback({
+        employee: (shift: Shift) => shift.employee.name,
+        startsAt: (shift: Shift) => Date.parse(shift.startsAt),
+        break: (shift: Shift) => shift.plannedBreakMinutes,
+        status: (shift: Shift) => shift.status,
+      })
+    : undefined;
   const rows = useQuery({
     queryKey: [
       "data",
@@ -50,13 +66,22 @@ export function Shifts() {
       from,
       to,
       status,
+      params.get("shiftSort"),
+      sorting.value.direction,
     ],
-    queryFn: async ({ signal }) =>
-      asPage<Shift>(
-        await api(
-          `/shifts?${queryString({ scope, page, pageSize: 20, from, to, status })}`,
-          { signal },
-        ),
+    queryFn: ({ signal }) =>
+      readFlatListPage<Shift>(
+        async (page, pageSize) =>
+          asPage<Shift>(
+            await api(
+              `/shifts?${queryString({ scope, page, pageSize, from, to, status })}`,
+              { signal },
+            ),
+          ),
+        page,
+        20,
+        sorting.value.direction,
+        value,
       ),
     enabled: view === "list",
     retry: false,
@@ -121,10 +146,21 @@ export function Shifts() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>직원</th>
-                    <th>예정 근무 (Asia/Seoul)</th>
-                    <th>예정 휴게</th>
-                    <th>상태</th>
+                    <ListColumnHeader
+                      column={sorting.column("직원", "employee")}
+                    />
+                    <ListColumnHeader
+                      column={sorting.column(
+                        "예정 근무 (Asia/Seoul)",
+                        "startsAt",
+                      )}
+                    />
+                    <ListColumnHeader
+                      column={sorting.column("예정 휴게", "break")}
+                    />
+                    <ListColumnHeader
+                      column={sorting.column("상태", "status")}
+                    />
                   </tr>
                 </thead>
                 <tbody>

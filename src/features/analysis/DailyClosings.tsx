@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, queryString } from "../../shared/api/client";
@@ -210,6 +212,12 @@ export function DailyClosings({
 }
 
 export function ClosingDetails({ closing }: { closing: Closing }) {
+  const sorting = useLocalTableSort<Closing["adjustments"][number]>([
+    { label: "시각", value: (entry) => entry.processedAt },
+    { label: "금액", value: (entry) => entry.amountKrw },
+    { label: "사유", value: (entry) => entry.reason },
+    { label: "처리자", value: (entry) => entry.processedBy.name },
+  ]);
   return (
     <section className="mt-4" aria-label="마감 상세">
       <h3>{closing.businessDate} 마감 상세</h3>
@@ -251,14 +259,13 @@ export function ClosingDetails({ closing }: { closing: Closing }) {
         <table className="data-table">
           <thead>
             <tr>
-              <th>시각</th>
-              <th>금액</th>
-              <th>사유</th>
-              <th>처리자</th>
+              {sorting.columns.map((column) => (
+                <ListColumnHeader key={column.label} column={column} />
+              ))}
             </tr>
           </thead>
           <tbody>
-            {closing.adjustments.map((entry) => (
+            {sorting.order(closing.adjustments).map((entry) => (
               <tr key={entry.id}>
                 <td>{formatDateTime(entry.processedAt)}</td>
                 <td>{formatKrw(entry.amountKrw)}</td>

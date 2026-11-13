@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
+import { formatPhone } from "../../shared/domain/format";
 import { displayDate } from "../../shared/domain/schema";
 import {
   hasBlockingReadError,
   isAccessError,
 } from "../../shared/api/read-model";
 import { MOCK } from "../../shared/api/client";
-import { Badge, Button, Heading } from "../../shared/ui/primitives";
+import { Button, Heading } from "../../shared/ui/primitives";
 import {
   ListCard,
   ListFilters,
@@ -23,8 +24,11 @@ import {
   customerListStatuses,
   parseCustomerFilters,
 } from "./model";
+import type { CustomerFilters } from "./model";
+import { sortColumn } from "../../shared/ui/table-sort";
 import { CustomerPanel } from "./CustomerPanel";
 import { CustomerDuplicates } from "./CustomerDuplicates";
+import { CustomerStatusBadge } from "./CustomerStatusBadge";
 
 export function Customers({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp(),
@@ -76,6 +80,26 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
       next.delete("action");
       return next;
     });
+  }
+  function sortableColumn(label: string, sort: CustomerFilters["sort"]) {
+    return sortColumn(
+      label,
+      sort,
+      filters,
+      ({ sort, direction }) => {
+        setParams(
+          (previous) => {
+            const next = new URLSearchParams(previous);
+            next.set("sort", sort);
+            next.set("direction", direction);
+            next.delete("page");
+            return next;
+          },
+          { replace: true },
+        );
+      },
+      sort === "registeredAt" ? "desc" : "asc",
+    );
   }
   function close() {
     setParams((previous) => {
@@ -141,22 +165,6 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
             ))}
           </select>
           <select
-            aria-label="회원 정렬"
-            value={filters.sort}
-            onChange={(event) => filter("sort", event.target.value)}
-          >
-            <option value="registeredAt">등록일 순</option>
-            <option value="name">이름 순</option>
-          </select>
-          <select
-            aria-label="정렬 방향"
-            value={filters.direction}
-            onChange={(event) => filter("direction", event.target.value)}
-          >
-            <option value="desc">내림차순</option>
-            <option value="asc">오름차순</option>
-          </select>
-          <select
             aria-label="페이지당 항목 수"
             value={filters.pageSize}
             onChange={(event) => filter("pageSize", event.target.value)}
@@ -197,12 +205,12 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
         <ListTable
           label="회원 목록"
           columns={[
-            "회원번호",
-            "회원 이름",
-            "연락처",
-            "상태",
-            "등록 지점",
-            "등록일",
+            sortableColumn("회원번호", "memberNo"),
+            sortableColumn("회원 이름", "name"),
+            sortableColumn("연락처", "phone"),
+            sortableColumn("상태", "status"),
+            sortableColumn("등록 지점", "registeredBranch"),
+            sortableColumn("등록일", "registeredAt"),
           ]}
           loading={rows.isPending}
           error={hasBlockingReadError(rows) ? rows.error : null}
@@ -223,9 +231,9 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
                   {customer.name}
                 </button>
               </td>
-              <td>{customer.phone}</td>
+              <td>{formatPhone(customer.phone)}</td>
               <td>
-                <Badge>{customer.status}</Badge>
+                <CustomerStatusBadge status={customer.status} />
               </td>
               <td>
                 {customer.registeredBranchId

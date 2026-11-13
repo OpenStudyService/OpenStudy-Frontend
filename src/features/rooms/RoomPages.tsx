@@ -1,3 +1,6 @@
+import { useTableSort } from "../../shared/ui/table-sort";
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -13,7 +16,7 @@ import {
 } from "../../shared/ui/primitives";
 import { Pager } from "../organization/shared";
 import { roomApi } from "./api";
-import type { RoomReservation } from "./model";
+import type { Room, RoomReservation } from "./model";
 import { RoomPanel } from "./RoomPanel";
 import { ReservationPanel } from "./ReservationPanel";
 import { displayTime, stamp } from "./shared";
@@ -42,14 +45,48 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
   const raw = Number(params.get("page") ?? 1),
     page = Number.isInteger(raw) && raw > 0 ? raw : 1,
     status = params.get("status") ?? "";
+  const sorting = useTableSort(
+    { sort: "roomNo", direction: "asc" },
+    "room",
+    "page",
+  );
   const data = useQuery({
-    queryKey: ["data", session.user.id, scope, "rooms", "list", page, status],
-    queryFn: ({ signal }) =>
-      roomApi.rooms(
-        scope,
-        { page, status: status as "사용 가능" | "운영 중단" },
-        signal,
-      ),
+    queryKey: [
+      "data",
+      session.user.id,
+      scope,
+      "rooms",
+      "list",
+      page,
+      status,
+      params.get("roomSort"),
+      sorting.value.direction,
+    ],
+    queryFn: ({ signal }) => {
+      const value = params.has("roomSort")
+        ? sorting.fallback({
+            roomNo: (r: Room) => r.roomNo,
+            branch: (r: Room) =>
+              session.branches.find((b) => b.id === r.branchId)?.name ??
+              r.branchId,
+            capacity: (r: Room) => r.capacity,
+            rate: (r: Room) => r.ratePerHourKrw,
+            status: (r: Room) => r.status,
+          })
+        : undefined;
+      return readListPage<Awaited<ReturnType<typeof roomApi.rooms>>>(
+        (page, pageSize) =>
+          roomApi.rooms(
+            scope,
+            { page, pageSize, status: status as "사용 가능" | "운영 중단" },
+            signal,
+          ),
+        page,
+        20,
+        sorting.value.direction,
+        value,
+      );
+    },
     retry: false,
   });
   const writable = session.branches.some(
@@ -93,11 +130,17 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
             <table className="min-w-[600px]">
               <thead>
                 <tr>
-                  <th>룸</th>
-                  <th>지점</th>
-                  <th>정원</th>
-                  <th>시간당 요금</th>
-                  <th>운영 상태</th>
+                  <ListColumnHeader column={sorting.column("룸", "roomNo")} />
+                  <ListColumnHeader column={sorting.column("지점", "branch")} />
+                  <ListColumnHeader
+                    column={sorting.column("정원", "capacity")}
+                  />
+                  <ListColumnHeader
+                    column={sorting.column("시간당 요금", "rate")}
+                  />
+                  <ListColumnHeader
+                    column={sorting.column("운영 상태", "status")}
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -168,6 +211,11 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
     Date.parse(to) > Date.parse(from) &&
     Date.parse(to) - Date.parse(from) <= 62 * 86400000;
   const selectedScope = scope === "all" ? branch || "all" : scope;
+  const sorting = useTableSort(
+    { sort: "start", direction: "asc" },
+    "reservation",
+    "page",
+  );
   const list = useQuery({
     queryKey: [
       "data",
@@ -181,19 +229,38 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
       to,
       roomId,
       status,
+      params.get("reservationSort"),
+      sorting.value.direction,
     ],
-    queryFn: ({ signal }) =>
-      roomApi.reservations(
-        selectedScope,
-        {
-          page,
-          roomId,
-          status: status as RoomReservation["status"],
-          from: stamp(from),
-          to: stamp(to),
-        },
-        signal,
-      ),
+    queryFn: ({ signal }) => {
+      const value = params.has("reservationSort")
+        ? sorting.fallback({
+            room: (r: RoomReservation) => `${r.room.name} · ${r.customer.name}`,
+            start: (r: RoomReservation) => Date.parse(r.startAt),
+            status: (r: RoomReservation) => r.status,
+            amount: (r: RoomReservation) => r.billing?.amountKrw,
+          })
+        : undefined;
+      return readListPage<Awaited<ReturnType<typeof roomApi.reservations>>>(
+        (page, pageSize) =>
+          roomApi.reservations(
+            selectedScope,
+            {
+              page,
+              pageSize,
+              roomId,
+              status: status as RoomReservation["status"],
+              from: stamp(from),
+              to: stamp(to),
+            },
+            signal,
+          ),
+        page,
+        20,
+        sorting.value.direction,
+        value,
+      );
+    },
     enabled: view === "list" && validRange,
     retry: false,
   });
@@ -376,7 +443,7 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
             show={show}
           />
         ) : items.length ? (
-          <ReservationTable rows={items} show={show} />
+          <ReservationTable rows={items} show={show} sorting={sorting} />
         ) : (
           <State title="조회 기간의 예약이 없어요" />
         )}
@@ -405,19 +472,23 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
 function ReservationTable({
   rows,
   show,
+  sorting,
 }: {
   rows: RoomReservation[];
   show: (id: string) => void;
+  sorting: ReturnType<typeof useTableSort>;
 }) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-[660px]">
         <thead>
           <tr>
-            <th>룸 · 고객</th>
-            <th>예약 시간</th>
-            <th>상태</th>
-            <th>확정 결제 금액</th>
+            <ListColumnHeader column={sorting.column("룸 · 고객", "room")} />
+            <ListColumnHeader column={sorting.column("예약 시간", "start")} />
+            <ListColumnHeader column={sorting.column("상태", "status")} />
+            <ListColumnHeader
+              column={sorting.column("확정 결제 금액", "amount")}
+            />
           </tr>
         </thead>
         <tbody>

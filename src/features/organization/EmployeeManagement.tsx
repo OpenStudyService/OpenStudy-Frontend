@@ -1,3 +1,4 @@
+import { useTableSort } from "../../shared/ui/table-sort";
 import { Tabs } from "radix-ui";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
@@ -45,7 +46,12 @@ import {
 
 const PAGE_SIZE = 20;
 // 초기화 대상: 직원 목록 검색과 페이지. tab은 남긴다.
-const EMPLOYEE_FILTER_KEYS = ["employeeSearch", "employeePage"];
+const EMPLOYEE_FILTER_KEYS = [
+  "employeeSearch",
+  "employeePage",
+  "employeeSort",
+  "employeeDirection",
+];
 
 export function EmployeeManagement() {
   const { session, scope } = useApp();
@@ -65,6 +71,10 @@ function EmployeeManagementContent() {
   const { session, scope } = useApp();
   const { page, search, setPage, setSearch } = useListSearch("employee");
   const [params, setParams] = useSearchParams();
+  const sorting = useTableSort(
+    { sort: "createdAt", direction: "desc" },
+    "employee",
+  );
   // 권한 프리셋은 사장님만 관리하므로 그 외 사용자가 tab=presets로 들어오면 직원 목록을 보여 준다.
   const tab =
     params.get("tab") === "invitations"
@@ -90,9 +100,27 @@ function EmployeeManagementContent() {
         (!m.status || m.status === "활성") &&
         m.permissions.includes("people:manage"),
     );
+  const clientSort = sorting.fallback({
+    email: (employee: Employee) => employee.email,
+    status: (employee: Employee) => employee.status,
+    membership: (employee: Employee) =>
+      employee.memberships
+        .map(
+          (m) =>
+            `${session.branches.find((b) => b.id === m.branchId)?.name ?? m.branchId} · ${m.role}`,
+        )
+        .join(", "),
+  });
   const data = useOrganizationList<"EmployeePage">(
-    `/employees?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search })}`,
+    `/employees?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, ...(!clientSort && sorting.value) })}`,
     allowed,
+    clientSort && {
+      sort: sorting.value.sort,
+      page,
+      pageSize: PAGE_SIZE,
+      direction: sorting.value.direction,
+      value: clientSort,
+    },
   );
   const presets = useOrganizationList<"PermissionPresetPage">(
     "/permission-presets?pageSize=100",
@@ -176,7 +204,12 @@ function EmployeeManagementContent() {
             </ListFilters>
             <ListTable
               label="직원 목록"
-              columns={["직원", "이메일", "상태", "소속 지점·역할"]}
+              columns={[
+                sorting.column("직원", "name"),
+                sorting.column("이메일", "email"),
+                sorting.column("상태", "status"),
+                sorting.column("소속 지점·역할", "membership"),
+              ]}
               loading={data.isPending}
               error={
                 !data.data || hasBlockingReadError(data) ? data.error : null

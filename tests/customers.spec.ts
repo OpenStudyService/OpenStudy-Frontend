@@ -193,8 +193,9 @@ test("URL filters survive reload and a cancelled keyboard close preserves regist
   );
   await expect(page).toHaveURL(/[?&]q=010(?:&|$)/);
   await change("회원 상태 필터", "정상");
-  await change("회원 정렬", "name");
-  await change("정렬 방향", "asc");
+  const nameColumn = page.getByRole("columnheader", { name: "회원 이름" });
+  await nameColumn.getByRole("button").click();
+  await expect(nameColumn).toHaveAttribute("aria-sort", "ascending");
   await change("페이지당 항목 수", "20");
   await expect
     .poll(() => {
@@ -209,7 +210,7 @@ test("URL filters survive reload and a cancelled keyboard close preserves regist
     "010",
   );
   await expect(page.getByLabel("회원 상태 필터")).toHaveValue("정상");
-  await expect(page.getByLabel("회원 정렬")).toHaveValue("name");
+  await expect(nameColumn).toHaveAttribute("aria-sort", "ascending");
   await page.getByRole("button", { name: "회원 등록", exact: true }).click();
   const panel = page.getByRole("dialog");
   await panel.getByLabel("회원 이름").fill("저장 전 이탈 검증");

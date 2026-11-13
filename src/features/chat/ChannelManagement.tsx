@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -42,6 +44,33 @@ export function ChannelManagement({
     enabled: allowed,
     retry: false,
   });
+  type ManagedChannel = NonNullable<typeof rows.data>["items"][number];
+  const branchLabel = (channel: ManagedChannel) =>
+    channel.branchId === "all"
+      ? "전체 지점"
+      : (session.branches.find((branch) => branch.id === channel.branchId)
+          ?.name ?? channel.branchId);
+  const participantNames = (channel: ManagedChannel) =>
+    channel.participantIds
+      .map(
+        (id) =>
+          canonicalChannel(channel)?.memberNames[id] ??
+          lookups.employees.find((person) => person.id === id)?.name ??
+          (session.user.id === id ? session.user.name : id),
+      )
+      .join(", ");
+  const sorting = useLocalTableSort<ManagedChannel>([
+    { label: "채널 이름", value: (channel) => channel.name },
+    { label: "지점", value: branchLabel },
+    { label: "채널 설명", value: (channel) => channel.description },
+    { label: "참여 직원", value: participantNames },
+  ]);
+  const visibleChannels =
+    rows.data?.items.filter(
+      (channel) =>
+        canManageChannel(session.user, channel.branchId) &&
+        (canonicalChannel(channel)?.canManage ?? true),
+    ) ?? [];
   const id = params.get("detail"),
     channel = rows.data?.items.find((c) => c.id === id);
   const close = () =>
@@ -85,10 +114,8 @@ export function ChannelManagement({
         <table className="data-table">
           <thead>
             <tr>
-              {["채널 이름", "지점", "채널 설명", "참여 직원"].map((t) => (
-                <th scope="col" key={t}>
-                  {t}
-                </th>
+              {sorting.columns.map((column) => (
+                <ListColumnHeader key={column.label} column={column} />
               ))}
             </tr>
           </thead>
@@ -109,38 +136,18 @@ export function ChannelManagement({
                 </td>
               </tr>
             ) : (
-              rows.data?.items
-                .filter(
-                  (c) =>
-                    canManageChannel(session.user, c.branchId) &&
-                    (canonicalChannel(c)?.canManage ?? true),
-                )
-                .map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <button className="cell-link" onClick={() => show(c.id)}>
-                        {c.name}
-                      </button>
-                    </td>
-                    <td>
-                      {c.branchId === "all"
-                        ? "전체 지점"
-                        : (session.branches.find((b) => b.id === c.branchId)
-                            ?.name ?? c.branchId)}
-                    </td>
-                    <td>{c.description}</td>
-                    <td>
-                      {c.participantIds
-                        .map(
-                          (id) =>
-                            canonicalChannel(c)?.memberNames[id] ??
-                            lookups.employees.find((p) => p.id === id)?.name ??
-                            (session.user.id === id ? session.user.name : id),
-                        )
-                        .join(", ")}
-                    </td>
-                  </tr>
-                ))
+              sorting.order(visibleChannels).map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <button className="cell-link" onClick={() => show(c.id)}>
+                      {c.name}
+                    </button>
+                  </td>
+                  <td>{branchLabel(c)}</td>
+                  <td>{c.description}</td>
+                  <td>{participantNames(c)}</td>
+                </tr>
+              ))
             )}
             {rows.isSuccess && !rows.data.items.length && (
               <tr>

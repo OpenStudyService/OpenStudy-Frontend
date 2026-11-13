@@ -1,3 +1,5 @@
+import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { hasBlockingReadError } from "../../shared/api/read-model";
@@ -33,6 +35,13 @@ export function OccupancyTrend({
     retry: false,
   });
   const data = trend.data;
+  const sorting = useLocalTableSort<NonNullable<typeof data>["items"][number]>([
+    { label: "구간", value: (item) => item.bucketStart },
+    { label: "좌석 수", value: (item) => item.seatCount },
+    { label: "점유 좌석·분", value: (item) => item.occupiedSeatMinutes },
+    { label: "전체 좌석·분", value: (item) => item.capacitySeatMinutes },
+    { label: "점유율", value: (item) => item.occupancy.percent },
+  ]);
 
   return (
     <section className="card mt-4 p-5" aria-label="좌석 점유 추이">
@@ -88,18 +97,16 @@ export function OccupancyTrend({
               format={formatPercent}
             />
             <div className="overflow-x-auto">
-              <table>
+              <table className="data-table">
                 <thead>
                   <tr>
-                    <th>구간</th>
-                    <th>좌석 수</th>
-                    <th>점유 좌석·분</th>
-                    <th>전체 좌석·분</th>
-                    <th>점유율</th>
+                    {sorting.columns.map((column) => (
+                      <ListColumnHeader key={column.label} column={column} />
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((item) => (
+                  {sorting.order(data.items).map((item) => (
                     <tr key={item.bucketStart}>
                       <th scope="row">{item.label}</th>
                       <td>{item.seatCount}</td>

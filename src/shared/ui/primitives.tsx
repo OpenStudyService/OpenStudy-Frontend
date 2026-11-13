@@ -11,16 +11,22 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) {
   return <button className={`btn ${variant} ${className}`} {...props} />;
 }
-export function Badge({ children }: { children: ReactNode }) {
+export function Badge({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone?: "good" | "bad" | "warn" | "neutral";
+}) {
   const s = String(children);
-  const tone = /완료|승인|정상|활성|퇴근|판매 중|이용 가능/.test(s)
+  const inferredTone = /완료|승인|정상|활성|퇴근|판매 중|이용 가능/.test(s)
     ? "good"
     : /실패|취소|환불|고장|불가|높음|반려|제한|비활성/.test(s)
       ? "bad"
       : /진행|대기|신청|근무|중|필요|만료/.test(s)
         ? "warn"
         : "neutral";
-  return <span className={`badge ${tone}`}>{children}</span>;
+  return <span className={`badge ${tone ?? inferredTone}`}>{children}</span>;
 }
 export function Avatar({
   name,

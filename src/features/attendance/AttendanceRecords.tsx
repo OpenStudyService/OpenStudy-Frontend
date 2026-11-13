@@ -1,3 +1,5 @@
+import { useTableSort } from "../../shared/ui/table-sort";
+import { readFlatListPage } from "../../shared/api/read-sorted-pages";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -28,11 +30,14 @@ const RECORD_FILTER_KEYS = [
   "mine",
   "employeeId",
   "page",
+  "sort",
+  "direction",
 ];
 
 export function AttendanceRecords() {
   const { session, scope, lookups } = useApp();
   const [params, setParams] = useSearchParams();
+  const sorting = useTableSort({ sort: "clockInAt", direction: "desc" });
   const from = params.get("from") || "",
     to = params.get("to") || "",
     status = params.get("status") || "",
@@ -62,21 +67,45 @@ export function AttendanceRecords() {
       mine,
       employeeId,
       page,
+      params.has("sort"),
+      sorting.value,
     ],
-    queryFn: ({ signal }) =>
-      attendanceApi.list(
-        {
-          scope,
-          from,
-          to,
-          status,
-          mine: manager ? mine : "true",
-          employeeId: manager ? employeeId : undefined,
-          page,
-          pageSize: PAGE_SIZE,
-        },
-        signal,
-      ),
+    queryFn: async ({ signal }) => {
+      const read = (page: number, pageSize: number) =>
+        attendanceApi.list(
+          {
+            scope,
+            from,
+            to,
+            status,
+            mine: manager ? mine : "true",
+            employeeId: manager ? employeeId : undefined,
+            page,
+            pageSize,
+          },
+          signal,
+        );
+      if (!params.has("sort")) return read(page, PAGE_SIZE);
+      const values = {
+        employee: (r: AttendanceRecord) => r.employee.name,
+        branch: (r: AttendanceRecord) =>
+          lookups.branches.find((b) => b.id === r.branchId)?.name ?? r.branchId,
+        clockInAt: (r: AttendanceRecord) => Date.parse(r.clockInAt),
+        clockOutAt: (r: AttendanceRecord) =>
+          r.clockOutAt ? Date.parse(r.clockOutAt) : null,
+        status: (r: AttendanceRecord) => r.status,
+        worked: (r: AttendanceRecord) => r.workedMinutes,
+      };
+      const value = sorting.fallback(values);
+      if (!value) return read(page, PAGE_SIZE);
+      return readFlatListPage(
+        read,
+        page,
+        PAGE_SIZE,
+        sorting.value.direction,
+        value,
+      );
+    },
     retry: false,
   });
   return (
@@ -155,7 +184,14 @@ export function AttendanceRecords() {
         </p>
         <ListTable
           label="출퇴근 기록"
-          columns={["직원", "기록 지점", "출근", "퇴근", "상태", "실근무 분"]}
+          columns={[
+            sorting.column("직원", "employee"),
+            sorting.column("기록 지점", "branch"),
+            sorting.column("출근", "clockInAt"),
+            sorting.column("퇴근", "clockOutAt"),
+            sorting.column("상태", "status"),
+            sorting.column("실근무 분", "worked"),
+          ]}
           loading={rows.isPending}
           error={hasBlockingReadError(rows) ? rows.error : null}
           onRetry={() => void rows.refetch()}

@@ -3,7 +3,8 @@ import { useId, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { ApiError } from "../../shared/api/client";
-import { Badge, Button, FieldError } from "../../shared/ui/primitives";
+import { Button, FieldError } from "../../shared/ui/primitives";
+import { CustomerStatusBadge } from "./CustomerStatusBadge";
 import { customerApi } from "./api";
 import {
   canCreateCustomer,
@@ -271,7 +272,7 @@ export function LatestCustomer({ customer }: { customer: Customer }) {
         <div>
           <dt>상태</dt>
           <dd>
-            <Badge>{customer.status}</Badge>
+            <CustomerStatusBadge status={customer.status} />
           </dd>
         </div>
         <div>

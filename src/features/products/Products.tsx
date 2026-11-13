@@ -1,3 +1,5 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { Tabs } from "radix-ui";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
@@ -37,6 +39,8 @@ const PRODUCT_FILTER_KEYS = [
   "productCategory",
   "productAvailability",
   "productPage",
+  "productSort",
+  "productDirection",
 ];
 const PAGE_SIZE = 20;
 
@@ -47,6 +51,7 @@ export function ProductManagement() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "categories" ? "categories" : "products";
   const { page, search, setPage, setSearch } = useListSearch("product");
+  const sorting = useTableSort({ sort: "name", direction: "asc" }, "product");
   const status = params.get("productStatus") || "";
   const availability = params.get("productAvailability") ?? "";
   const kind = params.get("productKind") || "";
@@ -64,6 +69,16 @@ export function ProductManagement() {
       },
       { replace: true },
     );
+  const clientSort = sorting.fallback({
+    kind: (product: Product) => product.terms.kind,
+    category: (product: Product) => product.category.name,
+    terms: (product: Product) => termsLabel(product.terms),
+    branches: (product: Product) =>
+      product.branchIds
+        .map((id) => session.branches.find((b) => b.id === id)?.name ?? id)
+        .join(", "),
+    status: (product: Product) => product.status,
+  });
   const products = useQuery({
     queryKey: [
       "data",
@@ -76,11 +91,19 @@ export function ProductManagement() {
       kind,
       categoryId,
       availability,
+      sorting.value,
     ],
     queryFn: ({ signal }) =>
-      api<ProductPage>(
-        `/products?${queryString({ scope, page, pageSize: PAGE_SIZE, q: search, status, kind, categoryId, availability, sort: "name", direction: "asc" })}`,
-        { signal },
+      readListPage<ProductPage>(
+        (page, pageSize) =>
+          api<ProductPage>(
+            `/products?${queryString({ scope, page, pageSize, q: search, status, kind, categoryId, availability, ...(!clientSort && sorting.value) })}`,
+            { signal },
+          ),
+        page,
+        PAGE_SIZE,
+        sorting.value.direction,
+        clientSort,
       ),
     enabled: tab === "products",
     retry: false,
@@ -209,13 +232,13 @@ export function ProductManagement() {
             <ListTable
               label="상품 목록"
               columns={[
-                "상품명",
-                "유형",
-                "분류",
-                "판매 금액",
-                "이용 조건",
-                "판매 지점",
-                "상태",
+                sorting.column("상품명", "name"),
+                sorting.column("유형", "kind"),
+                sorting.column("분류", "category"),
+                sorting.column("판매 금액", "priceKrw"),
+                sorting.column("이용 조건", "terms"),
+                sorting.column("판매 지점", "branches"),
+                sorting.column("상태", "status"),
               ]}
               loading={products.isPending}
               error={

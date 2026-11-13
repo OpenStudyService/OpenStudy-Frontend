@@ -267,6 +267,15 @@
   .data-table th {
     @apply border-b border-line bg-canvas px-5 py-3 font-medium text-muted;
   }
+  .data-table th.sort-column {
+    @apply p-0;
+  }
+  .sort-column > button {
+    @apply flex w-full items-center gap-1.5 px-5 py-3 text-left hover:text-primary focus-visible:text-primary;
+  }
+  .sort-column[aria-sort] > button {
+    @apply font-semibold text-primary;
+  }
   .data-table td {
     @apply border-b border-line px-5 py-4;
   }

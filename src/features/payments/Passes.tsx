@@ -1,3 +1,5 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
@@ -10,7 +12,7 @@ import {
 } from "../../shared/ui/ListLayout";
 import { listPasses } from "./api";
 import { passKinds, passStatuses } from "./model";
-import type { PassFilters } from "./model";
+import type { Pass, PassFilters } from "./model";
 import { PassPanel, passBalance } from "./PaymentPanels";
 import {
   CustomerSelector,
@@ -34,6 +36,7 @@ const PAGE_SIZE = 20;
 export function Passes({ embedded = false }: { embedded?: boolean }) {
   const { session, scope } = useApp();
   const { params, page, update, reset } = useSalesSearch();
+  const sorting = useTableSort({ sort: "createdAt", direction: "desc" });
   const branch = params.get("branchId") || "";
   const requestedScope =
     scope === "all" && session.branches.some((b) => b.id === branch)
@@ -49,6 +52,14 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
     sort: params.get("sort") === "expiresAt" ? "expiresAt" : "createdAt",
     direction: params.get("direction") === "asc" ? "asc" : "desc",
   };
+  const clientSort = sorting.fallback({
+    customer: (pass: Pass) => pass.customer.name,
+    product: (pass: Pass) => pass.productName,
+    balance: (pass: Pass) => passBalance(pass),
+    startedAt: (pass: Pass) =>
+      pass.startedAt ? Date.parse(pass.startedAt) : null,
+    status: (pass: Pass) => pass.status,
+  });
   const passes = useQuery({
     queryKey: [
       "data",
@@ -57,8 +68,16 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
       "passes",
       "list",
       filters,
+      sorting.value.sort,
     ],
-    queryFn: ({ signal }) => listPasses(filters, signal),
+    queryFn: ({ signal }) =>
+      readListPage<Awaited<ReturnType<typeof listPasses>>>(
+        (page, pageSize) => listPasses({ ...filters, page, pageSize }, signal),
+        page,
+        PAGE_SIZE,
+        sorting.value.direction,
+        clientSort,
+      ),
     retry: false,
   });
   const detail = params.get("detail");
@@ -136,12 +155,12 @@ export function Passes({ embedded = false }: { embedded?: boolean }) {
         <ListTable
           label="보유 이용권 목록"
           columns={[
-            "고객",
-            "이용권",
-            "잔량·이용 기간",
-            "시작 일시",
-            "만료 일시",
-            "상태",
+            sorting.column("고객", "customer"),
+            sorting.column("이용권", "product"),
+            sorting.column("잔량·이용 기간", "balance"),
+            sorting.column("시작 일시", "startedAt"),
+            sorting.column("만료 일시", "expiresAt"),
+            sorting.column("상태", "status"),
           ]}
           loading={passes.isPending}
           error={hasBlockingReadError(passes) ? passes.error : null}

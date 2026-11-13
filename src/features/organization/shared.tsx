@@ -1,5 +1,7 @@
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState, type ReactNode } from "react";
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import type { SortDirection } from "../../shared/ui/table-sort";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
@@ -10,12 +12,50 @@ import { organizationRead } from "./api";
 
 export function useOrganizationList<
   K extends "BranchPage" | "EmployeePage" | "PermissionPresetPage",
->(path: string, enabled = true) {
+>(
+  path: string,
+  enabled = true,
+  sorting?: {
+    sort: string;
+    page: number;
+    pageSize: number;
+    direction: SortDirection;
+    value: (
+      row: components["schemas"][K]["items"][number],
+    ) => string | number | null | undefined;
+  },
+) {
   const { session, scope } = useApp();
   return useQuery({
-    queryKey: ["data", session.user.id, scope, "organization", path],
-    queryFn: ({ signal }) =>
-      organizationRead<components["schemas"][K]>(path, signal),
+    queryKey: [
+      "data",
+      session.user.id,
+      scope,
+      "organization",
+      path,
+      sorting?.sort,
+      sorting?.direction,
+    ],
+    queryFn: ({ signal }) => {
+      if (!sorting)
+        return organizationRead<components["schemas"][K]>(path, signal);
+      const [resource, search] = path.split("?");
+      return readListPage<components["schemas"][K]>(
+        (page, pageSize) => {
+          const params = new URLSearchParams(search);
+          params.set("page", String(page));
+          params.set("pageSize", String(pageSize));
+          return organizationRead<components["schemas"][K]>(
+            `${resource}?${params}`,
+            signal,
+          );
+        },
+        sorting.page,
+        sorting.pageSize,
+        sorting.direction,
+        sorting.value,
+      );
+    },
     enabled,
     retry: false,
   });

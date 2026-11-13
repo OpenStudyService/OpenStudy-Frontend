@@ -267,6 +267,16 @@ export const invitationHandlers = [
               .toLowerCase()
               .includes((q.get("q") || "").toLowerCase()),
         );
+      const sort = q.get("sort");
+      const field =
+        sort === "name" || sort === "expiresAt" ? sort : "createdAt";
+      const direction = q.get("direction") === "asc" ? 1 : -1;
+      found.sort(
+        (left, right) =>
+          direction *
+          (left[field].localeCompare(right[field], "ko") ||
+            left.id.localeCompare(right.id)),
+      );
       const page = Number(q.get("page") || 1),
         pageSize = Number(q.get("pageSize") || 20);
       return {

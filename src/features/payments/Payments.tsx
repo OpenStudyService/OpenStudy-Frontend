@@ -1,3 +1,5 @@
+import { readListPage } from "../../shared/api/read-sorted-pages";
+import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
@@ -83,6 +85,7 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
   const query = useQueryClient();
   const { params, page, update, reset } = useSalesSearch();
   const [, setParams] = useSearchParams();
+  const sorting = useTableSort({ sort: "createdAt", direction: "desc" });
   const advanced = readAdvancedFilters(params);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Payment>();
@@ -123,6 +126,14 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
       (scope === "all" || b.id === scope) &&
       can(session.user, b.id, "payments:write"),
   );
+  const clientSort = sorting.fallback({
+    customer: (payment: Payment) => payment.customer.name,
+    product: (payment: Payment) => payment.productName ?? payment.purpose,
+    branch: (payment: Payment) =>
+      session.branches.find((b) => b.id === payment.branchId)?.name ??
+      payment.branchId,
+    status: (payment: Payment) => payment.status,
+  });
   const payments = useQuery({
     queryKey: [
       "data",
@@ -131,8 +142,17 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
       "payments",
       "list",
       filters,
+      sorting.value.sort,
     ],
-    queryFn: ({ signal }) => listPayments(filters, signal),
+    queryFn: ({ signal }) =>
+      readListPage<Awaited<ReturnType<typeof listPayments>>>(
+        (page, pageSize) =>
+          listPayments({ ...filters, page, pageSize }, signal),
+        page,
+        PAGE_SIZE,
+        sorting.value.direction,
+        clientSort,
+      ),
     enabled: readable && !invalidRange,
     retry: false,
   });
@@ -210,22 +230,6 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
                 onChange={(e) => update("to", e.target.value)}
               />
             </span>
-            <select
-              aria-label="결제 정렬"
-              value={filters.sort}
-              onChange={(e) => update("sort", e.target.value)}
-            >
-              <option value="createdAt">결제일 순</option>
-              <option value="amountKrw">금액 순</option>
-            </select>
-            <select
-              aria-label="결제 정렬 방향"
-              value={filters.direction}
-              onChange={(e) => update("direction", e.target.value)}
-            >
-              <option value="desc">내림차순</option>
-              <option value="asc">오름차순</option>
-            </select>
             <Button variant="quiet" onClick={() => reset(PAYMENT_FILTER_KEYS)}>
               초기화
             </Button>
@@ -299,12 +303,12 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
           <ListTable
             label="결제 목록"
             columns={[
-              "고객",
-              "구매 상품",
-              "결제 지점",
-              "서버 산정 금액",
-              "상태",
-              "결제 일시",
+              sorting.column("고객", "customer"),
+              sorting.column("구매 상품", "product"),
+              sorting.column("결제 지점", "branch"),
+              sorting.column("서버 산정 금액", "amountKrw"),
+              sorting.column("상태", "status"),
+              sorting.column("결제 일시", "createdAt", "desc"),
             ]}
             state={
               invalidRange && (
