@@ -345,7 +345,9 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
                 </td>
                 <td>{formatKrw(p.amountKrw)}</td>
                 <td>
-                  <Badge>{p.status}</Badge>
+                  <Badge tone={p.status === "환불" ? "warn" : undefined}>
+                    {p.status}
+                  </Badge>
                 </td>
                 <td>{dateTime(p.createdAt)}</td>
               </tr>

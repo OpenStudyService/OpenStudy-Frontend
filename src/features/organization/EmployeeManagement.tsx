@@ -234,7 +234,13 @@ function EmployeeManagementContent() {
                   </td>
                   <td>{employee.email}</td>
                   <td>
-                    <Badge>{employee.status}</Badge>
+                    <Badge
+                      tone={
+                        employee.status === "승인 대기" ? "warn" : undefined
+                      }
+                    >
+                      {employee.status}
+                    </Badge>
                   </td>
                   <td>
                     {employee.memberships.length

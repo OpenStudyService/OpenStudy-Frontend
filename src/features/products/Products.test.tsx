@@ -222,6 +222,17 @@ it("lists terms with explicit units and unlimited validity, and never offers del
   ).toBeVisible();
 });
 
+it("uses a warning badge for stopped sales in the list and detail", async () => {
+  products = [{ ...products[0], status: "판매 중지" }];
+  const dialog = await open();
+  const table = screen.getByRole("table", { name: "상품 목록", hidden: true });
+  expect(within(table).getByText("판매 중지")).toHaveClass("badge", "warn");
+  expect(await within(dialog).findByText("판매 중지")).toHaveClass(
+    "badge",
+    "warn",
+  );
+});
+
 it("explains a read-only shared product and hides every write control", async () => {
   session("writer");
   products = [time({ canEdit: false })];

@@ -584,6 +584,26 @@ it("resets payment filters including advanced filters but keeps unrelated params
   expect([...search().keys()]).toEqual(["tab"]);
 });
 
+it.each([
+  ["환불", "warn"],
+  ["실패", "bad"],
+] as const)(
+  "uses the expected badge for %s in the list and detail",
+  async (status, tone) => {
+    payment.status = status;
+    const user = userEvent.setup();
+    mount(<Payments />);
+    const table = await screen.findByRole("table", { name: "결제 목록" });
+    const badge = await within(table).findByText(status);
+    expect(badge).toHaveClass("badge", tone);
+    await user.click(
+      within(table).getByRole("button", { name: payment.customer.name }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(status)).toHaveClass("badge", tone);
+  },
+);
+
 it("shows the payment list states and Mock payment action inside the list card", async () => {
   mount(<Payments />, "?from=2026-11-03&to=2026-11-01");
   const table = await screen.findByRole("table", { name: "결제 목록" });

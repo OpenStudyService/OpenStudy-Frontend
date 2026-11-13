@@ -18,6 +18,7 @@ import { permissions, can, admin } from "../../shared/domain/schema";
 import { api, ApiError } from "../../shared/api/client";
 import {
   BranchForm,
+  BranchManagement,
   EmployeeDetail,
   EmployeeManagement,
   MembershipForm,
@@ -153,6 +154,33 @@ beforeEach(() => {
   setActor("owner");
 });
 afterEach(cleanup);
+
+it.each([
+  ["운영 중", "good", <BranchManagement />, branch],
+  [
+    "승인 대기",
+    "warn",
+    <EmployeeManagement />,
+    { ...employee, status: "승인 대기" },
+  ],
+] as const)(
+  "shows the configured organization list badge (%s)",
+  async (status, tone, element, item) => {
+    vi.mocked(api).mockResolvedValue({
+      items: [item],
+      meta: { page: 1, pageSize: 20, total: 1 },
+    });
+    const router = createMemoryRouter([{ path: "/", element }]);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    expect(
+      await within(screen.getByRole("table")).findByText(status),
+    ).toHaveClass("badge", tone);
+  },
+);
 
 it("selects employee tabs by click and arrow keys while preserving search", async () => {
   const user = userEvent.setup();
