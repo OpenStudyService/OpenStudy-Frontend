@@ -250,10 +250,12 @@ test("product draft survives cancelled close, back and reload, then discards onc
   page,
 }) => {
   await login(page);
+  await page.getByRole("button", { name: "메뉴 열기" }).click();
   await page
+    .getByRole("complementary", { name: "운영 메뉴" })
     .getByRole("link", { name: "상품 관리", exact: true })
-    .first()
     .click();
+  await expect(page).toHaveURL("/app/all/products");
   await page.getByRole("button", { name: "상품 등록", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const input = dialog.getByLabel("상품명", { exact: true });
