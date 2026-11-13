@@ -252,7 +252,7 @@ export function DomainDataTable({
                     }
                   }}
                 >
-                  {column.alias}
+                  {column.label ?? column.alias}
                   {column.unit ? ` (${column.unit})` : ""}
                 </button>
               </th>
@@ -385,7 +385,7 @@ function ComponentView({
                 key={`${index}:${column.alias}`}
                 className="rounded-lg bg-soft p-3"
               >
-                <dt>{KPI_LABELS[column.alias] ?? column.alias}</dt>
+                <dt>{KPI_LABELS[column.alias] ?? column.label ?? column.alias}</dt>
                 <dd className="m-0 mt-1 text-base font-semibold">
                   {cellText(row[column.alias], column.unit)}
                 </dd>
@@ -468,14 +468,14 @@ function ComponentView({
                 {type === "LINE_CHART" ? (
                   <Line
                     dataKey="value"
-                    name={metric.alias}
+                    name={metric.label ?? metric.alias}
                     stroke="var(--primary)"
                     isAnimationActive={false}
                   />
                 ) : (
                   <Bar
                     dataKey="value"
-                    name={metric.alias}
+                    name={metric.label ?? metric.alias}
                     fill="var(--primary)"
                     isAnimationActive={false}
                   />

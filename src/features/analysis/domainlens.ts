@@ -46,6 +46,8 @@ export function toViewMode(type: ViewComponentType) {
 
 export const datasetColumnSchema = z.object({
   alias: z.string(),
+  /** Display name; generated results carry compiler aliases (d0, m0), so the label comes from their QuerySpec. */
+  label: z.string().optional(),
   type: z.string(),
   unit: z.string().nullable().optional(),
   precision: z.number().nullable().optional(),
@@ -125,6 +127,121 @@ export interface ParsedAiResult {
   warnings: string[];
   truncation?: AiSchema["AiTruncation"];
   notice?: string;
+  /** Set for a result the AI generated (no registered analysis): what it measured, grouped and over which period. */
+  generated?: GeneratedConditions;
+}
+
+export interface GeneratedConditions {
+  metrics: string[];
+  dimensions: string[];
+  period: { from: string; to: string } | null;
+}
+
+/**
+ * Generated views name catalog components (PaginatedDataTable, BarChart, KpiGroup …). They render with the same
+ * table, bar, line and KPI views as registered results; their page/sort/CSV events are the result screen's own.
+ */
+const GENERATED_COMPONENTS: Record<string, ViewComponentType> = {
+  DataTable: "DATA_TABLE",
+  PaginatedDataTable: "DATA_TABLE",
+  DetailCard: "DATA_TABLE",
+  TABLE: "DATA_TABLE",
+  KpiGroup: "KPI",
+  BarChart: "BAR_CHART",
+  RankList: "BAR_CHART",
+  DonutChart: "BAR_CHART",
+  LineChart: "LINE_CHART",
+  AreaChart: "LINE_CHART",
+};
+
+/** Display names of the catalog fields and metrics a generated query can select (OpenStudy semantic catalog). */
+export const FIELD_LABELS: Record<string, string> = {
+  "sales.approved_amount_krw": "결제 승인액",
+  "sales.approved_count": "결제 건수",
+  "passes.issued_count": "이용권 발급 수",
+  "branch.name": "지점",
+  "payment.item_type": "상품 구분",
+  "payment.status": "결제 상태",
+  "pass.pass_type": "이용권 구분",
+  "payment.paid_at": "결제 시각",
+  "pass.issued_at": "발급 시각",
+};
+
+const selectionSchema = z.object({ field: z.string(), alias: z.string() });
+const querySpecSchema = z.object({
+  id: z.string(),
+  mode: z.string(),
+  dimensions: z.array(selectionSchema).default([]),
+  metrics: z.array(selectionSchema).default([]),
+  filter: z.unknown().optional(),
+});
+type GeneratedQuery = z.infer<typeof querySpecSchema>;
+
+/** The QuerySpecs of a response: one object, a list (a saved generated result) or none. */
+function querySpecsOf(raw: unknown): GeneratedQuery[] {
+  const list = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
+  return list.flatMap((item) => {
+    const parsed = querySpecSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+function fieldLabel(field: string) {
+  return FIELD_LABELS[field] ?? field;
+}
+
+const KST_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+type FilterLeaf = { field?: unknown; operator?: unknown; values?: unknown };
+
+/** A [from, to) instant range on one field as Asia/Seoul dates, both ends inclusive. */
+export function periodOf(filter: unknown): GeneratedConditions["period"] {
+  const leaves: FilterLeaf[] = [];
+  const collect = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const record = node as Record<string, unknown>;
+    if (record.kind === "leaf") leaves.push(record);
+    else if (record.junction === "AND" && Array.isArray(record.children))
+      record.children.forEach(collect);
+  };
+  collect(filter);
+  const first = (leaf?: FilterLeaf) =>
+    Array.isArray(leaf?.values) ? Date.parse(String(leaf.values[0])) : NaN;
+  const start = leaves.find((leaf) => leaf.operator === "GTE");
+  const end = leaves.find(
+    (leaf) => leaf.operator === "LT" && leaf.field === start?.field,
+  );
+  const from = first(start);
+  const to = first(end);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
+  return { from: KST_DATE.format(from), to: KST_DATE.format(to - 1) };
+}
+
+function normalizeGeneratedView(
+  view: ViewSpecEnvelopeDto,
+): ViewSpecEnvelopeDto {
+  return {
+    ...view,
+    components: view.components.flatMap((component) => {
+      const type =
+        GENERATED_COMPONENTS[component.componentRef.id] ??
+        normalizeComponentType(component.componentRef.id);
+      return type
+        ? [
+            {
+              ...component,
+              componentRef: { id: type, version: "1.0.0" },
+              events: [],
+            },
+          ]
+        : [];
+    }),
+  };
 }
 
 // Parse untrusted results before passing datasets and ViewSpec to the renderer.
@@ -135,7 +252,51 @@ export function parseAiResult(raw: unknown): ParsedAiResult {
 
   const data = envelope.data;
   const view = viewSpecEnvelopeSchema.safeParse(response.viewSpec ?? data.view);
-  const viewSpec = view.success ? view.data : null;
+  const queries = querySpecsOf(
+    (response as { querySpec?: unknown }).querySpec,
+  );
+  // A registered analysis runs as REGISTERED_ANALYSIS; any other query was generated (OpenStudy-Backend#233).
+  const isGenerated =
+    queries.length > 0 &&
+    queries.every((query) => query.mode !== "REGISTERED_ANALYSIS");
+  const viewSpec = view.success
+    ? isGenerated
+      ? normalizeGeneratedView(view.data)
+      : view.data
+    : null;
+  const labels = new Map(
+    queries.flatMap((query) =>
+      [...query.dimensions, ...query.metrics].map(
+        (selection) => [selection.alias, fieldLabel(selection.field)] as const,
+      ),
+    ),
+  );
+  const datasetList = isGenerated
+    ? data.datasets.map((dataset) => ({
+        ...dataset,
+        columns: dataset.columns.map((column) => ({
+          ...column,
+          label: column.label ?? labels.get(column.alias),
+        })),
+      }))
+    : data.datasets;
+  const generated: GeneratedConditions | undefined = isGenerated
+    ? {
+        metrics: [
+          ...new Set(
+            queries.flatMap((q) => q.metrics.map((m) => fieldLabel(m.field))),
+          ),
+        ],
+        dimensions: [
+          ...new Set(
+            queries.flatMap((q) =>
+              q.dimensions.map((d) => fieldLabel(d.field)),
+            ),
+          ),
+        ],
+        period: periodOf(queries[0]?.filter),
+      }
+    : undefined;
   const componentTypes = COMPONENT_TYPES.filter((type) =>
     viewSpec?.components.some(
       (component) => component.componentRef.id === type,
@@ -146,10 +307,14 @@ export function parseAiResult(raw: unknown): ParsedAiResult {
   );
   const notice = z.object({ message: z.string() }).safeParse(data.notice);
   return {
-    title: question?.shortLabel ?? "AI 데이터 분석 결과",
+    title:
+      question?.shortLabel ??
+      (generated
+        ? `${generated.dimensions.length ? `${generated.dimensions.join("·")}별 ` : ""}${generated.metrics.join("·")}`
+        : "AI 데이터 분석 결과"),
     primaryComponent: componentTypes[0] ?? "DATA_TABLE",
     componentTypes,
-    datasetList: data.datasets,
+    datasetList,
     viewSpec,
     asOf: data.asOf ?? null,
     snapshotVersion: data.snapshotVersion ?? null,
@@ -157,6 +322,7 @@ export function parseAiResult(raw: unknown): ParsedAiResult {
     warnings: data.warnings,
     truncation: response.truncation,
     notice: notice.success ? notice.data.message : undefined,
+    generated,
   };
 }
 
