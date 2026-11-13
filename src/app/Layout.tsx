@@ -103,6 +103,11 @@ export function Layout() {
     location = useLocation(),
     query = useQueryClient();
   const { navOpen, setNav, clearPrivate } = useUi();
+  const section = location.pathname.split("/")[3] || "home";
+  const sidebarCollapsed = section === "home" || section === "chat";
+  useLayoutEffect(() => {
+    setNav(false);
+  }, [scope, section, setNav]);
   const user = session.data?.user;
   const lookups = useQuery({
     queryKey: ["data", user?.id, scope, "lookups"],
@@ -226,15 +231,14 @@ export function Layout() {
     ["tasks", "tasks", "업무"],
     ...(can(activeUser, scope, "ai:read") ? [["chat", "chat", "채팅"]] : []),
   ];
-  const section = location.pathname.split("/")[3] || "home",
-    title =
-      section === "chat"
-        ? "AI 채팅"
-        : section === "settings"
-          ? "개인 설정"
-          : MOCK && section === "demo-tools"
-            ? "데모·검증 도구"
-            : navigation.find((n) => n.path === section)?.title || "OpenStudy";
+  const title =
+    section === "chat"
+      ? "AI 채팅"
+      : section === "settings"
+        ? "개인 설정"
+        : MOCK && section === "demo-tools"
+          ? "데모·검증 도구"
+          : navigation.find((n) => n.path === section)?.title || "OpenStudy";
   async function logout() {
     if (!confirmLeave()) return;
     await api("/auth/logout", { method: "POST", body: {} });
@@ -269,18 +273,18 @@ export function Layout() {
       refresh();
     }
   }
-  const sidebar = (
+  const sidebar = (branchSelectId: string) => (
     <aside className="sidebar">
       <div className="side-brand">
         OpenStudy <Icon name="leaf" size={18} />
       </div>
       <div className="side-scroll">
         <p className="nav-label">MY WORKSPACE</p>
-        <label className="sr-only" htmlFor="branch-select">
+        <label className="sr-only" htmlFor={branchSelectId}>
           현재 지점
         </label>
         <select
-          id="branch-select"
+          id={branchSelectId}
           className="scope-select"
           value={scope}
           onChange={(e) => changeScope(e.target.value)}
@@ -323,7 +327,9 @@ export function Layout() {
     </aside>
   );
   return (
-    <div className="workspace">
+    <div
+      className={sidebarCollapsed ? "workspace sidebar-collapsed" : "workspace"}
+    >
       <a className="skip-link" href="#main">
         본문으로 건너뛰기
       </a>
@@ -363,13 +369,14 @@ export function Layout() {
           src={activeUser.avatar}
         />
       </nav>
-      {sidebar}
+      {!sidebarCollapsed && sidebar("branch-select")}
       <div className="main-shell">
         <header className="topbar">
           <div className="flex min-w-0 items-center gap-3">
             <Button
               className="mobile-menu"
               aria-label="메뉴 열기"
+              aria-haspopup="dialog"
               onClick={() => setNav(true)}
             >
               <Icon name="menu" />
@@ -505,7 +512,7 @@ export function Layout() {
         title="메뉴"
         description="업무 공간과 운영 메뉴를 선택하세요."
       >
-        <div className="drawer-sidebar">{sidebar}</div>
+        <div className="drawer-sidebar">{sidebar("drawer-branch-select")}</div>
       </Panel>
     </div>
   );

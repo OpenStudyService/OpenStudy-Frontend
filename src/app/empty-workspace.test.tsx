@@ -180,10 +180,6 @@ it("renders empty summary cards without loading any chat data", async () => {
   ]) {
     expect(screen.getByRole("heading", { name: title })).toBeVisible();
   }
-  expect(screen.getByRole("combobox", { name: "현재 지점" })).toBeDisabled();
-  expect(
-    screen.getByRole("option", { name: "등록된 지점 없음" }),
-  ).toBeInTheDocument();
   expect(
     screen.getByRole("link", { name: /현재 이용 좌석/ }),
   ).toHaveTextContent("0/0석");
@@ -199,6 +195,11 @@ it("renders empty summary cards without loading any chat data", async () => {
       )
       .sort(),
   ).toEqual(["/api/home/summary", "/api/lookups", "/api/me"]);
+  await userEvent.click(screen.getByRole("button", { name: "메뉴 열기" }));
+  expect(screen.getByRole("combobox", { name: "현재 지점" })).toBeDisabled();
+  expect(
+    screen.getByRole("option", { name: "등록된 지점 없음" }),
+  ).toBeInTheDocument();
 });
 
 it.each([
@@ -310,6 +311,9 @@ it("uses known session branches when lookup arrays are absent", async () => {
     ],
   };
   renderWorkspace(() => Response.json({}), "home", current);
+  await userEvent.click(
+    await screen.findByRole("button", { name: "메뉴 열기" }),
+  );
   expect(
     await screen.findByRole("option", { name: "강남점" }),
   ).toBeInTheDocument();
@@ -487,7 +491,7 @@ it("keeps idle reads quiet and refreshes the active menu only on request", async
   }
 
   fail = true;
-  await user.click(screen.getByRole("link", { name: "대시보드" }));
+  await user.click(screen.getByRole("link", { name: "OpenStudy 홈" }));
   expect(
     await screen.findByText(/마지막 조회 결과를 표시합니다/),
   ).toBeVisible();
@@ -495,7 +499,12 @@ it("keeps idle reads quiet and refreshes the active menu only on request", async
   expect(reads).toBe(2);
 
   fail = false;
-  await user.click(screen.getByRole("link", { name: "대시보드" }));
+  await user.click(screen.getByRole("button", { name: "메뉴 열기" }));
+  await user.click(
+    within(screen.getByRole("dialog", { name: "메뉴" })).getByRole("link", {
+      name: "대시보드",
+    }),
+  );
   await waitFor(() => expect(reads).toBe(3));
   await waitFor(() =>
     expect(screen.queryByText(/마지막 조회 결과를 표시합니다/)).toBeNull(),
@@ -598,6 +607,7 @@ it("uses the server's staff default and changes the request and query key with t
   expect(
     clients[0].getQueryData(["data", "staff", "all", "home", false, undefined]),
   ).toBeDefined();
+  await userEvent.click(screen.getByRole("button", { name: "메뉴 열기" }));
   await userEvent.selectOptions(screen.getByLabelText("현재 지점"), "2");
   await waitFor(() => expect(reads[2]?.searchParams.get("scope")).toBe("2"));
   expect(reads[2].searchParams.get("mine")).toBe("false");

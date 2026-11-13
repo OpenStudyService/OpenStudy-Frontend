@@ -26,6 +26,77 @@ async function login(page: Page) {
   await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
 }
 
+for (const width of [1100, 1099, 390]) {
+  test(`home and chat start with the menu collapsed at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await login(page);
+    const rail = page.getByRole("navigation", {
+      name: "빠른 탐색",
+      exact: true,
+    });
+    const bottomNav = page.getByRole("navigation", {
+      name: "모바일 빠른 탐색",
+    });
+    const quickNav = width === 390 ? bottomNav : rail;
+    const fixedSidebar = page.locator(".workspace > .sidebar");
+    const openMenu = page.getByRole("button", { name: "메뉴 열기" });
+    const menu = page.getByRole("dialog", { name: "메뉴", exact: true });
+
+    await page.goto("/app/gangnam/home");
+    await expect(quickNav).toBeVisible();
+    await expect(width === 390 ? rail : bottomNav).toBeHidden();
+    await expect(fixedSidebar).toHaveCount(0);
+    await expect(page.locator(".main-shell")).toHaveCSS(
+      "width",
+      `${width - (width === 390 ? 0 : 70)}px`,
+    );
+    await openMenu.focus();
+    await page.keyboard.press("Enter");
+    await expect(menu.getByLabel("현재 지점")).toHaveValue("gangnam");
+    await expect(menu.getByRole("link", { name: "회원 관리" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(openMenu).toBeFocused();
+
+    await quickNav.getByRole("link", { name: "채팅", exact: true }).click();
+    await expect(page).toHaveURL(/\/gangnam\/chat$/);
+    await page.reload();
+    await expect(openMenu).toBeVisible();
+    await expect(fixedSidebar).toHaveCount(0);
+    await openMenu.click();
+    await menu.getByLabel("현재 지점").selectOption("seongsu");
+    await expect(page).toHaveURL(/\/seongsu\/chat$/);
+    await expect(menu).toBeHidden();
+    await openMenu.click();
+    await expect(menu.getByLabel("현재 지점")).toHaveValue("seongsu");
+    await page.goBack();
+    await expect(page).toHaveURL(/\/gangnam\/chat$/);
+    await expect(menu).toBeHidden();
+    await openMenu.click();
+    await expect(menu).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/gangnam\/home$/);
+    await expect(menu).toBeHidden();
+
+    for (const [label, route] of [
+      ["업무", "tasks"],
+      ["설정", "settings"],
+    ]) {
+      await quickNav.getByRole("link", { name: label, exact: true }).click();
+      await expect(page).toHaveURL(`/app/gangnam/${route}`);
+      if (width === 1100) {
+        await expect(fixedSidebar).toBeVisible();
+        await expect(openMenu).toBeHidden();
+      } else {
+        await expect(fixedSidebar).toBeHidden();
+        await expect(openMenu).toBeVisible();
+      }
+    }
+  });
+}
+
 test("registration actions sit at the right edge of their filters", async ({
   page,
 }) => {
@@ -435,7 +506,10 @@ test("workspace reads follow menu actions without a refresh control", async ({
   await page.getByRole("link", { name: "대시보드" }).click();
   await expect(page.getByRole("heading", { name: /안녕하세요/ })).toBeVisible();
   const entryResponse = nextTaskResponse();
-  await menu.click();
+  await page
+    .getByRole("navigation", { name: "빠른 탐색", exact: true })
+    .getByRole("link", { name: "업무", exact: true })
+    .click();
   await (await entryResponse).finished();
   expect(taskReads().length).toBeGreaterThan(initialReads + 1);
   expect(
