@@ -418,16 +418,18 @@ export function Layout() {
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
-              className="btn mobile-menu"
+              className={
+                navOpen ? "btn mobile-menu primary" : "btn mobile-menu"
+              }
               aria-label={inlineMenuOpen ? "메뉴 접기" : "메뉴 열기"}
-              aria-expanded={inlineMenu ? navOpen : undefined}
+              aria-expanded={navOpen}
               aria-controls={inlineMenuOpen ? "workspace-sidebar" : undefined}
               aria-haspopup={inlineMenu ? undefined : "dialog"}
               onKeyDown={closeMenuOnEscape}
               ref={menuButtonRef}
               onClick={() => setNav(!inlineMenuOpen)}
             >
-              <Icon name="menu" />
+              <Icon name={navOpen ? "close" : "menu"} />
             </button>
             <span className="hidden text-xs text-muted sm:block">
               워크스페이스

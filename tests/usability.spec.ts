@@ -49,10 +49,15 @@ for (const width of [1100, 1099, 390]) {
     await expect(quickNav).toBeVisible();
     await expect(width === 390 ? rail : bottomNav).toBeHidden();
     await expect(fixedSidebar).toHaveCount(0);
+    await expect(openMenu).toHaveAttribute("aria-expanded", "false");
     await expect(page.locator(".main-shell")).toHaveCSS(
       "width",
       `${width - (width === 390 ? 0 : 70)}px`,
     );
+    const closedBackground = await openMenu.evaluate(
+      (button) => getComputedStyle(button).backgroundColor,
+    );
+    const closedIcon = await openMenu.locator("svg path").getAttribute("d");
     await openMenu.focus();
     await page.keyboard.press("Enter");
     await expect(menu.getByLabel("현재 지점")).toHaveValue("gangnam");
@@ -65,14 +70,27 @@ for (const width of [1100, 1099, 390]) {
       await expect(page.locator(".main-shell")).toHaveCSS("width", "808px");
       const closeMenu = page.getByRole("button", { name: "메뉴 접기" });
       await expect(closeMenu).toHaveAttribute("aria-expanded", "true");
+      await expect(closeMenu).not.toHaveCSS(
+        "background-color",
+        closedBackground,
+      );
+      expect(await closeMenu.locator("svg path").getAttribute("d")).not.toBe(
+        closedIcon,
+      );
       await closeMenu.click();
       await expect(menu).toBeHidden();
+      await expect(openMenu).toHaveAttribute("aria-expanded", "false");
       await openMenu.click();
       await expect(fixedSidebar).toBeFocused();
     }
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
     await expect(openMenu).toBeFocused();
+    await page.mouse.move(0, 0);
+    await expect(openMenu).toHaveCSS("background-color", closedBackground);
+    expect(await openMenu.locator("svg path").getAttribute("d")).toBe(
+      closedIcon,
+    );
 
     await quickNav.getByRole("link", { name: "채팅", exact: true }).click();
     await expect(page).toHaveURL(/\/gangnam\/chat$/);
