@@ -1,6 +1,6 @@
 import { useConfirmDiscard } from "../shared/ui/leaveGuard";
-import { useLayoutEffect, useRef } from "react";
-import type { MouseEvent } from "react";
+import { useLayoutEffect, useRef, useSyncExternalStore } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import {
   Link,
   NavLink,
@@ -28,6 +28,18 @@ import { isAccessError } from "../shared/api/read-model";
 import { WorkspaceReadNotice } from "./WorkspaceReadNotice";
 import { DataNotice } from "../shared/ui/DataNotice";
 import { useUi } from "./store";
+
+const compactNavigationQuery = "(max-width: 1099px)";
+function subscribeToCompactNavigation(onChange: () => void) {
+  const media = window.matchMedia?.(compactNavigationQuery);
+  media?.addEventListener("change", onChange);
+  return () => media?.removeEventListener("change", onChange);
+}
+
+function hasCompactNavigation() {
+  return window.matchMedia?.(compactNavigationQuery).matches ?? false;
+}
+
 export const navigation = [
   { path: "home", title: "대시보드", icon: "home", group: "워크스페이스" },
   { path: "tasks", title: "업무 관리", icon: "tasks", group: "워크스페이스" },
@@ -103,6 +115,23 @@ export function Layout() {
     location = useLocation(),
     query = useQueryClient();
   const { navOpen, setNav, clearPrivate } = useUi();
+  const section = location.pathname.split("/")[3] || "home";
+  const collapsibleSidebar = section === "home" || section === "chat";
+  const compactNavigation = useSyncExternalStore(
+    subscribeToCompactNavigation,
+    hasCompactNavigation,
+  );
+  const inlineMenu = collapsibleSidebar && !compactNavigation;
+  const inlineMenuOpen = inlineMenu && navOpen;
+  const sidebarVisible = !collapsibleSidebar || inlineMenuOpen;
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    setNav(false);
+  }, [compactNavigation, scope, section, setNav]);
+  useLayoutEffect(() => {
+    if (inlineMenuOpen && useUi.getState().navOpen) sidebarRef.current?.focus();
+  }, [inlineMenuOpen]);
   const user = session.data?.user;
   const lookups = useQuery({
     queryKey: ["data", user?.id, scope, "lookups"],
@@ -226,15 +255,14 @@ export function Layout() {
     ["tasks", "tasks", "업무"],
     ...(can(activeUser, scope, "ai:read") ? [["chat", "chat", "채팅"]] : []),
   ];
-  const section = location.pathname.split("/")[3] || "home",
-    title =
-      section === "chat"
-        ? "AI 채팅"
-        : section === "settings"
-          ? "개인 설정"
-          : MOCK && section === "demo-tools"
-            ? "데모·검증 도구"
-            : navigation.find((n) => n.path === section)?.title || "OpenStudy";
+  const title =
+    section === "chat"
+      ? "AI 채팅"
+      : section === "settings"
+        ? "개인 설정"
+        : MOCK && section === "demo-tools"
+          ? "데모·검증 도구"
+          : navigation.find((n) => n.path === section)?.title || "OpenStudy";
   async function logout() {
     if (!confirmLeave()) return;
     await api("/auth/logout", { method: "POST", body: {} });
@@ -269,61 +297,82 @@ export function Layout() {
       refresh();
     }
   }
-  const sidebar = (
-    <aside className="sidebar">
-      <div className="side-brand">
-        OpenStudy <Icon name="leaf" size={18} />
-      </div>
-      <div className="side-scroll">
-        <p className="nav-label">MY WORKSPACE</p>
-        <label className="sr-only" htmlFor="branch-select">
-          현재 지점
-        </label>
-        <select
-          id="branch-select"
-          className="scope-select"
-          value={scope}
-          onChange={(e) => changeScope(e.target.value)}
-          disabled={current.branches.length === 0}
-        >
-          {current.branches.length === 0 && (
-            <option value={scope}>등록된 지점 없음</option>
-          )}
-          {current.branches.length > 0 &&
-            (scope === "all" || current.branches.length > 1) && (
-              <option value="all">전체 허용 지점</option>
+  function closeMenuOnEscape(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !inlineMenuOpen) return;
+    setNav(false);
+    menuButtonRef.current?.focus();
+  }
+  const sidebar = (inDrawer: boolean) => {
+    const branchSelectId = inDrawer ? "drawer-branch-select" : "branch-select";
+    return (
+      <aside
+        className="sidebar"
+        id={inDrawer ? undefined : "workspace-sidebar"}
+        aria-label="운영 메뉴"
+        ref={inDrawer ? undefined : sidebarRef}
+        tabIndex={!inDrawer && collapsibleSidebar ? -1 : undefined}
+        onKeyDown={inDrawer ? undefined : closeMenuOnEscape}
+      >
+        <div className="side-brand">
+          OpenStudy <Icon name="leaf" size={18} />
+        </div>
+        <div className="side-scroll">
+          <p className="nav-label">MY WORKSPACE</p>
+          <label className="sr-only" htmlFor={branchSelectId}>
+            현재 지점
+          </label>
+          <select
+            id={branchSelectId}
+            className="scope-select"
+            value={scope}
+            onChange={(e) => changeScope(e.target.value)}
+            disabled={current.branches.length === 0}
+          >
+            {current.branches.length === 0 && (
+              <option value={scope}>등록된 지점 없음</option>
             )}
-          {current.branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
+            {current.branches.length > 0 &&
+              (scope === "all" || current.branches.length > 1) && (
+                <option value="all">전체 허용 지점</option>
+              )}
+            {current.branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+          {menu.map((n, i) => (
+            <div key={n.path}>
+              {menu[i - 1]?.group !== n.group && (
+                <p className="nav-label">{n.group}</p>
+              )}
+              <NavLink
+                to={`/app/${scope}/${n.path}`}
+                className={({ isActive }) =>
+                  `nav-link ${isActive ? "active" : ""}`
+                }
+                onClick={(event) => menuClick(event, n.path)}
+              >
+                <Icon name={n.icon} size={17} />
+                {n.title}
+              </NavLink>
+            </div>
           ))}
-        </select>
-        {menu.map((n, i) => (
-          <div key={n.path}>
-            {menu[i - 1]?.group !== n.group && (
-              <p className="nav-label">{n.group}</p>
-            )}
-            <NavLink
-              to={`/app/${scope}/${n.path}`}
-              className={({ isActive }) =>
-                `nav-link ${isActive ? "active" : ""}`
-              }
-              onClick={(event) => menuClick(event, n.path)}
-            >
-              <Icon name={n.icon} size={17} />
-              {n.title}
-            </NavLink>
-          </div>
-        ))}
-      </div>
-      <div className="border-t border-line px-5 py-4 text-[10px] text-primary">
-        <Icon name="leaf" size={15} /> 오늘도, 좋은 공간을 함께.
-      </div>
-    </aside>
-  );
+        </div>
+        <div className="border-t border-line px-5 py-4 text-[10px] text-primary">
+          <Icon name="leaf" size={15} /> 오늘도, 좋은 공간을 함께.
+        </div>
+      </aside>
+    );
+  };
   return (
-    <div className="workspace">
+    <div
+      className={
+        collapsibleSidebar
+          ? `workspace sidebar-toggleable${sidebarVisible ? "" : " sidebar-collapsed"}`
+          : "workspace"
+      }
+    >
       <a className="skip-link" href="#main">
         본문으로 건너뛰기
       </a>
@@ -363,16 +412,23 @@ export function Layout() {
           src={activeUser.avatar}
         />
       </nav>
-      {sidebar}
+      {sidebarVisible && sidebar(false)}
       <div className="main-shell">
         <header className="topbar">
           <div className="flex min-w-0 items-center gap-3">
             <Button
+              type="button"
               className="mobile-menu"
-              aria-label="메뉴 열기"
-              onClick={() => setNav(true)}
+              variant={navOpen ? "primary" : undefined}
+              aria-label={inlineMenuOpen ? "메뉴 접기" : "메뉴 열기"}
+              aria-expanded={navOpen}
+              aria-controls={inlineMenuOpen ? "workspace-sidebar" : undefined}
+              aria-haspopup={inlineMenu ? undefined : "dialog"}
+              onKeyDown={closeMenuOnEscape}
+              ref={menuButtonRef}
+              onClick={() => setNav(!inlineMenuOpen)}
             >
-              <Icon name="menu" />
+              <Icon name={navOpen ? "close" : "menu"} />
             </Button>
             <span className="hidden text-xs text-muted sm:block">
               워크스페이스
@@ -500,12 +556,13 @@ export function Layout() {
         )}
       </nav>
       <Panel
-        open={navOpen}
+        open={compactNavigation && navOpen}
         onClose={() => setNav(false)}
         title="메뉴"
         description="업무 공간과 운영 메뉴를 선택하세요."
+        closeButtonVariant="primary"
       >
-        <div className="drawer-sidebar">{sidebar}</div>
+        <div className="drawer-sidebar">{sidebar(true)}</div>
       </Panel>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Dialog } from "radix-ui";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { useId, useRef, useState } from "react";
 import { PanelDrafts, confirmDiscard } from "./leaveGuard";
 import type { RefObject } from "react";
@@ -8,7 +8,7 @@ export function Button({
   variant = "",
   className = "",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) {
+}: ComponentPropsWithRef<"button"> & { variant?: string }) {
   return <button className={`btn ${variant} ${className}`} {...props} />;
 }
 export function Badge({
@@ -96,6 +96,7 @@ export function Panel({
   children,
   wide = false,
   closeDisabled = false,
+  closeButtonVariant,
 }: {
   open: boolean;
   onClose: () => void;
@@ -104,6 +105,7 @@ export function Panel({
   children: ReactNode;
   wide?: boolean;
   closeDisabled?: boolean;
+  closeButtonVariant?: string;
 }) {
   const headingId = useId();
   const [drafts] = useState(() => new Set<RefObject<boolean>>());
@@ -144,7 +146,11 @@ export function Panel({
                 <Dialog.Description>{description}</Dialog.Description>
               </div>
               <Dialog.Close asChild>
-                <Button aria-label="닫기" disabled={closeDisabled}>
+                <Button
+                  aria-label="닫기"
+                  disabled={closeDisabled}
+                  variant={closeButtonVariant}
+                >
                   <Icon name="close" />
                 </Button>
               </Dialog.Close>

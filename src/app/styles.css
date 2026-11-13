@@ -363,6 +363,12 @@
   .bottom-nav {
     @apply hidden;
   }
+  .workspace.sidebar-collapsed {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+  .sidebar-toggleable .mobile-menu {
+    display: inline-flex;
+  }
   .skip-link {
     @apply fixed -top-24 left-4 z-[100] rounded bg-primary px-4 py-3 text-white focus:top-3;
   }
@@ -686,4 +692,16 @@
 }
 .panel-body:has(.drawer-sidebar) {
   padding: 0;
+}
+.panel:has(.drawer-sidebar) {
+  left: 70px;
+  right: auto;
+  max-width: 300px;
+  border-left: 0;
+  border-right: 1px solid var(--line);
+}
+@media (max-width: 640px) {
+  .panel:has(.drawer-sidebar) {
+    left: 0;
+  }
 }
