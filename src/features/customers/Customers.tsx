@@ -88,9 +88,9 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
       onSort: () => {
         const nextDirection =
           direction === undefined
-            ? sort === "name"
-              ? "asc"
-              : "desc"
+            ? sort === "registeredAt"
+              ? "desc"
+              : "asc"
             : direction === "asc"
               ? "desc"
               : "asc";
@@ -211,11 +211,11 @@ export function Customers({ embedded = false }: { embedded?: boolean }) {
         <ListTable
           label="회원 목록"
           columns={[
-            "회원번호",
+            sortableColumn("회원번호", "memberNo"),
             sortableColumn("회원 이름", "name"),
-            "연락처",
-            "상태",
-            "등록 지점",
+            sortableColumn("연락처", "phone"),
+            sortableColumn("상태", "status"),
+            sortableColumn("등록 지점", "registeredBranch"),
             sortableColumn("등록일", "registeredAt"),
           ]}
           loading={rows.isPending}

@@ -1,4 +1,7 @@
-import type { components } from "../../shared/api/foundation.generated";
+import type {
+  components,
+  operations,
+} from "../../shared/api/foundation.generated";
 import { can } from "../../shared/domain/schema";
 import type { Employee } from "../../shared/domain/schema";
 
@@ -15,6 +18,17 @@ export type CustomerMerge = components["schemas"]["CustomerMerge"];
 export type CustomerMergeList = components["schemas"]["CustomerMergeList"];
 export const customerStatuses = ["정상", "이용 제한", "비활성"] as const;
 export const customerListStatuses = [...customerStatuses, "병합됨"] as const;
+type CustomerSort = NonNullable<
+  NonNullable<operations["listCustomers"]["parameters"]["query"]>["sort"]
+>;
+export const customerSortColumns = [
+  "registeredAt",
+  "name",
+  "memberNo",
+  "phone",
+  "status",
+  "registeredBranch",
+] as const satisfies readonly CustomerSort[];
 export interface CustomerDraft {
   registeredBranchId: string;
   name: string;
@@ -25,7 +39,7 @@ export interface CustomerDraft {
 export interface CustomerFilters {
   q: string;
   status: string;
-  sort: "registeredAt" | "name";
+  sort: CustomerSort;
   direction: "asc" | "desc";
   page: number;
   pageSize: number;
@@ -46,6 +60,7 @@ export const customerKeys = {
 export const canCreateCustomer = (user: Employee, branch: string) =>
   !!branch && branch !== "all" && can(user, branch, "members:write");
 export function parseCustomerFilters(params: URLSearchParams): CustomerFilters {
+  const requestedSort = params.get("sort");
   const positive = (
     value: string | null,
     fallback: number,
@@ -63,7 +78,9 @@ export function parseCustomerFilters(params: URLSearchParams): CustomerFilters {
     )
       ? params.get("status")!
       : "",
-    sort: params.get("sort") === "name" ? "name" : "registeredAt",
+    sort:
+      customerSortColumns.find((column) => column === requestedSort) ??
+      "registeredAt",
     direction: params.get("direction") === "asc" ? "asc" : "desc",
     page: positive(params.get("page"), 1),
     pageSize: positive(params.get("pageSize"), 20, 100),

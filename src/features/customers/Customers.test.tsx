@@ -304,6 +304,26 @@ it("sorts the full member query from the column headers and resets pagination", 
   expect(registeredAt.closest("th")).toHaveAttribute("aria-sort", "ascending");
 });
 
+it.each([
+  ["회원번호", "memberNo"],
+  ["연락처", "phone"],
+  ["상태", "status"],
+  ["등록 지점", "registeredBranch"],
+])("requests both sorting directions for %s", async (label, sort) => {
+  mount();
+  const table = await screen.findByRole("table", { name: "회원 목록" });
+  const button = within(table).getByRole("button", { name: label });
+  for (const direction of ["asc", "desc"]) {
+    await userEvent.click(button);
+    await waitFor(() =>
+      expect(vi.mocked(customerApi.list).mock.lastCall?.[1]).toMatchObject({
+        sort,
+        direction,
+      }),
+    );
+  }
+});
+
 it("requires an explicit registration branch in all scope and submits only canonical fields", async () => {
   context.value.scope = "all";
   mount("?detail=new");

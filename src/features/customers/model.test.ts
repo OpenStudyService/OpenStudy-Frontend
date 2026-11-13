@@ -88,7 +88,7 @@ it("maps an unassigned customer without inventing a registration branch", () => 
 it("bounds URL query parameters to the list contract and excludes UI-only detail keys", () => {
   const filters = parseCustomerFilters(
     new URLSearchParams(
-      "q=홍&status=bad&sort=phone&direction=bad&page=-2&pageSize=1000&detail=1&edit=1",
+      "q=홍&status=bad&sort=email&direction=bad&page=-2&pageSize=1000&detail=1&edit=1",
     ),
   );
   expect(filters).toEqual({

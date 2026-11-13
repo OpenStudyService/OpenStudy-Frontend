@@ -9296,8 +9296,14 @@ export interface operations {
         q?: components["parameters"]["Q"];
         /** @description 기본 desc. 최종 id tie-breaker도 같은 방향 적용. */
         direction?: components["parameters"]["Direction"];
-        /** @description 기본 registeredAt. 동률은 id로 안정 정렬. */
-        sort?: "registeredAt" | "name";
+        /** @description 기본 registeredAt. registeredBranch는 등록 지점 이름 순이며, status 오름차순은 정상·이용 제한·비활성·병합됨 순이다. 동률은 id로 안정 정렬. */
+        sort?:
+          | "registeredAt"
+          | "name"
+          | "memberNo"
+          | "phone"
+          | "status"
+          | "registeredBranch";
         /** @description 병합됨은 이 값으로만 나온다. */
         status?: "정상" | "이용 제한" | "비활성" | "병합됨";
       };

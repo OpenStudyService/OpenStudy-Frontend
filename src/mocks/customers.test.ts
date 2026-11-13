@@ -360,7 +360,7 @@ it("enforces search boundaries, ordering, pagination and the 100-row cap", async
     (await (await request("/customers?q=DEMO-member-")).json()).items,
   ).toHaveLength(0);
   expect((await request("/customers?pageSize=101")).status).toBe(422);
-  expect((await request("/customers?sort=phone")).status).toBe(422);
+  expect((await request("/customers?sort=email")).status).toBe(422);
   expect((await request("/customers?direction=other")).status).toBe(422);
   expect((await request(`/customers?q=${"x".repeat(101)}`)).status).toBe(422);
 });

@@ -6,6 +6,7 @@ import type { components } from "../shared/api/foundation.generated";
 import type { Employee, ResourceMap } from "../shared/domain/schema";
 import { assert, DomainError, store } from "./store";
 import { matchesCustomer, rejectMergedCustomer } from "./customer-identity";
+import { customerSortColumns } from "../features/customers/model";
 
 type Customer = components["schemas"]["Customer"];
 type CustomerItem = components["schemas"]["CustomerListItem"];
@@ -448,10 +449,11 @@ export const customerHandlers = [
     response(({ request }, actor) => {
       const scope = selected(actor, request),
         params = new URL(request.url).searchParams;
+      const requestedSort = params.get("sort") ?? "registeredAt";
       const page = Number(params.get("page") ?? 1),
         pageSize = Number(params.get("pageSize") ?? 20),
         q = (params.get("q") ?? "").trim(),
-        sort = params.get("sort") ?? "registeredAt",
+        sort = customerSortColumns.find((column) => column === requestedSort),
         direction = params.get("direction") ?? "desc",
         status = params.get("status");
       assert(
@@ -468,7 +470,7 @@ export const customerHandlers = [
       );
       assert(
         q.length <= 100 &&
-          ["registeredAt", "name"].includes(sort) &&
+          sort !== undefined &&
           ["asc", "desc"].includes(direction),
         "검색·정렬 조건을 확인해 주세요.",
         422,
@@ -487,12 +489,24 @@ export const customerHandlers = [
             (phoneQuery !== null &&
               row.phone.replace(/[\s-]/g, "").includes(phoneQuery))),
       );
+      const branches = new Map(
+        store.db.branches.map((branch) => [branch.id, branch.name]),
+      );
       const ordered = rows.map(item).sort((a, b) => {
-        const comparison =
-          (sort === "name"
-            ? a.name.localeCompare(b.name)
-            : a.registeredAt.localeCompare(b.registeredAt)) ||
-          a.id.localeCompare(b.id);
+        let comparison;
+        if (sort === "status") {
+          comparison =
+            listStatuses.options.indexOf(a.status) -
+            listStatuses.options.indexOf(b.status);
+        } else if (sort === "registeredBranch") {
+          comparison = (branches.get(a.registeredBranchId ?? "") ?? "").localeCompare(
+            branches.get(b.registeredBranchId ?? "") ?? "",
+            "ko",
+          );
+        } else {
+          comparison = a[sort].localeCompare(b[sort], "ko");
+        }
+        comparison ||= a.id.localeCompare(b.id);
         return direction === "asc" ? comparison : -comparison;
       });
       return {
