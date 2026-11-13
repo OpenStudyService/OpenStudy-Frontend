@@ -441,6 +441,31 @@ export const POC_QUESTIONS: PocQuestionSpec[] = [
   },
 ];
 
+export interface SuggestedQuestion extends PocQuestionSpec {
+  /** The chip text in "추천 질문". */
+  label: string;
+}
+
+/**
+ * The questions offered as suggestions. POC_QUESTIONS keeps one entry per registered analysis (its titles and names
+ * look analyses up there); a suggestion can ask the same analysis over another period, since the server reads the
+ * period a question names (OpenStudy-Backend, 2026-11-13). Last month's branch sales sit right beside this month's.
+ */
+export const SUGGESTED_QUESTIONS: SuggestedQuestion[] = POC_QUESTIONS.flatMap(
+  (q) =>
+    q.code === "POC-001"
+      ? [
+          { ...q, label: "이번 달 지점별 매출 비교" },
+          {
+            ...q,
+            code: "POC-001-LAST-MONTH",
+            question: "지난 달 지점별 매출을 비교해줘",
+            label: "지난 달 지점별 매출 비교",
+          },
+        ]
+      : [{ ...q, label: q.shortLabel }],
+);
+
 /**
  * POST /ai/queries. Unlike the generic client, a refused query (403·422·429) still carries the AI response body
  * (status, errorCode, message), so it is returned instead of thrown. The request sends the session CSRF token like
