@@ -145,6 +145,12 @@ function TaskPanelSession({
                     <dd>
                       <Badge>{task.priority}</Badge>{" "}
                       <Badge>{task.status}</Badge>
+                      {task.overdue && (
+                        <>
+                          {" "}
+                          <Badge>기한 초과</Badge>
+                        </>
+                      )}
                     </dd>
                   </div>
                 </dl>
