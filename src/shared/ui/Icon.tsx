@@ -32,6 +32,8 @@ const paths: Record<string, string> = {
   ai: "m12 3 2 6 6 3-6 2-2 7-2-7-7-2 7-3 2-6Zm8 0v4m-2-2h4",
   info: "M12 11v6m0-10h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
   eye: "M2 12c5-9 15-9 20 0-5 9-15 9-20 0Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
+  trash: "M4 7h16m-10 4v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3",
+  edit: "M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4",
 };
 export function Icon({
   name,

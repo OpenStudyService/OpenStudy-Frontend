@@ -417,6 +417,50 @@ it("renames and deletes a saved conversation from the history", async () => {
   confirm.mockRestore();
 });
 
+it("deletes the whole history one conversation at a time and reports the ones it could not delete", async () => {
+  const other = { ...saved, id: "conv-2", title: "좌석 점검" };
+  const third = { ...saved, id: "conv-3", title: "이용권 점검" };
+  mocks.history.list.mockResolvedValue([saved, other, third]);
+  mocks.history.remove.mockImplementation(async (id: string) => {
+    // One delete fails; one was already gone (404 counts as deleted).
+    if (id === "conv-2") throw new ApiError(500, { code: "INTERNAL_ERROR", message: "서버 오류" });
+    if (id === "conv-3") throw new ApiError(404, { code: "NOT_FOUND", message: "없음" });
+  });
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  show();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "대화 기록 전체 삭제" }),
+  );
+  expect(confirm).toHaveBeenCalledWith(
+    "대화 기록 3개를 모두 삭제할까요? 삭제한 대화는 되돌릴 수 없어요.",
+  );
+  expect(
+    await screen.findByText(
+      "대화 3개 중 1개를 지우지 못했어요. 다시 시도해 주세요.",
+    ),
+  ).toBeVisible();
+  expect(mocks.history.remove.mock.calls.map(([id]) => id)).toEqual([
+    "conv-1",
+    "conv-2",
+    "conv-3",
+  ]);
+  confirm.mockRestore();
+});
+
+it("keeps the history when the delete-all confirmation is declined, and has no recent-questions tab", async () => {
+  mocks.history.list.mockResolvedValue([saved]);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  show();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "대화 기록 전체 삭제" }),
+  );
+  expect(mocks.history.remove).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "최근 질문" })).toBeNull();
+  confirm.mockRestore();
+});
+
 it("shows readiness reasons after a 503 and retries the same request as a normal result", async () => {
   mocks.execute
     .mockResolvedValueOnce(
