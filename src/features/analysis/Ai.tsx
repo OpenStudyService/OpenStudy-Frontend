@@ -19,11 +19,9 @@ import type {
   AiConditions,
   AiContext,
   AiEditableFilters,
-  AiRecentQuery,
   AiRefinement,
 } from "./ai-reuse-api";
 import {
-  analysisName,
   AppliedConditions,
   ContextSummary,
   reuseFailure,
@@ -67,7 +65,6 @@ interface Turn {
   editableFilters?: AiEditableFilters | null;
   context?: AiContext | null;
   refined?: boolean;
-  recentResult?: boolean;
 }
 
 const DOMAINS = ["전체", "매출", "좌석", "이용권", "스터디룸", "업무", "근태"];
@@ -104,9 +101,6 @@ function AiChat() {
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   // Phones show either the history or the conversation (the team chat's list/main switch).
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyTab, setHistoryTab] = useState<"conversations" | "recent">(
-    "conversations",
-  );
   const [reuseBusy, setReuseBusy] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [reopenError, setReopenError] = useState("");
@@ -118,13 +112,6 @@ function AiChat() {
     queryKey: historyKey,
     queryFn: ({ signal }) => clearOnDenial(() => aiConversations.list(signal)),
     enabled: allowed,
-    retry: false,
-  });
-  const recentKey = ["data", user.id, scope, "ai", "recent"];
-  const recent = useQuery({
-    queryKey: recentKey,
-    queryFn: ({ signal }) => aiReuse.recent(signal),
-    enabled: allowed && historyTab === "recent",
     retry: false,
   });
   const readiness = useQuery({
@@ -164,34 +151,26 @@ function AiChat() {
 
   function refreshHistory() {
     void client.invalidateQueries({ queryKey: historyKey });
-    void client.invalidateQueries({ queryKey: recentKey });
   }
 
   async function ask(
     text: string,
     clarificationChoice?: string,
     retry?: AiQueryRequest,
-    newConversation = false,
   ) {
     const trimmed = text.trim();
     if (!trimmed || trimmed.length > MAX_QUESTION || abort.current || !ready)
       return;
-    const startFresh =
-      newConversation || turns.some((turn) => turn.recentResult);
     const payload = retry ?? {
       question: trimmed,
       scope,
       clarificationChoice,
-      conversationId: startFresh ? undefined : conversationId,
+      conversationId,
       clientRequestKey: crypto.randomUUID(),
     };
     const turn = emptyTurn(trimmed, new Date().toISOString());
     const id = turn.id;
-    if (startFresh) setConversationId(undefined);
-    setTurns((all) => [
-      ...(startFresh ? [] : all.map((t) => ({ ...t, retry: undefined }))),
-      turn,
-    ]);
+    setTurns((all) => [...all.map((t) => ({ ...t, retry: undefined })), turn]);
     setHistoryOpen(false);
     setReopenError("");
     setQuestion("");
@@ -315,58 +294,8 @@ function AiChat() {
         refined: true,
       };
       if (response.conversationId) setConversationId(response.conversationId);
-      setTurns((all) => [
-        ...all.map((item) => ({ ...item, recentResult: false })),
-        turn,
-      ]);
+      setTurns((all) => [...all, turn]);
       refreshHistory();
-    } finally {
-      if (abort.current === controller) abort.current = null;
-      setReuseBusy(false);
-    }
-  }
-
-  async function runRecent(item: AiRecentQuery) {
-    if (abort.current) return;
-    if (!item.rerunnable) {
-      await ask(item.question, undefined, undefined, true);
-      return;
-    }
-    if (!item.executionId) return;
-    const controller = new AbortController();
-    const signal = AbortSignal.any([
-      controller.signal,
-      AbortSignal.timeout(QUERY_TIMEOUT_MS),
-    ]);
-    abort.current = controller;
-    setReuseBusy(true);
-    setHistoryOpen(false);
-    setConversationId(undefined);
-    setReopenError("");
-    setTurns([]);
-    try {
-      const execution = await aiReuse.execution(
-        item.executionId,
-        undefined,
-        signal,
-      );
-      signal.throwIfAborted();
-      const parsed = parseAiResult(execution);
-      setTurns([
-        {
-          ...emptyTurn(item.question, item.askedAt),
-          executionId: execution.id,
-          conditions: execution.conditions,
-          editableFilters: execution.editableFilters,
-          refined: execution.origin === "REFINEMENT",
-          recentResult: true,
-          state: "completed",
-          parsed,
-          message: "최근 질문의 결과를 다시 조회했어요.",
-        },
-      ]);
-    } catch (error) {
-      if (!controller.signal.aborted) setReopenError(reuseFailure(error));
     } finally {
       if (abort.current === controller) abort.current = null;
       setReuseBusy(false);
@@ -382,6 +311,32 @@ function AiChat() {
     await clearOnDenial(() => aiConversations.remove(id));
     if (id === conversationId) startNew();
     refreshHistory();
+  }
+
+  /**
+   * Deletes every saved conversation of this employee, one by one through the same API as a single delete, so each
+   * keeps its ownership check. One already gone (404) counts as deleted; a lost permission stops the rest.
+   */
+  async function removeAll(ids: string[]) {
+    let failed = 0;
+    try {
+      for (const id of ids) {
+        try {
+          await clearOnDenial(() => aiConversations.remove(id));
+        } catch (e) {
+          if (e instanceof ApiError && (e.status === 401 || e.status === 403))
+            throw e;
+          if (!(e instanceof ApiError && e.status === 404)) failed++;
+        }
+      }
+    } finally {
+      if (conversationId && ids.includes(conversationId)) startNew();
+      refreshHistory();
+    }
+    if (failed)
+      throw new Error(
+        `대화 ${ids.length}개 중 ${failed}개를 지우지 못했어요. 다시 시도해 주세요.`,
+      );
   }
 
   async function clearOnDenial<T>(action: () => Promise<T>): Promise<T> {
@@ -431,22 +386,11 @@ function AiChat() {
         retry={() => void history.refetch()}
         activeId={conversationId}
         disabled={pending}
-        tab={historyTab}
-        onTab={setHistoryTab}
-        recent={
-          historyAccessDenied || readinessAccessDenied || recent.error
-            ? undefined
-            : recent.data?.items
-        }
-        recentLoading={recent.isPending}
-        recentError={recent.error}
-        retryRecent={() => void recent.refetch()}
-        onRunRecent={(item) => void runRecent(item)}
-        canAsk={ready}
         onNew={startNew}
         onOpen={(id) => void reopen(id)}
         onRename={rename}
         onRemove={remove}
+        onRemoveAll={removeAll}
       />
       <section className="chat-main" aria-labelledby="ai-chat-title">
         <header className="chat-header">
@@ -460,7 +404,7 @@ function AiChat() {
           <div className="flex shrink-0 items-center gap-2">
             <Badge>{MOCK ? "AI 응답 모킹" : "DomainLens"}</Badge>
             <Button className="sm:hidden" onClick={() => setHistoryOpen(true)}>
-              대화 기록 · 최근 질문
+              대화 기록
             </Button>
           </div>
         </header>
@@ -500,8 +444,6 @@ function AiChat() {
               title="대화를 다시 여는 중이에요"
               message="저장된 질문을 지금 권한과 기준 시각으로 다시 조회하고 있어요."
             />
-          ) : reuseBusy && turns.length === 0 ? (
-            <State loading title="최근 질문의 결과를 다시 조회하고 있어요" />
           ) : turns.length === 0 && conversationId ? (
             <State
               title="이 대화에 다시 볼 질문이 없어요"
@@ -1117,14 +1059,7 @@ function History({
   onOpen,
   onRename,
   onRemove,
-  tab,
-  onTab,
-  recent,
-  recentLoading,
-  recentError,
-  retryRecent,
-  onRunRecent,
-  canAsk,
+  onRemoveAll,
 }: {
   conversations?: AiConversationSummary[];
   loading: boolean;
@@ -1136,18 +1071,13 @@ function History({
   onOpen: (id: string) => void;
   onRename: (id: string, title: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
-  tab: "conversations" | "recent";
-  onTab: (tab: "conversations" | "recent") => void;
-  recent?: AiRecentQuery[];
-  recentLoading: boolean;
-  recentError: Error | null;
-  retryRecent: () => void;
-  onRunRecent: (item: AiRecentQuery) => void;
-  canAsk: boolean;
+  onRemoveAll: (ids: string[]) => Promise<void>;
 }) {
   const [editing, setEditing] = useState<string>();
   const [draft, setDraft] = useState("");
   const [failure, setFailure] = useState("");
+  const [removing, setRemoving] = useState(false);
+  const locked = disabled || removing;
   async function run(action: () => Promise<void>) {
     setFailure("");
     try {
@@ -1156,31 +1086,25 @@ function History({
       setFailure((e as Error).message || "처리하지 못했어요.");
     }
   }
+  function removeAll() {
+    if (!conversations?.length) return;
+    const ids = conversations.map((c) => c.id);
+    if (
+      !window.confirm(
+        `대화 기록 ${ids.length}개를 모두 삭제할까요? 삭제한 대화는 되돌릴 수 없어요.`,
+      )
+    )
+      return;
+    setRemoving(true);
+    void run(() => onRemoveAll(ids)).finally(() => setRemoving(false));
+  }
   return (
     <aside className="chat-list" aria-labelledby="ai-history-title">
       <header className="chat-header">
-        <h2 id="ai-history-title" className="sr-only">
-          질문 기록
+        <h2 id="ai-history-title" className="whitespace-nowrap text-sm">
+          대화 기록
         </h2>
-        <div className="tabs" role="group" aria-label="질문 기록 보기">
-          <button
-            type="button"
-            className={`tab ${tab === "conversations" ? "active" : ""}`}
-            aria-pressed={tab === "conversations"}
-            onClick={() => onTab("conversations")}
-          >
-            대화 기록
-          </button>
-          <button
-            type="button"
-            className={`tab ${tab === "recent" ? "active" : ""}`}
-            aria-pressed={tab === "recent"}
-            onClick={() => onTab("recent")}
-          >
-            최근 질문
-          </button>
-        </div>
-        <Button variant="primary" disabled={disabled} onClick={onNew}>
+        <Button variant="primary" disabled={locked} onClick={onNew}>
           <Icon name="plus" size={14} />새 대화
         </Button>
       </header>
@@ -1190,17 +1114,7 @@ function History({
             <FieldError>{failure}</FieldError>
           </div>
         )}
-        {tab === "recent" ? (
-          <RecentQuestions
-            items={recent}
-            loading={recentLoading}
-            error={recentError}
-            retry={retryRecent}
-            disabled={disabled}
-            canAsk={canAsk}
-            onRun={onRunRecent}
-          />
-        ) : loading ? (
+        {loading ? (
           <State loading />
         ) : error ? (
           <ErrorState error={error} retry={retry} />
@@ -1209,91 +1123,112 @@ function History({
             아직 저장된 대화가 없어요. 질문하면 여기에 남아요.
           </p>
         ) : (
-          <ul className="grid gap-1">
-            {conversations.map((c) => {
-              const title = c.title || "제목 없는 대화";
-              if (editing === c.id)
-                return (
-                  <li key={c.id}>
-                    <form
-                      className="grid gap-2 rounded-lg border border-line p-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const next = draft.trim();
-                        if (!next) return;
-                        void run(async () => {
-                          await onRename(c.id, next);
-                          setEditing(undefined);
-                        });
-                      }}
-                    >
-                      <label className="sr-only" htmlFor={`ai-title-${c.id}`}>
-                        대화 제목
-                      </label>
-                      <input
-                        id={`ai-title-${c.id}`}
-                        value={draft}
-                        maxLength={200}
-                        autoFocus
-                        onChange={(e) => setDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") setEditing(undefined);
+          <>
+            <div className="mb-1 flex items-center justify-between px-1 text-[11px] text-muted">
+              <span>대화 {conversations.length}개</span>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-soft hover:text-red-700 disabled:opacity-50"
+                aria-label="대화 기록 전체 삭제"
+                disabled={locked}
+                onClick={removeAll}
+              >
+                <Icon name="trash" size={12} />
+                {removing ? "삭제 중" : "전체 삭제"}
+              </button>
+            </div>
+            {/* minmax(0, 1fr): a long title is cut with an ellipsis instead of widening the row past the panel and pushing its buttons out of view. */}
+            <ul className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1">
+              {conversations.map((c) => {
+                const title = c.title || "제목 없는 대화";
+                if (editing === c.id)
+                  return (
+                    <li key={c.id}>
+                      <form
+                        className="grid gap-2 rounded-lg border border-line p-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const next = draft.trim();
+                          if (!next) return;
+                          void run(async () => {
+                            await onRename(c.id, next);
+                            setEditing(undefined);
+                          });
                         }}
-                      />
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          type="button"
-                          onClick={() => setEditing(undefined)}
-                        >
-                          취소
-                        </Button>
-                        <Button
-                          type="submit"
-                          variant="primary"
-                          disabled={!draft.trim()}
-                        >
-                          저장
-                        </Button>
-                      </div>
-                    </form>
-                  </li>
-                );
-              return (
-                <li
-                  key={c.id}
-                  className={`rounded-lg px-3 py-2 ${c.id === activeId ? "bg-soft" : "hover:bg-soft"}`}
-                >
-                  <button
-                    type="button"
-                    className={`block w-full truncate text-left text-[13px] disabled:cursor-not-allowed ${c.id === activeId ? "font-semibold text-primary" : "text-ink"}`}
-                    aria-current={c.id === activeId ? "true" : undefined}
-                    disabled={disabled}
-                    onClick={() => onOpen(c.id)}
+                      >
+                        <label className="sr-only" htmlFor={`ai-title-${c.id}`}>
+                          대화 제목
+                        </label>
+                        <input
+                          id={`ai-title-${c.id}`}
+                          value={draft}
+                          maxLength={200}
+                          autoFocus
+                          onChange={(e) => setDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setEditing(undefined);
+                          }}
+                        />
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            onClick={() => setEditing(undefined)}
+                          >
+                            취소
+                          </Button>
+                          <Button
+                            type="submit"
+                            variant="primary"
+                            disabled={!draft.trim()}
+                          >
+                            저장
+                          </Button>
+                        </div>
+                      </form>
+                    </li>
+                  );
+                return (
+                  <li
+                    key={c.id}
+                    className={`flex min-w-0 items-start gap-1 rounded-lg px-3 py-2 ${c.id === activeId ? "bg-soft" : "hover:bg-soft"}`}
                   >
-                    {title}
-                  </button>
-                  <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted">
-                    <time dateTime={c.lastAskedAt}>
-                      {displayDate(c.lastAskedAt)}
-                    </time>
-                    <span className="flex shrink-0 gap-2">
+                    <div className="min-w-0 flex-1">
                       <button
                         type="button"
-                        className="hover:text-primary disabled:opacity-50"
+                        className={`block w-full truncate text-left text-[13px] disabled:cursor-not-allowed ${c.id === activeId ? "font-semibold text-primary" : "text-ink"}`}
+                        aria-current={c.id === activeId ? "true" : undefined}
+                        disabled={locked}
+                        onClick={() => onOpen(c.id)}
+                      >
+                        {title}
+                      </button>
+                      <time
+                        className="mt-0.5 block text-[11px] text-muted"
+                        dateTime={c.lastAskedAt}
+                      >
+                        {displayDate(c.lastAskedAt)}
+                      </time>
+                    </div>
+                    <span className="flex shrink-0 gap-0.5">
+                      <button
+                        type="button"
+                        className="rounded-md p-1.5 text-muted hover:bg-surface hover:text-primary disabled:opacity-50"
                         aria-label={`${title} 제목 변경`}
-                        disabled={disabled}
+                        title="제목 변경"
+                        disabled={locked}
                         onClick={() => {
                           setDraft(c.title || "");
                           setEditing(c.id);
                         }}
                       >
-                        수정
+                        <Icon name="edit" size={14} />
                       </button>
                       <button
                         type="button"
-                        className="hover:text-primary disabled:opacity-50"
+                        className="rounded-md p-1.5 text-muted hover:bg-surface hover:text-red-700 disabled:opacity-50"
                         aria-label={`${title} 삭제`}
-                        disabled={disabled}
+                        title="삭제"
+                        disabled={locked}
                         onClick={() => {
                           if (
                             window.confirm(
@@ -1303,83 +1238,16 @@ function History({
                             void run(() => onRemove(c.id));
                         }}
                       >
-                        삭제
+                        <Icon name="trash" size={14} />
                       </button>
                     </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
     </aside>
-  );
-}
-
-function RecentQuestions({
-  items,
-  loading,
-  error,
-  retry,
-  disabled,
-  canAsk,
-  onRun,
-}: {
-  items?: AiRecentQuery[];
-  loading: boolean;
-  error: Error | null;
-  retry: () => void;
-  disabled: boolean;
-  canAsk: boolean;
-  onRun: (item: AiRecentQuery) => void;
-}) {
-  if (loading) return <State loading />;
-  if (error) return <ErrorState error={error} retry={retry} />;
-  if (!items?.length)
-    return <p className="help px-2 py-4">최근 30일 동안 한 질문이 없어요.</p>;
-  const statusLabels: Record<string, string> = {
-    READY: "조회 완료",
-    COMPLETED: "조회 완료",
-    CLARIFICATION: "확인 필요",
-    UNSUPPORTED: "지원하지 않음",
-    REFUSED: "거절",
-    DENIED: "권한 거절",
-    CANCELED: "취소",
-    INVALID: "입력 오류",
-  };
-  return (
-    <ul className="grid gap-2" aria-label="최근 질문 목록">
-      {items.map((item) => (
-        <li
-          key={item.requestId}
-          className="grid gap-1 rounded-lg border border-line p-2"
-        >
-          <p className="break-words text-sm font-semibold">{item.question}</p>
-          <p className="help">
-            {item.conversationTitle || "제목 없는 대화"} ·{" "}
-            {statusLabels[item.status] ?? item.status}
-          </p>
-          <p className="help">
-            {item.analysisId ? `${analysisName(item.analysisId)} · ` : ""}
-            <time dateTime={item.askedAt}>{formatDateTime(item.askedAt)}</time>
-          </p>
-          <div>
-            <Button
-              type="button"
-              disabled={
-                disabled || (item.rerunnable ? !item.executionId : !canAsk)
-              }
-              onClick={() => onRun(item)}
-            >
-              {item.rerunnable ? "결과 다시 조회" : "새 질문으로 보내기"}
-            </Button>
-            {!item.rerunnable && (
-              <p className="help">AI가 이 질문을 새로 해석해요.</p>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
   );
 }

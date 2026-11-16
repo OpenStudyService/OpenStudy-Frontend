@@ -145,7 +145,7 @@ it("returns the requested AI dataset as CSV and checks ownership, limits and ava
   }
 });
 
-it("saves changed conditions in the same conversation and runs recent questions through the correct routes", async () => {
+it("saves changed conditions in the same conversation and deletes the whole history through the per-conversation API", async () => {
   store.reset();
   store.persona = "owner";
   const client = new QueryClient({
@@ -272,42 +272,40 @@ it("saves changed conditions in the same conversation and runs recent questions 
     });
   }
 
+  // A second conversation, then the history's delete-all removes both through the per-conversation API.
+  await user.click(screen.getByRole("button", { name: "새 대화" }));
   await ask("지원 범위를 알 수 없는 질문");
   await screen.findByText("어떤 분석이 필요한지 더 자세히 알려 주세요.");
-  await user.click(screen.getByRole("button", { name: "최근 질문" }));
-  const recent = await screen.findByRole("list", { name: "최근 질문 목록" });
-  const items = within(recent).getAllByRole("listitem");
-  expect(items).toHaveLength(3);
-  expect(items[0]).toHaveTextContent("지원 범위를 알 수 없는 질문");
-  expect(items[1]).toHaveTextContent("원결제일 기준으로");
-  const beforeReplay = requests.length;
+  await waitFor(async () =>
+    expect(await aiConversations.list()).toHaveLength(2),
+  );
+  const ids = (await aiConversations.list()).map(({ id }) => id);
+  const history = screen.getByRole("complementary", { name: "대화 기록" });
+  await within(history).findAllByRole("button", { name: /삭제$/ });
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const beforeDelete = requests.length;
   await user.click(
-    within(items[1]).getByRole("button", { name: "결과 다시 조회" }),
+    within(history).getByRole("button", { name: "대화 기록 전체 삭제" }),
+  );
+  expect(confirm).toHaveBeenCalledWith(
+    "대화 기록 2개를 모두 삭제할까요? 삭제한 대화는 되돌릴 수 없어요.",
   );
   expect(
-    await screen.findByText("최근 질문의 결과를 다시 조회했어요."),
+    await within(history).findByText(
+      "아직 저장된 대화가 없어요. 질문하면 여기에 남아요.",
+    ),
   ).toBeVisible();
-  expect(requests.slice(beforeReplay)).toContainEqual({
-    method: "GET",
-    path: `/api/ai/executions/${followUpId}`,
-  });
-  expect(requests.slice(beforeReplay)).not.toContainEqual({
-    method: "POST",
-    path: "/api/ai/queries",
-  });
-  const beforeNew = requests.length;
-  await user.click(
-    within(items[0]).getByRole("button", { name: "새 질문으로 보내기" }),
-  );
-  await screen.findByText("어떤 분석이 필요한지 더 자세히 알려 주세요.");
-  expect(requests.slice(beforeNew)).toContainEqual({
-    method: "POST",
-    path: "/api/ai/queries",
-  });
-  expect(await aiConversations.list()).toHaveLength(2);
-  await Promise.all(
-    (await aiConversations.list()).map(({ id }) => aiConversations.remove(id)),
-  );
+  for (const id of ids)
+    expect(requests.slice(beforeDelete)).toContainEqual({
+      method: "DELETE",
+      path: `/api/ai/conversations/${id}`,
+    });
+  expect(await aiConversations.list()).toHaveLength(0);
+  // The open conversation was deleted with the rest: the screen starts a new one.
+  expect(
+    screen.queryByText("어떤 분석이 필요한지 더 자세히 알려 주세요."),
+  ).toBeNull();
+  confirm.mockRestore();
   client.clear();
 });
 
