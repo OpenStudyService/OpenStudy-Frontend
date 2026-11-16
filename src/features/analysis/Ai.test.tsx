@@ -204,16 +204,18 @@ it("asks with the current scope and shows the answer with its sales totals", asy
   expect(await screen.findByText("강남점 매출이에요.")).toBeInTheDocument();
   expect(screen.getByText("이번 달 매출")).toBeInTheDocument();
   expect(screen.getAllByText("25,000원")[0]).toBeInTheDocument();
-  expect(screen.getByRole("group", { name: "결과 보기" })).toBeInTheDocument();
+  // Assembled as the mock-up: the badge names the visual, the KPI cards and the chart panel are shown together.
+  expect(screen.getByText("BAR")).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "요약 지표" })).toBeVisible();
   expect(
     screen.getByRole("button", { name: "branchSales CSV 다운로드" }),
   ).toBeVisible();
   expect(
     screen.getByRole("button", { name: "salesTotals CSV 다운로드" }),
   ).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: "표로 보기" }));
+  await userEvent.click(screen.getByRole("button", { name: /전체 표 보기/ }));
   expect(
-    screen.getByRole("button", { name: "표로 보기", pressed: true }),
+    screen.getByRole("button", { name: /간단히 보기/ }),
   ).toBeInTheDocument();
   expect(
     await screen.findByRole("table", { name: "결과 데이터 표" }),
@@ -235,7 +237,7 @@ it("explains a refused question without showing any result", async () => {
     await screen.findByText("이 지점의 매출 조회 권한이 없어요."),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole("group", { name: "결과 보기" }),
+    screen.queryByRole("region", { name: "요약 지표" }),
   ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: /CSV 다운로드|PNG 저장/ }),
@@ -381,7 +383,7 @@ it("reopens a saved conversation with each question re-run, and keeps asking in 
       "저장된 질문의 분석은 현재 제공되지 않아요. 다시 질문해 주세요.",
     ),
   ).toBeInTheDocument();
-  expect(screen.getAllByRole("group", { name: "결과 보기" })).toHaveLength(1);
+  expect(screen.getAllByRole("region", { name: "요약 지표" })).toHaveLength(1);
   await ask("이어서 질문");
   expect(await screen.findByText("이어서 답했어요.")).toBeInTheDocument();
   expect(mocks.execute).toHaveBeenLastCalledWith(
@@ -557,16 +559,18 @@ it.each([
     });
     show();
     const user = await ask("이번 달 매출");
-    await user.click(await screen.findByRole("button", { name: "표로 보기" }));
+    await user.click(
+      await screen.findByRole("button", { name: /전체 표 보기/ }),
+    );
     expect(
       await screen.findByText(
         `${reason} 조회 범위를 줄여 조건을 변경하거나 다시 질문해 주세요.`,
       ),
     ).toBeVisible();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "막대" }));
-    expect(screen.getByText("현재 조건으로 결과를 볼 수 없어요")).toBeVisible();
+    // The earlier chart and KPI figures are not shown beside the refusal.
     expect(screen.queryByText("25,000원")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "요약 지표" })).toBeNull();
   },
 );
 
@@ -622,7 +626,9 @@ it("uses server page metadata and resets the page and sort when switching data k
   });
   show();
   const user = await ask("이번 달 매출");
-  await user.click(await screen.findByRole("button", { name: "표로 보기" }));
+  await user.click(
+    await screen.findByRole("button", { name: /전체 표 보기/ }),
+  );
   await user.click(await screen.findByRole("button", { name: "다음" }));
   expect(await screen.findByText("2페이지 · 총 21개")).toBeVisible();
   const table = screen.getByRole("table", { name: "결과 데이터 표" });

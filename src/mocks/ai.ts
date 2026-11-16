@@ -106,23 +106,89 @@ function mockAiAnswer(
   const asOf = new Date().toISOString();
   const status = executionId ? "COMPLETED" : "CLARIFICATION";
   const data = conditions ? mockAiDataset(conditions, poc?.code) : null;
+  // Arranged as the backend composes a registered sales result (DomainLens result mock-up): totals as KPI cards,
+  // then the chart beside the table that lists its rows.
+  const totals = data?.chart
+    ? {
+        id: "salesTotals",
+        columns: ["approved_krw", "refund_krw", "net_krw"].map((alias) => ({
+          alias,
+          type: "INTEGER",
+          unit: "KRW",
+          precision: 0,
+        })),
+        rows: [
+          Object.fromEntries(
+            ["approved_krw", "refund_krw", "net_krw"].map((alias) => [
+              alias,
+              data.rows.reduce(
+                (sum, row) =>
+                  sum + Number((row as Record<string, unknown>)[alias] ?? 0),
+                0,
+              ),
+            ]),
+          ),
+        ],
+      }
+    : null;
+  const component = (
+    id: string,
+    type: string,
+    datasetId: string,
+    bindings: Record<string, unknown>,
+    title: string,
+  ) => ({
+    id,
+    componentRef: { id: type, version: "1.0.0" },
+    datasetId,
+    bindings,
+    options: { title },
+    events: [],
+  });
   const view = data && {
     catalogVersion: "openstudy-ui-1.0.0",
-    components: [
-      {
-        id: "mock-ai-result",
-        componentRef: {
-          id: data.chart ? "BAR_CHART" : "DATA_TABLE",
-          version: "1.0.0",
-        },
-        datasetId: data.id,
-        bindings: data.chart
-          ? { category: "branch_name", value: "net_krw" }
-          : {},
-        options: { title: data.title },
-        events: [],
-      },
-    ],
+    components: totals
+      ? [
+          component(
+            "kpi",
+            "KPI",
+            totals.id,
+            { values: ["approved_krw", "refund_krw", "net_krw"] },
+            "합계",
+          ),
+          component(
+            "mock-ai-result",
+            "BAR_CHART",
+            data.id,
+            { category: "branch_name", value: "net_krw" },
+            data.title,
+          ),
+          component(
+            "table",
+            "DATA_TABLE",
+            data.id,
+            {
+              columns: ["branch_name", "approved_krw", "refund_krw", "net_krw"],
+            },
+            `${data.title} 상세`,
+          ),
+        ]
+      : [component("mock-ai-result", "DATA_TABLE", data.id, {}, data.title)],
+    layout: totals
+      ? {
+          kind: "stack",
+          children: [
+            { componentId: "kpi" },
+            {
+              kind: "split",
+              children: [
+                { componentId: "mock-ai-result" },
+                { componentId: "table" },
+              ],
+            },
+          ],
+        }
+      : { kind: "stack", children: [{ componentId: "mock-ai-result" }] },
   };
   return {
     requestId,
@@ -149,6 +215,18 @@ function mockAiAnswer(
           executionId,
           status,
           datasets: [
+            ...(totals
+              ? [
+                  {
+                    ...totals,
+                    totalElements: 1,
+                    page: 0,
+                    size: 50,
+                    snapshotAt: asOf,
+                    asOf,
+                  },
+                ]
+              : []),
             {
               id: data.id,
               columns: data.columns,

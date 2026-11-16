@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { ViewSpecRenderer } from "./Charts";
 import { useAiConditionEntries } from "./AiConditions";
 import { CsvExportButton } from "./ExportButton";
@@ -54,21 +55,21 @@ export function AiCsvExports({
 
 export function AiChartResults({
   parsed,
-  activeView,
   scope,
   conditions,
+  detail,
 }: {
   parsed: ParsedAiResult;
-  activeView: string;
   scope: string;
   conditions?: AiConditions | null;
+  detail?: ComponentProps<typeof ViewSpecRenderer>["detail"];
 }) {
   const entries = useAiConditionEntries(conditions, parsed.generated);
   return (
     <ViewSpecRenderer
       parsed={parsed}
-      activeView={activeView}
       scope={scope}
+      detail={detail}
       exportConditions={
         entries.length
           ? entries.map(([label, value]) => `${label} ${value}`)

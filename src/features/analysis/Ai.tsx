@@ -29,13 +29,12 @@ import {
   reuseFailure,
 } from "./AiConditions";
 import { ResultDetails } from "./ResultDetails";
+import { drawableComponents, resultBadge } from "./Charts";
 import {
   aiConversations,
   executeAiQuery,
   parseAiResult,
-  normalizeComponentType,
   SUGGESTED_QUESTIONS,
-  toViewMode,
 } from "./domainlens";
 import type {
   AiConversationSummary,
@@ -58,7 +57,6 @@ interface Turn {
   askedAt: string;
   state: "loading" | "completed" | "clarification" | "refused" | "error";
   parsed: ParsedAiResult | null;
-  view: string;
   message: string;
   options: ClarificationOptionDto[];
   /** The engine's own stage record, returned with the answer (the query runs in one request, not streamed). */
@@ -364,7 +362,6 @@ function AiChat() {
           recentResult: true,
           state: "completed",
           parsed,
-          view: toViewMode(parsed.primaryComponent),
           message: "최근 질문의 결과를 다시 조회했어요.",
         },
       ]);
@@ -529,7 +526,6 @@ function AiChat() {
                 disabled={pending || !ready}
                 onRefine={(body) => refine(turn, body)}
                 onRetry={() => void ask(turn.question, undefined, turn.retry)}
-                onView={(view) => patch(turn.id, { view })}
                 onChoose={(option) => void ask(turn.question, option.id)}
               />
             ))
@@ -683,7 +679,6 @@ function TurnView({
   userName,
   scope,
   disabled,
-  onView,
   onChoose,
   onRetry,
   onRefine,
@@ -692,7 +687,6 @@ function TurnView({
   userName: string;
   scope: string;
   disabled: boolean;
-  onView: (view: string) => void;
   onChoose: (option: ClarificationOptionDto) => void;
   onRetry: () => void;
   onRefine: (body: AiRefinement) => Promise<void>;
@@ -735,7 +729,6 @@ function TurnView({
               disabled={disabled}
               onRefine={onRefine}
               scope={scope}
-              onView={onView}
             />
           )}
           {turn.state === "clarification" && (
@@ -776,34 +769,17 @@ function Answer({
   scope,
   disabled,
   onRefine,
-  onView,
 }: {
   turn: Turn;
   parsed: ParsedAiResult;
   scope: string;
   disabled: boolean;
   onRefine: (body: AiRefinement) => Promise<void>;
-  onView: (view: string) => void;
 }) {
-  const { view, message, executionId } = turn;
+  const { message, executionId } = turn;
   const [accessDenied, setAccessDenied] = useState(false);
-  const [refinementDenied, setRefinementDenied] = useState(false);
+  // The table panel switched to the server-paged, sortable table (the former "표로 보기").
   const [detailDatasetId, setDetailDatasetId] = useState<string>();
-  const showDetails =
-    view === "table" && executionId && parsed.datasetList.length > 0;
-  function selectView(next: string) {
-    if (next === "table") {
-      setRefinementDenied(false);
-      if (view !== "table") {
-        const component = parsed.viewSpec?.components.find((item) => {
-          const type = normalizeComponentType(item.componentRef.id);
-          return type && toViewMode(type) === view;
-        });
-        setDetailDatasetId(component?.datasetId ?? undefined);
-      }
-    }
-    onView(next);
-  }
 
   async function apply(body: AiRefinement) {
     try {
@@ -811,37 +787,32 @@ function Answer({
     } catch (error) {
       if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
         setAccessDenied(true);
-        setRefinementDenied(true);
+        setDetailDatasetId(undefined);
       }
       throw error;
     }
   }
-  const views = [
-    ...new Set([...parsed.componentTypes.map(toViewMode), "table"]),
-  ];
   const empty = parsed.datasetList.every((d) => d.rows.length === 0);
+  const period = turn.conditions?.period ?? parsed.generated?.period;
+  const components = drawableComponents(parsed);
   return (
     <>
       {message && <p>{message}</p>}
       <section
-        className="card mt-2 max-w-3xl"
+        className="card ai-result mt-2 max-w-5xl"
         aria-label={`${parsed.title} 결과`}
       >
         <header className="card-header">
-          <h3 className="text-sm">{parsed.title}</h3>
-          {views.length > 1 && (
-            <div className="flex gap-1" role="group" aria-label="결과 보기">
-              {views.map((v) => (
-                <Button
-                  key={v}
-                  variant={view === v ? "primary" : ""}
-                  aria-pressed={view === v}
-                  onClick={() => selectView(v)}
-                >
-                  {viewLabel(v)}
-                </Button>
-              ))}
-            </div>
+          <div className="min-w-0">
+            <h3 className="text-sm">{parsed.title}</h3>
+            {period && (
+              <p className="help mt-0.5">
+                {period.from} ~ {period.to} · Asia/Seoul
+              </p>
+            )}
+          </div>
+          {components.length > 0 && (
+            <span className="result-badge">{resultBadge(parsed)}</span>
           )}
         </header>
         <AiCsvExports
@@ -865,7 +836,8 @@ function Answer({
           </div>
         )}
         <div className="p-4">
-          {showDetails && !refinementDenied ? (
+          {accessDenied && executionId && detailDatasetId ? (
+            // The detail table was refused: only its reason and retry, never the earlier figures.
             <ResultDetails
               executionId={executionId}
               original={parsed}
@@ -873,34 +845,38 @@ function Answer({
               onAccessChecked={setAccessDenied}
             />
           ) : accessDenied ? (
-            <>
-              <State
-                title="현재 조건으로 결과를 볼 수 없어요"
-                message="조회 범위를 줄여 조건을 변경하거나 다시 질문해 주세요."
-              />
-              {showDetails && (
-                <Button
-                  type="button"
-                  onClick={() => setRefinementDenied(false)}
-                >
-                  표 다시 조회
-                </Button>
-              )}
-            </>
+            <State
+              title="현재 조건으로 결과를 볼 수 없어요"
+              message="조회 범위를 줄여 조건을 변경하거나 다시 질문해 주세요."
+            />
           ) : empty ? (
             <State
               title="결과 없음"
               message="기간과 허용 지점을 확인해 주세요."
             />
           ) : (
-            <>
-              <AiChartResults
-                parsed={parsed}
-                activeView={view}
-                scope={scope}
-                conditions={turn.conditions}
-              />
-            </>
+            <AiChartResults
+              parsed={parsed}
+              scope={scope}
+              conditions={turn.conditions}
+              detail={
+                executionId
+                  ? {
+                      datasetId: detailDatasetId,
+                      open: setDetailDatasetId,
+                      close: () => setDetailDatasetId(undefined),
+                      render: (dataset) => (
+                        <ResultDetails
+                          executionId={executionId}
+                          original={parsed}
+                          initialDatasetId={dataset.id}
+                          onAccessChecked={setAccessDenied}
+                        />
+                      ),
+                    }
+                  : undefined
+              }
+            />
           )}
         </div>
         {!accessDenied && parsed.truncation?.isTruncated && (
@@ -909,33 +885,26 @@ function Answer({
               `일부 결과만 표시해요. 최대 ${parsed.truncation.maxRows}행까지 조회했어요.`}
           </p>
         )}
-        {!accessDenied && !showDetails && (
-          <p className="help border-t border-line px-4 py-3">
-            기준 시각 {formatDateTime(parsed.asOf)}
-            {" · "}Asia/Seoul
-            {" · "}선택 범위 {scope === "all" ? "허용된 지점" : scope}
-            {parsed.notice && ` · ${parsed.notice}`}
-            {parsed.warnings.length > 0 && ` · ${parsed.warnings.join(" · ")}`}
+        {!accessDenied && (
+          <p className="help result-source border-t border-line px-4 py-3">
+            <span>
+              기준 시각 {formatDateTime(parsed.asOf)}
+              {" · "}Asia/Seoul
+              {" · "}선택 범위 {scope === "all" ? "허용된 지점" : scope}
+              {parsed.notice && ` · ${parsed.notice}`}
+              {parsed.warnings.length > 0 &&
+                ` · ${parsed.warnings.join(" · ")}`}
+            </span>
+            {components.length > 0 && (
+              <span>
+                ViewSpec ·{" "}
+                {components.map((c) => c.componentRef.id).join(" · ")}
+              </span>
+            )}
           </p>
         )}
       </section>
     </>
-  );
-}
-
-function viewLabel(view: string) {
-  return (
-    {
-      table: "표로 보기",
-      bar: "막대",
-      line: "선",
-      ranked_bar: "순위",
-      heatmap: "히트맵",
-      seat_map: "좌석",
-      week_calendar: "캘린더",
-      task_list: "목록",
-      kpi: "요약",
-    }[view] || view
   );
 }
 
@@ -1030,7 +999,6 @@ function emptyTurn(question: string, askedAt: string): Turn {
     askedAt,
     state: "loading",
     parsed: null,
-    view: "",
     message: "",
     options: [],
     stages: [],
@@ -1050,7 +1018,6 @@ function outcome(res: AiQueryResponseDto): Partial<Turn> {
       conditions: res.conditions,
       context: res.context,
       editableFilters: res.editableFilters,
-      view: toViewMode(parsed.primaryComponent),
       message: res.message || "",
     };
   }

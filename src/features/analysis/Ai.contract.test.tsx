@@ -231,7 +231,9 @@ it("saves changed conditions in the same conversation and runs recent questions 
   expect(
     within(answer).getByText("2026-10-02 ~ 2026-10-17 · 변경한 기간"),
   ).toBeVisible();
-  await user.click(within(answer).getByRole("button", { name: "표로 보기" }));
+  await user.click(
+    within(answer).getByRole("button", { name: /전체 표 보기/ }),
+  );
   const table = await within(answer).findByRole("table", {
     name: "결과 데이터 표",
   });
