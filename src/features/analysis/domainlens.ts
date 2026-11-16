@@ -28,22 +28,6 @@ export function normalizeComponentType(
   return COMPONENT_TYPES.find((type) => type === raw);
 }
 
-const VIEW_MODE: Record<ViewComponentType, string> = {
-  HEATMAP: "heatmap",
-  RANKED_BAR_CHART: "ranked_bar",
-  SEAT_MAP: "seat_map",
-  WEEK_CALENDAR: "week_calendar",
-  TASK_LIST: "task_list",
-  LINE_CHART: "line",
-  BAR_CHART: "bar",
-  KPI: "kpi",
-  DATA_TABLE: "table",
-};
-
-export function toViewMode(type: ViewComponentType) {
-  return VIEW_MODE[type];
-}
-
 export const datasetColumnSchema = z.object({
   alias: z.string(),
   /** Display name; generated results carry compiler aliases (d0, m0), so the label comes from their QuerySpec. */
@@ -90,6 +74,72 @@ export const viewSpecEnvelopeSchema = z.object({
 });
 
 export type ViewSpecEnvelopeDto = z.infer<typeof viewSpecEnvelopeSchema>;
+
+/** ViewSpec layout (view-1.0 schema): a component reference or a stack/grid/split container. */
+export type ViewLayoutNode =
+  | { componentId: string }
+  | { kind: "stack" | "grid" | "split"; children: ViewLayoutNode[] };
+
+const layoutNodeSchema: z.ZodType<ViewLayoutNode> = z.lazy(() =>
+  z.union([
+    z.object({ componentId: z.string() }),
+    z.object({
+      kind: z.enum(["stack", "grid", "split"]),
+      children: z.array(layoutNodeSchema).min(1),
+    }),
+  ]),
+);
+
+/**
+ * The layout to draw the given components with. The response is untrusted: a leaf naming an unknown or repeated
+ * component is dropped, a split keeps its two-column form only with exactly two children, and a component the layout
+ * leaves out is added at the end. Without a usable layout every component is stacked in order.
+ */
+export function layoutOf(
+  view: ViewSpecEnvelopeDto | null | undefined,
+  componentIds: string[],
+): ViewLayoutNode {
+  const known = new Set(componentIds);
+  const used = new Set<string>();
+  const clean = (
+    node: ViewLayoutNode,
+    depth: number,
+  ): ViewLayoutNode | null => {
+    if ("componentId" in node) {
+      if (!known.has(node.componentId) || used.has(node.componentId))
+        return null;
+      used.add(node.componentId);
+      return node;
+    }
+    if (depth > 4) return null;
+    const children = node.children
+      .map((child) => clean(child, depth + 1))
+      .filter((child): child is ViewLayoutNode => child !== null);
+    if (!children.length) return null;
+    if (node.kind === "split" && children.length !== 2)
+      return { kind: "stack", children };
+    return { kind: node.kind, children };
+  };
+  const parsed = layoutNodeSchema.safeParse(view?.layout);
+  const root =
+    parsed.success && !("componentId" in parsed.data)
+      ? clean(parsed.data, 1)
+      : null;
+  const missing = componentIds
+    .filter((id) => !used.has(id))
+    .map((componentId) => ({ componentId }));
+  if (!root) return { kind: "stack", children: missing };
+  if (!missing.length) return root;
+  return {
+    kind: "stack",
+    children: [
+      ...("componentId" in root || root.kind !== "stack"
+        ? [root]
+        : root.children),
+      ...missing,
+    ],
+  };
+}
 
 export const resultEnvelopeSchema = z.object({
   requestId: z.string(),
@@ -252,9 +302,7 @@ export function parseAiResult(raw: unknown): ParsedAiResult {
 
   const data = envelope.data;
   const view = viewSpecEnvelopeSchema.safeParse(response.viewSpec ?? data.view);
-  const queries = querySpecsOf(
-    (response as { querySpec?: unknown }).querySpec,
-  );
+  const queries = querySpecsOf((response as { querySpec?: unknown }).querySpec);
   // A registered analysis runs as REGISTERED_ANALYSIS; any other query was generated (OpenStudy-Backend#233).
   const isGenerated =
     queries.length > 0 &&

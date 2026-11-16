@@ -507,6 +507,65 @@
   .thread .messages {
     @apply px-4;
   }
+  /* AI result assembled by its ViewSpec layout (DomainLens result mock-up): KPI row, chart beside its table. */
+  .ai-result {
+    container-type: inline-size;
+  }
+  .result-badge {
+    @apply inline-flex min-h-6 shrink-0 items-center rounded-md border border-line bg-soft px-2 text-[11px] font-bold tracking-wide text-primary;
+  }
+  .result-stack,
+  .result-layout {
+    @apply grid min-w-0 gap-3;
+  }
+  .result-split {
+    @apply grid min-w-0 gap-3;
+    grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.65fr);
+  }
+  .result-grid {
+    @apply grid min-w-0 gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .result-kpis {
+    @apply m-0 grid gap-2;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .result-kpi {
+    @apply min-w-0 rounded-[10px] border border-line bg-canvas px-3 py-2.5;
+  }
+  .result-kpi dt {
+    @apply truncate text-[11px] font-semibold text-muted;
+  }
+  .result-kpi dd {
+    @apply m-0 mt-1 text-base font-bold tracking-tight;
+  }
+  .result-panel {
+    @apply min-w-0 overflow-hidden rounded-[10px] border border-line;
+  }
+  .result-panel-head {
+    @apply flex items-center justify-between gap-2 border-b border-line bg-canvas px-3 py-2;
+  }
+  .result-panel-head h4 {
+    @apply truncate text-xs font-semibold;
+  }
+  .result-panel-head span {
+    @apply shrink-0 text-[11px] text-muted;
+  }
+  .result-panel-body {
+    @apply grid min-w-0 gap-2 p-3;
+  }
+  .result-source {
+    @apply flex flex-wrap justify-between gap-x-4 gap-y-1;
+  }
+}
+/* A narrow result card stacks the split and shows the KPI cards two to a row, as the mock-up does under 930px. */
+@container (max-width: 720px) {
+  .result-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .result-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 1099px) {
   .workspace {

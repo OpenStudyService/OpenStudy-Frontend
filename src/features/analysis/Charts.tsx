@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -12,11 +12,13 @@ import {
 } from "recharts";
 import { won } from "../../shared/domain/schema";
 import { formatDateTime } from "../../shared/domain/format";
+import { Button } from "../../shared/ui/primitives";
 import { ChartExport } from "./ChartExport";
 import {
+  layoutOf,
   normalizeComponentType,
-  toViewMode,
   type ParsedAiResult,
+  type ViewLayoutNode,
   type TypedDatasetDto,
   type ViewSpecComponentDto,
 } from "./domainlens";
@@ -340,18 +342,24 @@ const KPI_LABELS: Record<string, string> = {
   refund_krw: "환불액",
 };
 
-function ComponentView({
+/**
+ * One ViewSpec component drawn from its dataset: the bindings name the columns, the rows are the data. With
+ * `withTable` a chart also lists its rows below it; an assembled result shows that table in its own panel instead.
+ */
+export function ComponentView({
   component,
   dataset,
   scope,
   exportConditions,
   asOf,
+  withTable = true,
 }: {
   component: ViewSpecComponentDto;
   dataset: TypedDatasetDto;
   scope: string;
   exportConditions?: string[];
   asOf?: string | null;
+  withTable?: boolean;
 }) {
   const type = component.componentRef.id;
   const fields = boundFields(component, dataset);
@@ -378,22 +386,19 @@ function ComponentView({
     if (!Array.isArray(values)) return invalid;
     return (
       <>
-        <dl className="mb-4 flex flex-wrap gap-2 text-xs">
+        <dl className="result-kpis">
           {dataset.rows.flatMap((row, index) =>
             fields.map((column) => (
-              <div
-                key={`${index}:${column.alias}`}
-                className="rounded-lg bg-soft p-3"
-              >
-                <dt>{KPI_LABELS[column.alias] ?? column.label ?? column.alias}</dt>
-                <dd className="m-0 mt-1 text-base font-semibold">
-                  {cellText(row[column.alias], column.unit)}
-                </dd>
+              <div key={`${index}:${column.alias}`} className="result-kpi">
+                <dt>
+                  {KPI_LABELS[column.alias] ?? column.label ?? column.alias}
+                </dt>
+                <dd>{cellText(row[column.alias], column.unit)}</dd>
               </div>
             )),
           )}
         </dl>
-        {table}
+        {withTable && table}
       </>
     );
   }
@@ -493,7 +498,9 @@ function ComponentView({
       return (
         <>
           {chart}
-          <DomainDataTable dataset={{ ...dataset, rows: ordered }} />
+          {withTable && (
+            <DomainDataTable dataset={{ ...dataset, rows: ordered }} />
+          )}
         </>
       );
     }
@@ -557,89 +564,173 @@ function ComponentView({
       {type === "RANKED_BAR_CHART" && dataset.rows.length > 20 && (
         <p>차트에 상위 20개 항목을 표시해요.</p>
       )}
-      {table}
+      {withTable && table}
     </>
   );
 }
 
-export function ViewSpecRenderer({
-  parsed,
-  activeView,
-  scope = "all",
-  exportConditions,
-}: {
-  parsed: ParsedAiResult;
-  activeView?: string;
-  scope?: string;
-  exportConditions?: string[];
-}) {
-  const spec = parsed.viewSpec;
-  const components =
-    spec?.components.filter(
+const PANEL_TITLES: Record<string, string> = {
+  BAR_CHART: "막대 차트",
+  LINE_CHART: "추이",
+  RANKED_BAR_CHART: "순위",
+  HEATMAP: "히트맵",
+  SEAT_MAP: "좌석 배치",
+  WEEK_CALENDAR: "주간 예약",
+  TASK_LIST: "업무 목록",
+  DATA_TABLE: "상세 표",
+};
+
+const TYPE_BADGES: Record<string, string> = {
+  BAR_CHART: "BAR",
+  LINE_CHART: "LINE",
+  RANKED_BAR_CHART: "RANKING",
+  HEATMAP: "HEATMAP",
+  SEAT_MAP: "SEAT MAP",
+  WEEK_CALENDAR: "WEEK CALENDAR",
+  TASK_LIST: "LIST",
+  DATA_TABLE: "TABLE",
+  KPI: "KPI",
+};
+
+/** The components a result can draw: catalog types of version 1.0.0 without interaction events. */
+export function drawableComponents(parsed: ParsedAiResult) {
+  return (
+    parsed.viewSpec?.components.filter(
       (component) =>
         normalizeComponentType(component.componentRef.id) &&
         component.componentRef.version === "1.0.0" &&
         component.events.length === 0,
-    ) ?? [];
-  const mode = activeView ?? toViewMode(parsed.primaryComponent);
-  const selected = components.filter((component) => {
-    const type = normalizeComponentType(component.componentRef.id);
-    return type && toViewMode(type) === mode;
-  });
+    ) ?? []
+  );
+}
+
+/** "BAR + TABLE": the result's visual types as the mock-up's badge shows them; KPI only when it is alone. */
+export function resultBadge(parsed: ParsedAiResult) {
+  const types = [
+    ...new Set(drawableComponents(parsed).map((c) => c.componentRef.id)),
+  ];
+  const shown = types.filter((type) => type !== "KPI");
+  return (shown.length ? shown : types)
+    .map((t) => TYPE_BADGES[t] ?? t)
+    .join(" + ");
+}
+
+/** The server-paged, sortable table of one dataset, opened from the panel that lists that dataset's rows. */
+export interface DetailTable {
+  /** The dataset whose detail table is open, if any. */
+  datasetId?: string;
+  open: (datasetId: string) => void;
+  close: () => void;
+  render: (dataset: TypedDatasetDto) => ReactNode;
+}
+
+/**
+ * The result assembled by its ViewSpec layout, as the DomainLens mock-up does: a stack of bands, a split of a chart
+ * (wider) and its table, a grid of cards. Each component is drawn from its dataset by its bindings; the KPI cards
+ * stand on their own, every other component sits in a titled panel. The panel that lists a dataset's rows (its table,
+ * or a chart no table accompanies) can open that dataset's detail table.
+ */
+export function ViewSpecRenderer({
+  parsed,
+  scope = "all",
+  exportConditions,
+  detail,
+}: {
+  parsed: ParsedAiResult;
+  scope?: string;
+  exportConditions?: string[];
+  detail?: DetailTable;
+}) {
+  const spec = parsed.viewSpec;
+  const components = drawableComponents(parsed);
   if (spec?.catalogVersion !== "openstudy-ui-1.0.0" || !components.length) {
     return <p role="alert">지원하는 결과 표시 명세가 없어요.</p>;
   }
-  if (mode === "table") {
-    const displayed = new Set(selected.map((component) => component.datasetId));
-    const primary = components.find(
-      (component) => component.componentRef.id === parsed.primaryComponent,
-    );
+  const byId = new Map(components.map((c) => [c.id, c]));
+  const layout = layoutOf(
+    spec,
+    components.map((c) => c.id),
+  );
+  // A chart whose rows no table component lists keeps its own table, so every figure stays readable as text.
+  const tabled = new Set(
+    components
+      .filter((c) => c.componentRef.id === "DATA_TABLE")
+      .map((c) => c.datasetId),
+  );
+  return <div className="result-layout">{node(layout, "root")}</div>;
+
+  function node(item: ViewLayoutNode, key: string): ReactNode {
+    if ("componentId" in item) {
+      const component = byId.get(item.componentId);
+      return component ? leaf(component) : null;
+    }
     return (
-      <>
-        {selected.map((component) => renderComponent(component))}
-        {primary &&
-          !displayed.has(primary.datasetId) &&
-          renderComponent(primary, true)}
-      </>
+      <div key={key} className={`result-${item.kind}`} data-layout={item.kind}>
+        {item.children.map((child, index) => node(child, `${key}.${index}`))}
+      </div>
     );
   }
-  return (
-    <>
-      {components
-        .filter(
-          (component) => component.componentRef.id === "KPI" && mode !== "kpi",
-        )
-        .map((component) => renderComponent(component))}
-      {selected.length ? (
-        selected.map((component) => renderComponent(component))
-      ) : (
-        <p role="alert">이 결과 화면은 표시할 수 없어요.</p>
-      )}
-    </>
-  );
 
-  function renderComponent(component: ViewSpecComponentDto, tableOnly = false) {
+  function leaf(component: ViewSpecComponentDto) {
+    const type = component.componentRef.id;
     const dataset = parsed.datasetList.find(
       (d) => d.id === component.datasetId,
     );
+    const view = (withTable: boolean) =>
+      dataset ? (
+        <ComponentView
+          component={component}
+          dataset={dataset}
+          scope={scope}
+          exportConditions={exportConditions}
+          asOf={dataset.asOf ?? parsed.asOf}
+          withTable={withTable}
+        />
+      ) : (
+        <p role="alert">표시할 데이터가 없어요.</p>
+      );
+    if (type === "KPI") {
+      return (
+        <section key={component.id} aria-label="요약 지표">
+          {view(false)}
+        </section>
+      );
+    }
+    const title =
+      typeof component.options.title === "string"
+        ? component.options.title
+        : (PANEL_TITLES[type] ?? "결과");
+    const isTable = type === "DATA_TABLE";
+    const listsRows = !!dataset && (isTable || !tabled.has(dataset.id));
+    const open = listsRows && !!detail && detail.datasetId === dataset.id;
+    const body = open ? (
+      <>
+        {!isTable && view(false)}
+        {detail.render(dataset)}
+      </>
+    ) : (
+      view(listsRows)
+    );
     return (
-      <section className="mb-4 grid gap-2" key={component.id}>
-        {typeof component.options.title === "string" && (
-          <h4>{component.options.title}</h4>
-        )}
-        {!dataset ? (
-          <p role="alert">표시할 데이터가 없어요.</p>
-        ) : tableOnly ? (
-          <DomainDataTable dataset={dataset} />
-        ) : (
-          <ComponentView
-            component={component}
-            dataset={dataset}
-            scope={scope}
-            exportConditions={exportConditions}
-            asOf={dataset.asOf ?? parsed.asOf}
-          />
-        )}
+      <section key={component.id} className="result-panel" aria-label={title}>
+        <header className="result-panel-head">
+          <h4>{title}</h4>
+          {dataset && isTable && (
+            <span>{dataset.rows.length.toLocaleString("ko-KR")}행</span>
+          )}
+        </header>
+        <div className="result-panel-body">
+          {body}
+          {listsRows && detail && (
+            <Button
+              type="button"
+              aria-label={`${title} ${open ? "간단히 보기" : "전체 표 보기"}`}
+              onClick={() => (open ? detail.close() : detail.open(dataset.id))}
+            >
+              {open ? "간단히 보기" : "전체 표 보기"}
+            </Button>
+          )}
+        </div>
       </section>
     );
   }
