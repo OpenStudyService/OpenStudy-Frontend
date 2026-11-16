@@ -180,7 +180,9 @@ describe("DomainLens ViewSpec contract (ported from OpenStudy-DomainLenz)", () =
     expect(screen.getByText(/화요일 15시 \(78\.3%\)/)).toBeInTheDocument();
 
     // Ranked bars are drawn as the mock-up's horizontal bars; the screen-reader summary names each product.
-    expect(screen.getByText(/종일 시간권 100시간 \(데모\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/종일 시간권 100시간 \(데모\)/),
+    ).toBeInTheDocument();
 
     expect(screen.getByTestId("viewspec-seat-map")).toBeInTheDocument();
     expect(screen.getByText("A-01")).toBeInTheDocument();
@@ -279,3 +281,63 @@ it.each([
     expect(screen.getByRole("table")).toBeVisible();
   },
 );
+
+it("shows realtime seats over several branches as a labelled occupancy comparison", () => {
+  const parsed = parseAiResult({
+    envelope: {
+      requestId: "req",
+      status: "READY",
+      datasets: [
+        {
+          id: "branchSeats",
+          columns: [
+            { alias: "branch_name", type: "STRING" },
+            { alias: "occupied", type: "INTEGER", unit: "석" },
+            { alias: "available", type: "INTEGER", unit: "석" },
+            { alias: "free", type: "INTEGER", unit: "석" },
+            { alias: "occupied_pct", type: "DECIMAL", unit: "%" },
+          ],
+          rows: [
+            {
+              branch_name: "성수점",
+              occupied: 14,
+              available: 23,
+              free: 9,
+              occupied_pct: 60.9,
+            },
+            {
+              branch_name: "강남점",
+              occupied: 19,
+              available: 22,
+              free: 3,
+              occupied_pct: 86.4,
+            },
+          ],
+        },
+      ],
+      view: {
+        components: [
+          {
+            id: "table",
+            componentRef: { id: "DATA_TABLE", version: "1.0.0" },
+            datasetId: "branchSeats",
+            bindings: {
+              columns: [
+                "branch_name",
+                "occupied",
+                "available",
+                "free",
+                "occupied_pct",
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+  render(<ViewSpecRenderer parsed={parsed} />);
+  for (const name of ["지점", "이용 중", "운영 좌석", "빈자리", "점유율"]) {
+    expect(screen.getByRole("button", { name })).toBeVisible();
+  }
+  expect(screen.getByRole("cell", { name: "86.4%" })).toBeVisible();
+});
