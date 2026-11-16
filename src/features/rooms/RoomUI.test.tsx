@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -277,6 +283,60 @@ it("renders invalid calendar ranges as guidance without firing a calendar reques
   mount(<Reservations />, "/?from=not-a-date&view=calendar");
   expect(screen.getByText("조회 기간을 확인하세요")).toBeVisible();
   expect(roomApi.calendar).not.toHaveBeenCalled();
+});
+
+it("opens the Korean business week across branches, separates overlapping reservations, and navigates by week", async () => {
+  const [gangnam, otherBranch] = context.value.session.branches;
+  context.value.scope = "all";
+  context.value.session.branches = [gangnam, otherBranch];
+  context.value.session.asOf = "2026-11-02T00:30:00+09:00";
+  const first = {
+    ...reservation,
+    branchId: gangnam.id,
+    startAt: "2026-11-02T03:00:00Z",
+    endAt: "2026-11-02T05:00:00Z",
+  };
+  const second = {
+    ...first,
+    id: "booking2",
+    branchId: otherBranch.id,
+    room: { id: "r2", roomNo: "B1", name: "모임방" },
+  };
+  vi.mocked(roomApi.calendar).mockImplementation(async (branch, from, to) => ({
+    from,
+    to,
+    items: from.startsWith("2026-11-02")
+      ? [branch === gangnam.id ? first : second]
+      : [],
+    closedDates: branch === otherBranch.id ? ["2026-11-03"] : [],
+  }));
+  const { user } = mount(<Reservations />);
+  const monday = await screen.findByRole("region", {
+    name: "2026-11-02 월요일",
+  });
+  expect(
+    screen.getByRole("region", { name: "2026-11-08 일요일" }),
+  ).toBeVisible();
+  const [booking1, booking2] = within(monday).getAllByRole("button");
+  expect(booking1).toHaveAccessibleName(/12:00–14:00.*공부방.*확정/);
+  expect(booking2).toHaveAccessibleName(/12:00–14:00.*모임방.*확정/);
+  expect(booking1.style.top).toBe(booking2.style.top);
+  expect(booking1.style.insetInlineStart).not.toBe(
+    booking2.style.insetInlineStart,
+  );
+  expect(screen.getByText(`${otherBranch.name} 휴무`)).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "다음 주" }));
+  await screen.findByRole("region", { name: "2026-11-09 월요일" });
+  expect(roomApi.calendar).toHaveBeenCalledWith(
+    gangnam.id,
+    "2026-11-09T00:00:00+09:00",
+    "2026-11-16T00:00:00+09:00",
+    undefined,
+    expect.any(AbortSignal),
+  );
+  await user.click(screen.getByRole("button", { name: "이번 주" }));
+  await screen.findByRole("button", { name: /공부방.*확정/ });
 });
 it("keeps the originally requested room status through background changes and explicit conflict comparison", async () => {
   const stopped = { ...room, status: "운영 중단" as const, version: 2 };

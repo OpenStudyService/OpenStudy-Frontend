@@ -1,0 +1,203 @@
+.reservation-view-switch,
+.reservation-week-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.reservation-view-switch {
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--bg);
+}
+
+.reservation-view-switch .btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+.reservation-view-switch .btn[aria-pressed="true"] {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.reservation-week-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.reservation-week-toolbar h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.reservation-week-toolbar > span,
+.reservation-week-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.reservation-week-empty {
+  margin: 0;
+  padding: 0 1rem 0.8rem;
+}
+
+.reservation-week-scroll {
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+}
+
+.reservation-week-scroll:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.reservation-week-grid {
+  --calendar-hour: 64px;
+  display: grid;
+}
+
+.reservation-week-time-heading,
+.reservation-week-hours {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+
+.reservation-week-time-heading,
+.reservation-week-day-heading {
+  padding: 0.65rem 0.5rem;
+  border-inline-end: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.reservation-week-time-heading {
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.reservation-week-day-heading h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.reservation-week-day-heading time {
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.reservation-week-day-heading[aria-current="date"] {
+  background: var(--soft);
+  box-shadow: inset 0 3px var(--primary);
+}
+
+.reservation-week-closed {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.reservation-week-hours > div {
+  height: var(--calendar-hour);
+  padding: 0.2rem 0.4rem;
+  border-inline-end: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.73rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.reservation-week-track {
+  position: relative;
+  border-inline-end: 1px solid var(--line);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--calendar-hour) - 1px),
+    var(--line) calc(var(--calendar-hour) - 1px) var(--calendar-hour)
+  );
+}
+
+.reservation-week-track[data-closed="true"] {
+  background-color: var(--bg);
+}
+
+.reservation-week-booking {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  padding: 0.24rem 0.38rem;
+  border: 1px solid #b6cde1;
+  border-inline-start: 3px solid #47769e;
+  border-radius: 0.4rem;
+  background: #e9f2fc;
+  color: #244b68;
+  text-align: start;
+  font-size: 0.72rem;
+  line-height: 1.32;
+  cursor: pointer;
+}
+
+.reservation-week-booking[data-status="이용 중"] {
+  border-color: #a3cabb;
+  border-inline-start-color: #34836b;
+  background: #e5f5ed;
+  color: #205849;
+}
+
+.reservation-week-booking[data-status="완료"] {
+  border-color: #cdd5df;
+  border-inline-start-color: #798a9a;
+  background: #f0f3f7;
+  color: #415266;
+}
+
+.reservation-week-booking[data-status="취소"] {
+  border-color: #e6c9bb;
+  border-inline-start-color: #ac7458;
+  background: #fcf0eb;
+  color: #75432e;
+}
+
+.reservation-week-booking:hover {
+  filter: brightness(0.96);
+}
+
+.reservation-week-booking:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.reservation-week-booking > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reservation-week-booking-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
