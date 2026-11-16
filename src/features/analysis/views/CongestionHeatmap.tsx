@@ -45,11 +45,14 @@ export function CongestionHeatmap({
   rows: Record<string, unknown>[];
   branchName?: string;
 }) {
+  // A generated congestion result has the rate only; the seat counts appear when the registered analysis sends them.
+  const count = (value: unknown) =>
+    typeof value === "number" ? value : undefined;
   const normalized = rows.map((r) => ({
     weekday: Number(r.weekday ?? 1),
     hour: Number(r.hour_kst ?? r.hourKst ?? 9),
-    occupied: Number(r.occupied_seat_samples ?? r.occupiedSeatSamples ?? 0),
-    capacity: Number(r.seat_sample_capacity ?? r.seatSampleCapacity ?? 120),
+    occupied: count(r.occupied_seat_samples ?? r.occupiedSeatSamples),
+    capacity: count(r.seat_sample_capacity ?? r.seatSampleCapacity),
     pct: Number(r.sampled_occupancy_pct ?? r.sampledOccupancyPct ?? 0),
   }));
 
@@ -123,18 +126,24 @@ export function CongestionHeatmap({
                         className={`rounded-lg border px-2 py-2.5 transition ${cellBackground(pct, isPeak)}`}
                         title={
                           cell
-                            ? `${WEEKDAY_LABELS[wd]}요일 ${hr}시: ${cell.occupied}/${cell.capacity}석 (${pct.toFixed(1)}%)`
+                            ? `${WEEKDAY_LABELS[wd]}요일 ${hr}시: ${
+                                cell.occupied !== undefined &&
+                                cell.capacity !== undefined
+                                  ? `${cell.occupied}/${cell.capacity}석 `
+                                  : ""
+                              }(${pct.toFixed(1)}%)`
                             : undefined
                         }
                       >
                         <div className="text-xs">
                           {cell ? `${pct.toFixed(1)}%` : "해당 없음"}
                         </div>
-                        {cell && (
-                          <div className="text-[10px] opacity-80">
-                            {cell.occupied}/{cell.capacity}석
-                          </div>
-                        )}
+                        {cell?.occupied !== undefined &&
+                          cell.capacity !== undefined && (
+                            <div className="text-[10px] opacity-80">
+                              {cell.occupied}/{cell.capacity}석
+                            </div>
+                          )}
                       </div>
                     </td>
                   );

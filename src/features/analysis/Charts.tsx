@@ -505,22 +505,29 @@ export function ComponentView({
       );
     }
     case "HEATMAP":
+      // The bindings name the weekday axis (category), the hour axis (series) and the rate (value): the registered
+      // analysis binds its own column names, a generated query its aliases (d0, d1, m0).
       if (
-        category !== "weekday" ||
-        series !== "hour_kst" ||
-        value !== "sampled_occupancy_pct" ||
+        typeof category !== "string" ||
+        typeof series !== "string" ||
+        typeof value !== "string" ||
         dataset.rows.some((row) =>
-          [
-            category,
-            series,
-            value,
-            "occupied_seat_samples",
-            "seat_sample_capacity",
-          ].some((field) => typeof row[field] !== "number"),
+          [category, series, value].some(
+            (field) => typeof row[field] !== "number",
+          ),
         )
       )
         return invalid;
-      chart = <CongestionHeatmap rows={dataset.rows} />;
+      chart = (
+        <CongestionHeatmap
+          rows={dataset.rows.map((row) => ({
+            ...row,
+            weekday: row[category],
+            hour_kst: row[series],
+            sampled_occupancy_pct: row[value],
+          }))}
+        />
+      );
       break;
     case "RANKED_BAR_CHART":
       if (

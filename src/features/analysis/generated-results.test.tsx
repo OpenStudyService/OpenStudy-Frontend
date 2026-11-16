@@ -37,6 +37,72 @@ describe("AI-generated results (OpenStudy-Frontend#122)", () => {
     expect(screen.getByRole("table")).toBeInTheDocument();
   });
 
+  it("draws generated congestion as a heatmap beside its table", () => {
+    // The shape the backend compiles for "강남점은 언제 가장 붐벼?": occupancy by weekday (d0) and hour (d1).
+    const response = generatedResponse("Heatmap", {
+      category: "d0",
+      series: "d1",
+      value: "m0",
+    });
+    response.querySpec.source = "seat_occupancy_sample";
+    response.querySpec.dimensions = [
+      { field: "seat_occupancy_sample.weekday_kst", alias: "d0" },
+      { field: "seat_occupancy_sample.hour_kst", alias: "d1" },
+    ];
+    response.querySpec.metrics = [
+      { field: "seats.occupancy_pct", alias: "m0" },
+    ];
+    const chart = response.viewSpec.components[0];
+    response.viewSpec.components = [
+      chart,
+      {
+        ...chart,
+        id: "c1",
+        componentRef: { id: "PaginatedDataTable", version: "1.0.0" },
+        bindings: { columns: ["d0", "d1", "m0"] },
+      },
+    ];
+    response.viewSpec.layout = {
+      kind: "stack",
+      children: [
+        {
+          kind: "split",
+          children: [{ componentId: "c0" }, { componentId: "c1" }],
+        },
+      ],
+    } as unknown as typeof response.viewSpec.layout;
+    const dataset = response.envelope.datasets[0];
+    dataset.columns = [
+      { alias: "d0", type: "INTEGER", unit: null, precision: null },
+      { alias: "d1", type: "INTEGER", unit: null, precision: null },
+      { alias: "m0", type: "DECIMAL", unit: "%", precision: 1 },
+    ];
+    dataset.rows = [
+      { d0: 1, d1: 9, m0: 25 },
+      { d0: 1, d1: 12, m0: 37.5 },
+      { d0: 3, d1: 18, m0: 12.5 },
+    ] as unknown as typeof dataset.rows;
+
+    const parsed = parseAiResult(response);
+    expect(parsed.title).toBe("요일·시간대별 좌석 점유율");
+    render(<ViewSpecRenderer parsed={parsed} />);
+    const heatmap = screen.getByRole("region", {
+      name: /요일·시간대별 좌석 혼잡도 히트맵/,
+    });
+    expect(
+      within(heatmap).getByText(/월요일 12시 \(37\.5%\)/),
+    ).toBeInTheDocument();
+    expect(within(heatmap).getAllByText("37.5%")).toHaveLength(1);
+    // The table panel lists the same rows under readable names, not d0/d1/m0.
+    const table = screen.getByRole("table", { name: "결과 데이터 표" });
+    expect(
+      within(table).getByRole("button", { name: "요일" }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).getByRole("button", { name: "시간대" }),
+    ).toBeInTheDocument();
+  });
+
   it("draws a generated KPI with the metric's name", () => {
     const response = generatedResponse("KpiGroup", { values: ["m0"] });
     response.querySpec.dimensions = [];
