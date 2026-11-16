@@ -1,15 +1,11 @@
 import { sortRows } from "../ui/table-sort";
 import type { SortDirection } from "../ui/table-sort";
 
-export async function readSortedPages<Row>(
+export async function readAllPages<Row>(
   read: (
     page: number,
     pageSize: number,
   ) => Promise<{ items: Row[]; total: number }>,
-  page: number,
-  pageSize: number,
-  direction: SortDirection,
-  value: Parameters<typeof sortRows<Row>>[1],
   rowId: (row: Row) => string,
 ) {
   const batchSize = 100;
@@ -35,6 +31,21 @@ export async function readSortedPages<Row>(
       rows.push(row);
     }
   }
+  return rows;
+}
+
+export async function readSortedPages<Row>(
+  read: (
+    page: number,
+    pageSize: number,
+  ) => Promise<{ items: Row[]; total: number }>,
+  page: number,
+  pageSize: number,
+  direction: SortDirection,
+  value: Parameters<typeof sortRows<Row>>[1],
+  rowId: (row: Row) => string,
+) {
+  const rows = await readAllPages(read, rowId);
   return sortRows(rows, value, direction).slice(
     (page - 1) * pageSize,
     page * pageSize,

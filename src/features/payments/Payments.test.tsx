@@ -224,6 +224,91 @@ async function fillSale() {
   return user;
 }
 
+it("loads all on-sale products for the selected branch into one dropdown", async () => {
+  const user = userEvent.setup();
+  context.value.scope = "all";
+  const product = {
+    id: "prod1",
+    name: "강남 판매 상품",
+    priceKrw: 9000,
+    terms: { kind: "시간권", includedMinutes: 600, validDays: null },
+    status: "판매 중",
+    branchIds: ["gangnam"],
+  };
+  const firstPage = Array.from({ length: 100 }, (_, index) => ({
+    ...product,
+    id: `prod-${index + 1}`,
+    name: `강남 판매 상품 ${index + 1}`,
+  }));
+  vi.mocked(api)
+    .mockResolvedValueOnce({
+      items: firstPage,
+      meta: { page: 1, pageSize: 100, total: 103 },
+    })
+    .mockResolvedValueOnce({
+      items: [
+        { ...product, id: "prod-101", name: "다음 페이지 상품" },
+        { ...product, id: "stopped", name: "중지 상품", status: "판매 중지" },
+        {
+          ...product,
+          id: "other",
+          name: "다른 지점 상품",
+          branchIds: ["seongsu"],
+        },
+      ],
+      meta: { page: 2, pageSize: 100, total: 103 },
+    })
+    .mockResolvedValueOnce({
+      items: [],
+      meta: { page: 1, pageSize: 100, total: 0 },
+    });
+  mount(<Payments />, "?detail=new");
+
+  const panel = within(screen.getByRole("dialog", { name: "Mock 결제" }));
+  const branch = panel.getByRole("combobox", { name: "판매 지점" });
+  const dropdown = panel.getByRole("combobox", { name: "판매 상품" });
+  expect(dropdown).toBeDisabled();
+  expect(api).not.toHaveBeenCalled();
+  expect(panel.queryByLabelText("판매 상품 검색")).not.toBeInTheDocument();
+  expect(
+    panel.queryByRole("button", { name: /상품 (이전|다음)/ }),
+  ).not.toBeInTheDocument();
+  expect(panel.getByRole("searchbox", { name: "고객 검색어" })).toHaveAttribute(
+    "placeholder",
+    "고객 이름·회원번호·연락처",
+  );
+  expect(panel.queryByText("고객을 선택해 주세요.")).not.toBeInTheDocument();
+
+  await user.selectOptions(branch, "gangnam");
+  await within(dropdown).findByRole("option", { name: /다음 페이지 상품/ });
+  expect(within(dropdown).getAllByRole("option")).toHaveLength(102);
+  expect(
+    within(dropdown).queryByRole("option", {
+      name: /중지 상품|다른 지점 상품/,
+    }),
+  ).not.toBeInTheDocument();
+  const requests = vi
+    .mocked(api)
+    .mock.calls.map(
+      ([url]) => new URL(url, "https://openstudy.test").searchParams,
+    );
+  expect(requests.map((params) => params.get("page"))).toEqual(["1", "2"]);
+  expect(
+    requests.every(
+      (params) =>
+        params.get("scope") === "gangnam" && params.get("status") === "판매 중",
+    ),
+  ).toBe(true);
+  await user.selectOptions(dropdown, "prod-101");
+
+  await user.selectOptions(branch, "seongsu");
+  await within(dropdown).findByRole("option", {
+    name: "판매 중인 상품이 없어요",
+  });
+  expect(dropdown).toHaveValue("");
+  expect(dropdown).toBeDisabled();
+});
+
 it("uses official Mock failure input, sends no amount and renders the server amount without an issued pass", async () => {
   payment = {
     ...payment,
