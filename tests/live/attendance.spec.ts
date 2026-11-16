@@ -186,11 +186,15 @@ test("historical seconds fixture is calculated by the Backend as 498 minutes in 
     expect(detail.workedMinutes).toBe(498);
     expect(detail.breaks).toHaveLength(2);
     await staff.page.goto("/app/1/attendance?week=2026-11-01");
+    const calendar = staff.page.getByRole("region", {
+      name: "주간 근무 시간표",
+    });
     await expect(
-      staff.page.getByRole("group", {
-        name: /실제 출퇴근.*QA One.*실근무 498분/,
+      calendar.getByRole("listitem").filter({
+        has: staff.page.getByText("출근", { exact: true }),
+        hasText: "QA One",
       }),
-    ).toBeVisible();
+    ).toContainText("09:00");
   } finally {
     await staff.context.close();
   }
@@ -241,7 +245,9 @@ test("a committed clock-in with a lost response recovers current and does not du
       (await (await api(staff.context, "/me/attendance/current")).json())
         .attendance,
     ).toBeNull();
-    await staff.page.getByRole("link", { name: "근무 관리", exact: true }).click();
+    await staff.page
+      .getByRole("link", { name: "근무 관리", exact: true })
+      .click();
     await expect(card.getByRole("button", { name: "휴게 시작" })).toHaveCount(
       0,
     );

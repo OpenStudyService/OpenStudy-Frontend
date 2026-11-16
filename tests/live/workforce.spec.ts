@@ -124,7 +124,9 @@ test("manager creates, edits and cancels a Sunday overnight shift in the correct
     await expect(
       page
         .getByRole("region", { name: "2036-11-02 일요일" })
-        .getByRole("button", { name: /22:00–24:00 예정 근무.*QA Staff/ }),
+        .getByRole("button", {
+          name: /예정 근무.*QA Staff.*22:00–다음 날 07:00/,
+        }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: /예정 근무 ·/ })).toHaveCount(
       1,

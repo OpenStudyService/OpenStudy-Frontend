@@ -58,7 +58,9 @@ it("shows only response employees and puts a Sunday overnight shift in its start
     name: "2026-11-08 일요일",
   });
   expect(
-    within(sunday).getByRole("button", { name: /22:00–24:00 예정 근무.*본인/ }),
+    within(sunday).getByRole("button", {
+      name: /예정 근무.*본인.*22:00–다음 날 06:00/,
+    }),
   ).toBeVisible();
   expect(screen.getAllByRole("button", { name: /예정 근무/ })).toHaveLength(1);
   expect(screen.queryByText("다른 직원")).toBeNull();
@@ -67,7 +69,7 @@ it("shows only response employees and puts a Sunday overnight shift in its start
     expect.objectContaining({ signal: expect.any(AbortSignal) }),
   );
 });
-it("separates actual work and renders the server minutes without recalculation", async () => {
+it("groups employees by Seoul minute and action and places overnight events on their own date", async () => {
   vi.mocked(api).mockResolvedValue({
     shifts: [
       {
@@ -76,6 +78,7 @@ it("separates actual work and renders the server minutes without recalculation",
         branchId: "1",
         startsAt: "2026-11-04T00:00:00Z",
         endsAt: "2026-11-04T09:00:00Z",
+        workDate: "2026-11-04",
         plannedBreakMinutes: 60,
         plannedWorkMinutes: 480,
       },
@@ -87,20 +90,44 @@ it("separates actual work and renders the server minutes without recalculation",
         branchId: "1",
         workDate: "2026-11-04",
         clockInAt: "2026-11-04T00:00:00Z",
-        clockOutAt: "2026-11-04T09:00:00Z",
+        clockOutAt: "2026-11-04T16:00:00Z",
         status: "퇴근",
-        workedMinutes: 498,
+        breaks: [
+          {
+            startedAt: "2026-11-04T14:30:00Z",
+            endedAt: "2026-11-04T15:30:00Z",
+          },
+        ],
+      },
+      {
+        id: "working",
+        employee: { id: "coworker", name: "동료" },
+        branchId: "1",
+        workDate: "2026-11-04",
+        clockInAt: "2026-11-04T00:00:42Z",
+        clockOutAt: null,
+        breaks: [{ startedAt: "2026-11-04T14:30:05Z", endedAt: null }],
       },
     ],
   });
   show();
-  expect(await screen.findByText(/실근무 498분/)).toBeVisible();
-  const planned = screen.getByRole("button", { name: /예정 근무.*본인/ });
-  const actual = screen.getByRole("group", { name: /실제 출퇴근.*본인/ });
-  expect(planned.style.top).toBe(actual.style.top);
-  expect(planned.style.insetInlineStart).not.toBe(
-    actual.style.insetInlineStart,
+  const wed = within(
+    await screen.findByRole("region", { name: "2026-11-04 수요일" }),
   );
+  expect(wed.getByRole("button", { name: /예정 근무.*본인/ })).toBeVisible();
+  const arrival = wed.getByText("출근", { exact: true }).closest("li");
+  expect(arrival).toHaveTextContent("09:00 출근 · 동료, 본인");
+  expect(wed.getByText("휴게 시작").closest("li")).toHaveTextContent(
+    "23:30 휴게 시작 · 동료, 본인",
+  );
+  expect(wed.queryByText("퇴근", { exact: true })).toBeNull();
+  const thu = within(screen.getByRole("region", { name: "2026-11-05 목요일" }));
+  expect(thu.getByText("휴게 끝").closest("li")).toHaveTextContent(
+    "00:30 휴게 끝 · 본인",
+  );
+  expect(
+    thu.getByText("퇴근", { exact: true }).closest("li"),
+  ).toHaveTextContent("01:00 퇴근 · 본인");
 });
 it("does not substitute lookups on a failed request", async () => {
   vi.mocked(api).mockRejectedValue(new Error("연결 실패"));
