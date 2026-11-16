@@ -74,21 +74,17 @@ export const dateTime = formatDateTime;
 /** 목록 카드 안에서 필터 바 아래 보조 행으로 고객 선택을 놓을 때의 배치. */
 export const LIST_CUSTOMER_SELECTOR_CLASS =
   "grid gap-3 border-b border-line px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end";
-export function CustomerSelector({
-  value,
-  onChange,
-  disabled = false,
-  allowAll = false,
-  className = "my-3",
+export const CUSTOMER_SEARCH_PAGE_SIZE = 20;
+
+export function useCustomerSearch({
+  initialSearch = "",
+  keepPreviousPage = false,
 }: {
-  value: string;
-  onChange: (id: string) => void;
-  disabled?: boolean;
-  allowAll?: boolean;
-  className?: string;
-}) {
+  initialSearch?: string;
+  keepPreviousPage?: boolean;
+} = {}) {
   const { session, scope } = useApp();
-  const [search, setSearch] = useState("");
+  const [search, setQuery] = useState(initialSearch);
   const [page, setPage] = useState(1);
   const customers = useQuery({
     queryKey: [
@@ -103,21 +99,54 @@ export function CustomerSelector({
     queryFn: ({ signal }) =>
       customerApi.list(
         scope,
-        { q: search, page, pageSize: 20, sort: "name", direction: "asc" },
+        {
+          q: search,
+          page,
+          pageSize: CUSTOMER_SEARCH_PAGE_SIZE,
+          sort: "name",
+          direction: "asc",
+        },
         signal,
       ),
+    placeholderData: (previous, query) =>
+      keepPreviousPage && query?.queryKey.at(-2) === search
+        ? previous
+        : undefined,
     retry: false,
   });
+  return {
+    search,
+    setSearch(value: string) {
+      setQuery(value);
+      setPage(1);
+    },
+    page,
+    setPage,
+    customers,
+  };
+}
+
+export function CustomerSelector({
+  value,
+  onChange,
+  disabled = false,
+  allowAll = false,
+  className = "my-3",
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  disabled?: boolean;
+  allowAll?: boolean;
+  className?: string;
+}) {
+  const { search, setSearch, page, setPage, customers } = useCustomerSearch();
   return (
     <div className={className}>
       <Field label="고객 검색 (이름·회원번호·연락처)">
         <input
           value={search}
           disabled={disabled}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </Field>
       <Field label={allowAll ? "고객 필터" : "고객 선택"}>
@@ -161,7 +190,10 @@ export function CustomerSelector({
           </span>
           <Button
             type="button"
-            disabled={disabled || page * 20 >= customers.data.meta.total}
+            disabled={
+              disabled ||
+              page * CUSTOMER_SEARCH_PAGE_SIZE >= customers.data.meta.total
+            }
             onClick={() => setPage(page + 1)}
           >
             고객 다음

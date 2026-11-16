@@ -19,12 +19,7 @@ import {
   Panel,
   State,
 } from "../../shared/ui/primitives";
-import {
-  ListCard,
-  ListFilters,
-  ListFooter,
-  ListTable,
-} from "../../shared/ui/ListLayout";
+import { ListCard, ListFooter, ListTable } from "../../shared/ui/ListLayout";
 import { listPayments } from "./api";
 import {
   AdvancedFilters,
@@ -33,15 +28,10 @@ import {
 } from "./AdvancedFilters";
 import { paymentStatuses } from "./model";
 import type { Payment, PaymentFilters } from "./model";
+import { PaymentCustomerPicker } from "./PaymentCustomerPicker";
 import { PaymentCreate, PaymentResult } from "./PaymentCreate";
 import { PaymentPanel } from "./PaymentPanels";
-import {
-  CustomerSelector,
-  LIST_CUSTOMER_SELECTOR_CLASS,
-  MockPaymentNotice,
-  dateTime,
-  useSalesSearch,
-} from "./shared";
+import { MockPaymentNotice, dateTime, useSalesSearch } from "./shared";
 
 const PAGE_SIZE = 20;
 const PAYMENT_FILTER_KEYS = [
@@ -187,73 +177,87 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
       <MockPaymentNotice />
       {readable ? (
         <ListCard>
-          <ListFilters actions={createButton}>
-            <select
-              aria-label="결제 상태 필터"
-              value={status ?? ""}
-              onChange={(e) => update("status", e.target.value)}
-            >
-              <option value="">전체 상태</option>
-              {paymentStatuses.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-            {scope === "all" && (
-              <select
-                aria-label="결제 지점 필터"
-                value={branch}
-                onChange={(e) => update("branchId", e.target.value)}
-              >
-                <option value="">전체 지점</option>
-                {session.branches
-                  .filter((b) => can(session.user, b.id, "payments:read"))
-                  .map((b) => (
-                    <option value={b.id} key={b.id}>
-                      {b.name}
-                    </option>
+          <section aria-label="결제 조회 조건" className="border-b border-line">
+            <div className="grid grid-cols-2 items-start gap-3 p-4 pb-3 sm:gap-4 sm:px-5 sm:pt-5 lg:grid-cols-4 [&_:is(input,select)]:h-10">
+              <label className="field">
+                시작일
+                <input
+                  type="date"
+                  aria-label="결제 기간 시작"
+                  value={from}
+                  onChange={(e) => update("from", e.target.value)}
+                />
+              </label>
+              <label className="field">
+                종료일 (포함)
+                <input
+                  type="date"
+                  aria-label="결제 기간 종료"
+                  value={to}
+                  onChange={(e) => update("to", e.target.value)}
+                />
+              </label>
+              <label className="field">
+                결제 상태
+                <select
+                  aria-label="결제 상태 필터"
+                  value={status ?? ""}
+                  onChange={(e) => update("status", e.target.value)}
+                >
+                  <option value="">전체 상태</option>
+                  {paymentStatuses.map((s) => (
+                    <option key={s}>{s}</option>
                   ))}
-              </select>
-            )}
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted">결제 기간</span>
-              <input
-                type="date"
-                aria-label="결제 기간 시작"
-                value={from}
-                onChange={(e) => update("from", e.target.value)}
+                </select>
+              </label>
+              {scope === "all" && (
+                <label className="field">
+                  결제 지점
+                  <select
+                    aria-label="결제 지점 필터"
+                    value={branch}
+                    onChange={(e) => update("branchId", e.target.value)}
+                  >
+                    <option value="">전체 지점</option>
+                    {session.branches
+                      .filter((b) => can(session.user, b.id, "payments:read"))
+                      .map((b) => (
+                        <option value={b.id} key={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 pb-4 sm:px-5">
+              <PaymentCustomerPicker
+                mode="filter"
+                value={filters.customerId ?? ""}
+                onChange={(id) => update("customerId", id)}
               />
-              <span aria-hidden="true">~</span>
-              <input
-                type="date"
-                aria-label="결제 기간 종료"
-                value={to}
-                onChange={(e) => update("to", e.target.value)}
-              />
-            </span>
-            <Button variant="quiet" onClick={() => reset(PAYMENT_FILTER_KEYS)}>
-              초기화
-            </Button>
-          </ListFilters>
-          <AdvancedFilters
-            className="border-b border-line [&_.filters]:border-b-0 [&>summary]:cursor-pointer [&>summary]:px-4 [&>summary]:py-3 [&>summary]:text-xs [&>summary]:text-muted"
-            values={advanced}
-            branches={session.branches.filter((b) => can(session.user, b.id))}
-            change={(key, values) =>
-              setParams((previous) => {
-                const next = new URLSearchParams(previous);
-                next.delete(key);
-                values.forEach((value) => next.append(key, value));
-                next.delete("page");
-                return next;
-              })
-            }
-          />
-          <CustomerSelector
-            className={LIST_CUSTOMER_SELECTOR_CLASS}
-            value={filters.customerId ?? ""}
-            onChange={(id) => update("customerId", id)}
-            allowAll
-          />
+              <div className="ml-auto flex flex-wrap justify-end gap-2">
+                <Button onClick={() => reset(PAYMENT_FILTER_KEYS)}>
+                  초기화
+                </Button>
+                {createButton}
+              </div>
+            </div>
+            <AdvancedFilters
+              label="결제 고급 필터"
+              values={advanced}
+              branches={session.branches.filter((b) => can(session.user, b.id))}
+              change={(key, values) =>
+                setParams((previous) => {
+                  const next = new URLSearchParams(previous);
+                  next.delete(key);
+                  values.forEach((value) => next.append(key, value));
+                  next.delete("page");
+                  return next;
+                })
+              }
+            />
+          </section>
           {data && (
             <section
               aria-label="결제 목록 적용 조건과 합계"

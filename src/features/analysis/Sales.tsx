@@ -34,11 +34,9 @@ import { SalesChartExport } from "./SalesChartExport";
 import { DailyClosings } from "./DailyClosings";
 import { PassUsage } from "./PassUsage";
 import {
-  SalesAdvancedFilters,
-  SalesProductKindFilter,
-} from "./SalesAdvancedFilters";
-import {
+  AdvancedFilters,
   AppliedAdvancedFilters,
+  ProductKindFilter,
   readAdvancedFilters,
 } from "../payments/AdvancedFilters";
 
@@ -393,7 +391,7 @@ function SalesWorkspace() {
               </label>
               {isPassUsage ? (
                 <>
-                  <SalesProductKindFilter
+                  <ProductKindFilter
                     values={advanced.productKinds}
                     change={(productKinds) => changeFilters({ productKinds })}
                   />
@@ -487,7 +485,8 @@ function SalesWorkspace() {
               </div>
             )}
             {isSalesReport && (
-              <SalesAdvancedFilters
+              <AdvancedFilters
+                label="매출 고급 필터"
                 values={advanced}
                 branches={session.branches.filter((b) =>
                   can(session.user, b.id),

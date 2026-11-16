@@ -1,3 +1,4 @@
+import { selectPaymentCustomer } from "../payment-customer-picker";
 import { randomUUID } from "node:crypto";
 import {
   expect,
@@ -81,7 +82,11 @@ async function fixture(context: BrowserContext, kind = "시간권") {
   expect(productResponse.status()).toBe(201);
   return { customer, product: await productResponse.json() };
 }
-async function createForm(page: Page, customerId: string, productId: string) {
+async function createForm(
+  page: Page,
+  customer: { name: string; memberNo: string },
+  productId: string,
+) {
   await page.goto("/app/all/payments?detail=new");
   const panel = page.getByRole("dialog");
   await expect(
@@ -90,10 +95,7 @@ async function createForm(page: Page, customerId: string, productId: string) {
   await panel
     .getByRole("combobox", { name: "판매 지점", exact: true })
     .selectOption(branchId);
-  await expect(
-    panel.getByLabel("고객 선택").locator(`option[value="${customerId}"]`),
-  ).toBeAttached();
-  await panel.getByLabel("고객 선택").selectOption(customerId);
+  await selectPaymentCustomer(page, customer);
   await expect(
     panel
       .getByRole("combobox", { name: "판매 상품", exact: true })
@@ -118,7 +120,7 @@ test("real API: approval and failure persist with server price and type-specific
   try {
     for (const kind of ["시간권", "정액권", "기간권"]) {
       const { customer, product } = await fixture(context, kind);
-      const panel = await createForm(page, customer.id, product.id);
+      const panel = await createForm(page, customer, product.id);
       const responsePromise = paymentResponse(page);
       await panel
         .getByRole("button", { name: "Mock 결제 요청", exact: true })
@@ -152,7 +154,7 @@ test("real API: approval and failure persist with server price and type-specific
         await expect(
           page.getByRole("cell", { name: "50,000원", exact: true }),
         ).toBeVisible();
-      const failedPanel = await createForm(page, customer.id, product.id);
+      const failedPanel = await createForm(page, customer, product.id);
       await failedPanel.getByLabel("Mock 결제 결과").selectOption("FAILED");
       const failedPromise = paymentResponse(page);
       await failedPanel
@@ -195,7 +197,7 @@ test("real committed response loss: payment and refund reuse the same keys witho
   const { context, page } = await login(browser);
   try {
     const { customer, product } = await fixture(context);
-    const panel = await createForm(page, customer.id, product.id);
+    const panel = await createForm(page, customer, product.id);
     const keys: string[] = [];
     let first: Payment | undefined;
     await page.route("**/api/payments?**", async (route) => {
