@@ -202,6 +202,7 @@ const GENERATED_COMPONENTS: Record<string, ViewComponentType> = {
   DonutChart: "BAR_CHART",
   LineChart: "LINE_CHART",
   AreaChart: "LINE_CHART",
+  Heatmap: "HEATMAP",
 };
 
 /** Display names of the catalog fields and metrics a generated query can select (OpenStudy semantic catalog). */
@@ -209,6 +210,9 @@ export const FIELD_LABELS: Record<string, string> = {
   "sales.approved_amount_krw": "결제 승인액",
   "sales.approved_count": "결제 건수",
   "passes.issued_count": "이용권 발급 수",
+  "seats.occupancy_pct": "좌석 점유율",
+  "seat_occupancy_sample.weekday_kst": "요일",
+  "seat_occupancy_sample.hour_kst": "시간대",
   "branch.name": "지점",
   "payment.item_type": "상품 구분",
   "payment.status": "결제 상태",
