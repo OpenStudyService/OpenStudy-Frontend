@@ -6,6 +6,7 @@ import {
   screen,
   waitFor,
   act,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -423,7 +424,8 @@ it("hides management on denied access and ignores a late response after scope ch
       }),
   );
   const { user, rerender } = mount(<Lockers />);
-  await user.click(await screen.findByRole("button", { name: "L-01" }));
+  const row = await screen.findByRole("row", { name: /L-01/ });
+  await user.click(within(row).getByRole("cell", { name: "—" }));
   await user.click(await screen.findByRole("button", { name: "유료 배정" }));
   await selectCustomer(user);
   await user.click(screen.getByRole("button", { name: "Mock 결제 후 배정" }));

@@ -186,11 +186,23 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
               </thead>
               <tbody>
                 {list.data.items.map((r) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    className="cursor-pointer hover:bg-canvas"
+                    onClick={(event) => {
+                      event.currentTarget.cells[0]
+                        .querySelector("button")
+                        ?.focus({ preventScroll: true });
+                      change("detail", r.id);
+                    }}
+                  >
                     <td>
-                      <Button onClick={() => change("detail", r.id)}>
+                      <button
+                        type="button"
+                        className="border-0 bg-transparent p-0 text-inherit"
+                      >
                         {r.lockerNo}
-                      </Button>
+                      </button>
                     </td>
                     <td>
                       {session.branches.find((b) => b.id === r.branchId)
