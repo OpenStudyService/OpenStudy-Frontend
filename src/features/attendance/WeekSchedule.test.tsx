@@ -54,10 +54,11 @@ it("shows only response employees and puts a Sunday overnight shift in its start
     attendance: [],
   });
   show();
-  const row = await screen.findByRole("rowheader", { name: "본인" });
-  const cells = within(row.parentElement!).getAllByRole("cell");
+  const sunday = await screen.findByRole("region", {
+    name: "2026-11-08 일요일",
+  });
   expect(
-    within(cells[6]).getByRole("button", { name: /예정 근무/ }),
+    within(sunday).getByRole("button", { name: /22:00–24:00 예정 근무.*본인/ }),
   ).toBeVisible();
   expect(screen.getAllByRole("button", { name: /예정 근무/ })).toHaveLength(1);
   expect(screen.queryByText("다른 직원")).toBeNull();
@@ -68,7 +69,17 @@ it("shows only response employees and puts a Sunday overnight shift in its start
 });
 it("separates actual work and renders the server minutes without recalculation", async () => {
   vi.mocked(api).mockResolvedValue({
-    shifts: [],
+    shifts: [
+      {
+        id: "planned",
+        employee: { id: "staff", name: "본인" },
+        branchId: "1",
+        startsAt: "2026-11-04T00:00:00Z",
+        endsAt: "2026-11-04T09:00:00Z",
+        plannedBreakMinutes: 60,
+        plannedWorkMinutes: 480,
+      },
+    ],
     attendance: [
       {
         id: "actual",
@@ -84,7 +95,12 @@ it("separates actual work and renders the server minutes without recalculation",
   });
   show();
   expect(await screen.findByText(/실근무 498분/)).toBeVisible();
-  expect(screen.queryByRole("button", { name: /예정 근무/ })).toBeNull();
+  const planned = screen.getByRole("button", { name: /예정 근무.*본인/ });
+  const actual = screen.getByRole("group", { name: /실제 출퇴근.*본인/ });
+  expect(planned.style.top).toBe(actual.style.top);
+  expect(planned.style.insetInlineStart).not.toBe(
+    actual.style.insetInlineStart,
+  );
 });
 it("does not substitute lookups on a failed request", async () => {
   vi.mocked(api).mockRejectedValue(new Error("연결 실패"));

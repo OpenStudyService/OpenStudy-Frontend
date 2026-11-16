@@ -6,12 +6,20 @@ import type { ResourceMap } from "../../shared/domain/schema";
 import { api, MOCK } from "../../shared/api/client";
 import { hasBlockingReadError, asPage } from "../../shared/api/read-model";
 import { DataNotice } from "../../shared/ui/DataNotice";
-import { weekly, weekDays, shiftTime as displayDate } from "./api";
+import { Button } from "../../shared/ui/primitives";
+import {
+  shiftDay,
+  WeekTimeGrid,
+  type WeekEvent,
+} from "../../shared/ui/WeekTimeGrid";
+import { weekly, weekDays } from "./api";
 
 export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
   const { session, scope, lookups } = useApp();
   const [params, setParams] = useSearchParams();
-  const selected = params.get("week") || businessDate(session.asOf);
+  const today = businessDate(session.asOf);
+  const requested = params.get("week");
+  const selected = requested && weekDays(requested).length ? requested : today;
   const days = weekDays(selected);
   const data = useQuery({
     queryKey: ["data", session.user.id, scope, "shifts", "weekly", selected],
@@ -38,12 +46,6 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
     enabled: MOCK,
     retry: false,
   });
-  // Rows come only from the authorized response, never the staff lookup.
-  const people = new Map(
-    [...(data.data?.shifts ?? []), ...(data.data?.attendance ?? [])].map(
-      (r) => [r.employee.id, r.employee.name],
-    ),
-  );
   const leaves = MOCK
     ? (leave.data?.items.filter(
         (l) =>
@@ -53,33 +55,85 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
           l.endsOn >= days[0],
       ) ?? [])
     : [];
-  for (const l of leaves)
-    people.set(
-      l.employeeId,
-      lookups.employees.find((e) => e.id === l.employeeId)?.name ||
-        l.employeeId,
-    );
   const branch = (id: string) =>
     lookups.branches.find((b) => b.id === id)?.name || id;
+  const events: WeekEvent[] = [
+    ...(data.data?.shifts ?? []).map((shift) => {
+      const detail = `예정 근무 · ${branch(shift.branchId)}`;
+      const summary = `예정 휴게 ${shift.plannedBreakMinutes}분 · 실근무 ${shift.plannedWorkMinutes}분`;
+      return {
+        id: `shift-${shift.id}`,
+        startAt: shift.startsAt,
+        endAt: shift.endsAt,
+        title: shift.employee.name,
+        detail,
+        summary,
+        label: `${detail} · ${shift.employee.name} · ${summary}`,
+        status: "planned-work",
+        onSelect: () => onSelect(shift.id),
+      };
+    }),
+    ...(data.data?.attendance ?? []).map((record) => {
+      const detail = `실제 출퇴근 · ${branch(record.branchId)}`;
+      const summary = record.clockOutAt
+        ? `실근무 ${record.workedMinutes ?? "미확정"}분`
+        : "진행 중 · 퇴근 후 실근무 확정";
+      const markerEnd =
+        Date.parse(session.asOf) > Date.parse(record.clockInAt)
+          ? session.asOf
+          : record.clockInAt;
+      return {
+        id: `attendance-${record.id}`,
+        startAt: record.clockInAt,
+        endAt: record.clockOutAt ?? markerEnd,
+        title: record.employee.name,
+        detail,
+        summary,
+        label: `${detail} · ${record.employee.name} · ${summary}`,
+        status: record.clockOutAt ? "actual-work" : "working",
+        ongoing: !record.clockOutAt,
+      };
+    }),
+  ];
+  function setWeek(date: string) {
+    if (!date) return;
+    setParams((p) => {
+      p.set("week", date);
+      return p;
+    });
+  }
+  const week = days[0];
   return (
     <section>
-      <div className="flex flex-wrap items-center gap-3 p-4">
-        <label htmlFor="schedule-week">주간 기준일</label>
-        <input
-          id="schedule-week"
-          type="date"
-          value={selected}
-          onChange={(e) => {
-            if (e.target.value)
-              setParams((p) => {
-                p.set("week", e.target.value);
-                return p;
-              });
-          }}
-        />
-        <small>
-          {days[0]} ~ {days[6]} · Asia/Seoul · 시작한 날짜 기준
-        </small>
+      <div className="week-calendar-toolbar">
+        <div className="week-calendar-controls">
+          <Button
+            aria-label="이전 주"
+            onClick={() => setWeek(shiftDay(week, -7))}
+          >
+            ‹
+          </Button>
+          <Button onClick={() => setWeek(today)}>이번 주</Button>
+          <Button
+            aria-label="다음 주"
+            onClick={() => setWeek(shiftDay(week, 7))}
+          >
+            ›
+          </Button>
+        </div>
+        <h2>
+          {week.replaceAll("-", ".")} – {days[6].replaceAll("-", ".")}
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="schedule-week">주간 기준일</label>
+          <input
+            id="schedule-week"
+            type="date"
+            value={selected}
+            onChange={(event) => setWeek(event.target.value)}
+          />
+          <small>한국 시간</small>
+        </div>
       </div>
       <DataNotice
         label="근무표 데이터"
@@ -94,91 +148,24 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
           retry={() => void leave.refetch()}
         />
       )}
-      {!hasBlockingReadError(data) && (
-        <div className="data-scroll">
-          <table className="data-table min-w-[980px]">
-            <thead>
-              <tr>
-                <th>직원</th>
-                {days.map((d, i) => (
-                  <th key={d}>
-                    {d.slice(5)} {"월화수목금토일"[i]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {!people.size && !data.isPending && (
-                <tr>
-                  <td colSpan={8}>등록된 근무와 출퇴근 기록이 없어요.</td>
-                </tr>
-              )}
-              {[...people].map(([id, name]) => (
-                <tr key={id}>
-                  <th scope="row">{name}</th>
-                  {days.map((d) => (
-                    <td key={d} className="align-top">
-                      <div className="flex min-h-20 flex-col gap-2">
-                        {data.data?.shifts
-                          .filter(
-                            (s) => s.employee.id === id && s.workDate === d,
-                          )
-                          .map((s) => (
-                            <button
-                              className="calendar-item text-left"
-                              key={s.id}
-                              onClick={() => onSelect(s.id)}
-                            >
-                              예정 근무 · {branch(s.branchId)}
-                              <br />
-                              {displayDate(s.startsAt)} ~{" "}
-                              {displayDate(s.endsAt)}
-                              <br />
-                              <small>
-                                예정 휴게 {s.plannedBreakMinutes}분 · 예정
-                                실근무 {s.plannedWorkMinutes}분
-                              </small>
-                            </button>
-                          ))}
-                        {data.data?.attendance
-                          .filter(
-                            (a) => a.employee.id === id && a.workDate === d,
-                          )
-                          .map((a) => (
-                            <div className="card p-2" key={a.id}>
-                              실제 출퇴근 · {branch(a.branchId)} · {a.status}
-                              <br />
-                              {displayDate(a.clockInAt)} ~{" "}
-                              {a.clockOutAt
-                                ? displayDate(a.clockOutAt)
-                                : "진행 중"}
-                              <br />
-                              실근무{" "}
-                              {a.workedMinutes === null
-                                ? "퇴근 후 확정"
-                                : `${a.workedMinutes}분`}
-                            </div>
-                          ))}
-                        {leaves
-                          .filter(
-                            (l) =>
-                              l.employeeId === id &&
-                              l.startsOn <= d &&
-                              l.endsOn >= d,
-                          )
-                          .map((l) => (
-                            <span className="badge" key={l.id}>
-                              휴가 · {l.amount}일 승인
-                            </span>
-                          ))}
-                      </div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!data.isPending && !hasBlockingReadError(data) && (
+        <WeekTimeGrid
+          week={week}
+          today={today}
+          events={events}
+          label="주간 근무 시간표"
+          emptyMessage="등록된 근무와 출퇴근 기록이 없어요."
+          getDayNotes={(date) =>
+            leaves
+              .filter((l) => l.startsOn <= date && l.endsOn >= date)
+              .map((l) => {
+                const name =
+                  lookups.employees.find((e) => e.id === l.employeeId)?.name ||
+                  l.employeeId;
+                return `${name} · 휴가 승인 (${l.amount}일)`;
+              })
+          }
+        />
       )}
     </section>
   );

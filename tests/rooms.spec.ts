@@ -49,12 +49,14 @@ test("Mock reservations provide calendar/list views and enforce whole-hour contr
   ).toHaveCount(24);
   await expect(panel.getByText(/실제 금전 이동 없음/)).toBeVisible();
   await panel.getByRole("button", { name: "닫기", exact: true }).click();
+  const calendar = page.getByRole("region", { name: "주간 예약 시간표" });
+  await expect(calendar).toBeVisible();
+  await page.getByRole("button", { name: "목록 보기", exact: true }).click();
+  await expect(calendar).toHaveCount(0);
+  await page.getByRole("button", { name: "주간 달력", exact: true }).click();
+  await expect(calendar).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "달력 보기", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "달력 보기", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "목록 보기", exact: true }),
+    calendar.getByRole("region", { name: /월요일$/ }),
   ).toBeVisible();
 });
 

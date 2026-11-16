@@ -15,12 +15,10 @@ test("mock schedule creates an overnight shift, keeps conflicts and cancels thro
     page.getByRole("heading", { name: "예정 근무 상세" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "닫기", exact: true }).click();
-  const cells = page
-    .getByRole("rowheader", { name: "박준호" })
-    .locator("..")
-    .getByRole("cell");
   await expect(
-    cells.nth(6).getByRole("button", { name: /예정 근무/ }),
+    page
+      .getByRole("region", { name: "2036-11-02 일요일" })
+      .getByRole("button", { name: /22:00–24:00 예정 근무.*박준호/ }),
   ).toBeVisible();
   await page.getByRole("button", { name: "근무 등록" }).click();
   await page.getByLabel("근무 직원").selectOption("junho");

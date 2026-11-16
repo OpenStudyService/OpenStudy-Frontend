@@ -1,5 +1,5 @@
 .reservation-view-switch,
-.reservation-week-controls {
+.week-calendar-controls {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -24,7 +24,7 @@
   font-weight: 700;
 }
 
-.reservation-week-toolbar {
+.week-calendar-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -34,61 +34,61 @@
   border-top: 1px solid var(--line);
 }
 
-.reservation-week-toolbar h2 {
+.week-calendar-toolbar h2 {
   margin: 0;
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
 }
 
-.reservation-week-toolbar > span,
-.reservation-week-empty {
+.week-calendar-toolbar > span,
+.week-calendar-empty {
   color: var(--muted);
   font-size: 0.8rem;
 }
 
-.reservation-week-empty {
+.week-calendar-empty {
   margin: 0;
   padding: 0 1rem 0.8rem;
 }
 
-.reservation-week-scroll {
+.week-calendar-scroll {
   overflow-x: auto;
   border-top: 1px solid var(--line);
 }
 
-.reservation-week-scroll:focus-visible {
+.week-calendar-scroll:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
-.reservation-week-grid {
+.week-calendar-grid {
   --calendar-hour: 64px;
   display: grid;
 }
 
-.reservation-week-time-heading,
-.reservation-week-hours {
+.week-calendar-time-heading,
+.week-calendar-hours {
   position: sticky;
   inset-inline-start: 0;
   z-index: 1;
   background: var(--bg);
 }
 
-.reservation-week-time-heading,
-.reservation-week-day-heading {
+.week-calendar-time-heading,
+.week-calendar-day-heading {
   padding: 0.65rem 0.5rem;
   border-inline-end: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
 
-.reservation-week-time-heading {
+.week-calendar-time-heading {
   color: var(--muted);
   text-align: center;
   font-size: 0.75rem;
 }
 
-.reservation-week-day-heading h3 {
+.week-calendar-day-heading h3 {
   display: flex;
   align-items: baseline;
   justify-content: center;
@@ -99,26 +99,26 @@
   font-weight: 600;
 }
 
-.reservation-week-day-heading time {
+.week-calendar-day-heading time {
   color: var(--ink);
   font-size: 1.05rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.reservation-week-day-heading[aria-current="date"] {
+.week-calendar-day-heading[aria-current="date"] {
   background: var(--soft);
   box-shadow: inset 0 3px var(--primary);
 }
 
-.reservation-week-closed {
+.week-calendar-day-note {
   margin: 0.2rem 0 0;
   color: var(--muted);
   text-align: center;
   font-size: 0.75rem;
 }
 
-.reservation-week-hours > div {
+.week-calendar-hours > div {
   height: var(--calendar-hour);
   padding: 0.2rem 0.4rem;
   border-inline-end: 1px solid var(--line);
@@ -129,7 +129,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.reservation-week-track {
+.week-calendar-track {
   position: relative;
   border-inline-end: 1px solid var(--line);
   background-image: repeating-linear-gradient(
@@ -139,11 +139,11 @@
   );
 }
 
-.reservation-week-track[data-closed="true"] {
+.week-calendar-track[data-closed="true"] {
   background-color: var(--bg);
 }
 
-.reservation-week-booking {
+.week-calendar-event {
   position: absolute;
   display: flex;
   flex-direction: column;
@@ -158,46 +158,51 @@
   text-align: start;
   font-size: 0.72rem;
   line-height: 1.32;
-  cursor: pointer;
 }
 
-.reservation-week-booking[data-status="이용 중"] {
+.week-calendar-event[data-status="이용 중"],
+.week-calendar-event[data-status="actual-work"],
+.week-calendar-event[data-status="working"] {
   border-color: #a3cabb;
   border-inline-start-color: #34836b;
   background: #e5f5ed;
   color: #205849;
 }
 
-.reservation-week-booking[data-status="완료"] {
+.week-calendar-event[data-status="working"] {
+  border-block-end-style: dashed;
+}
+
+.week-calendar-event[data-status="완료"] {
   border-color: #cdd5df;
   border-inline-start-color: #798a9a;
   background: #f0f3f7;
   color: #415266;
 }
 
-.reservation-week-booking[data-status="취소"] {
+.week-calendar-event[data-status="취소"] {
   border-color: #e6c9bb;
   border-inline-start-color: #ac7458;
   background: #fcf0eb;
   color: #75432e;
 }
 
-.reservation-week-booking:hover {
+button.week-calendar-event:hover {
   filter: brightness(0.96);
 }
 
-.reservation-week-booking:focus-visible {
+.week-calendar-event:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
-.reservation-week-booking > * {
+.week-calendar-event > * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.reservation-week-booking-time {
+.week-calendar-event-time {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }

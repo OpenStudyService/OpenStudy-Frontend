@@ -54,7 +54,7 @@ test("leave approval/cancel and weekly schedule use one balance", async ({
   await expect(balance).toContainText("내역 합계 14일");
   await page.goto("/app/gangnam/attendance?tab=shifts&week=2026-10-20");
   await expect(
-    page.getByText("휴가 · 1일 승인", { exact: true }),
+    page.getByText("박준호 · 휴가 승인 (1일)", { exact: true }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "휴가 신청·승인" }).click();
   await balance.getByLabel("잔여량 조회 대상").selectOption("junho");
