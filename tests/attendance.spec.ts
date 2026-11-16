@@ -32,13 +32,15 @@ test("mock attendance shares clock, break and out records with list, detail and 
     page.getByRole("dialog").getByText(`실근무: ${record.workedMinutes}분`),
   ).toBeVisible();
   await page.goto(`/app/gangnam/attendance?week=${record.workDate}`);
-  await expect(
-    page.getByRole("region", { name: "주간 근무 시간표" }).getByRole("group", {
-      name: new RegExp(
-        `실제 출퇴근.*강남점.*김서연.*실근무 ${record.workedMinutes}분`,
-      ),
-    }),
-  ).toBeVisible();
+  const calendar = page.getByRole("region", { name: "주간 근무 시간표" });
+  for (const action of ["출근", "휴게 시작", "휴게 끝", "퇴근"]) {
+    await expect(
+      calendar.getByRole("listitem").filter({
+        has: page.getByText(action, { exact: true }),
+        hasText: "김서연",
+      }),
+    ).toBeVisible();
+  }
 });
 test("mock attendance staff sees only personal records and no staff management filters", async ({
   page,

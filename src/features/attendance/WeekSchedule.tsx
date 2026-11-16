@@ -7,12 +7,51 @@ import { api, MOCK } from "../../shared/api/client";
 import { hasBlockingReadError, asPage } from "../../shared/api/read-model";
 import { DataNotice } from "../../shared/ui/DataNotice";
 import { Button } from "../../shared/ui/primitives";
-import {
-  shiftDay,
-  WeekTimeGrid,
-  type WeekEvent,
-} from "../../shared/ui/WeekTimeGrid";
-import { weekly, weekDays } from "./api";
+import { shiftDay } from "../../shared/ui/WeekTimeGrid";
+import { seoulInput, weekly, weekDays, type Shift, type Weekly } from "./api";
+
+type AttendanceAction = "출근" | "휴게 시작" | "휴게 끝" | "퇴근";
+type AttendanceLine = {
+  time: string;
+  action: AttendanceAction;
+  people: Map<string, string>;
+};
+
+function attendanceLines(
+  records: Weekly["attendance"],
+  days: string[],
+  employeeLabel: (record: Weekly["attendance"][number]) => string,
+) {
+  const groups = new Map<string, Map<string, AttendanceLine>>();
+  for (const day of days) groups.set(day, new Map());
+
+  for (const record of records) {
+    const add = (action: AttendanceAction, instant: string | null) => {
+      if (!instant) return;
+      const local = seoulInput(instant);
+      const day = groups.get(local.slice(0, 10));
+      if (!day) return;
+      const time = local.slice(11);
+      const key = `${time} ${action}`;
+      const line = day.get(key) ?? { time, action, people: new Map() };
+      line.people.set(
+        `${record.branchId}:${record.employee.id}`,
+        employeeLabel(record),
+      );
+      day.set(key, line);
+    };
+
+    add("출근", record.clockInAt);
+    for (const pause of record.breaks) {
+      add("휴게 시작", pause.startedAt);
+      add("휴게 끝", pause.endedAt);
+    }
+    add("퇴근", record.clockOutAt);
+  }
+  return groups;
+}
+
+const weekdays = ["월", "화", "수", "목", "금", "토", "일"];
 
 export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
   const { session, scope, lookups } = useApp();
@@ -57,44 +96,16 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
     : [];
   const branch = (id: string) =>
     lookups.branches.find((b) => b.id === id)?.name || id;
-  const events: WeekEvent[] = [
-    ...(data.data?.shifts ?? []).map((shift) => {
-      const detail = `예정 근무 · ${branch(shift.branchId)}`;
-      const summary = `예정 휴게 ${shift.plannedBreakMinutes}분 · 실근무 ${shift.plannedWorkMinutes}분`;
-      return {
-        id: `shift-${shift.id}`,
-        startAt: shift.startsAt,
-        endAt: shift.endsAt,
-        title: shift.employee.name,
-        detail,
-        summary,
-        label: `${detail} · ${shift.employee.name} · ${summary}`,
-        status: "planned-work",
-        onSelect: () => onSelect(shift.id),
-      };
-    }),
-    ...(data.data?.attendance ?? []).map((record) => {
-      const detail = `실제 출퇴근 · ${branch(record.branchId)}`;
-      const summary = record.clockOutAt
-        ? `실근무 ${record.workedMinutes ?? "미확정"}분`
-        : "진행 중 · 퇴근 후 실근무 확정";
-      const markerEnd =
-        Date.parse(session.asOf) > Date.parse(record.clockInAt)
-          ? session.asOf
-          : record.clockInAt;
-      return {
-        id: `attendance-${record.id}`,
-        startAt: record.clockInAt,
-        endAt: record.clockOutAt ?? markerEnd,
-        title: record.employee.name,
-        detail,
-        summary,
-        label: `${detail} · ${record.employee.name} · ${summary}`,
-        status: record.clockOutAt ? "actual-work" : "working",
-        ongoing: !record.clockOutAt,
-      };
-    }),
-  ];
+  const employeeLabel = (record: Weekly["attendance"][number] | Shift) =>
+    scope === "all"
+      ? `${record.employee.name} (${branch(record.branchId)})`
+      : record.employee.name;
+  const actual = attendanceLines(
+    data.data?.attendance ?? [],
+    days,
+    employeeLabel,
+  );
+  const planned = data.data?.shifts ?? [];
   function setWeek(date: string) {
     if (!date) return;
     setParams((p) => {
@@ -149,23 +160,122 @@ export function WeekSchedule({ onSelect }: { onSelect: (id: string) => void }) {
         />
       )}
       {!data.isPending && !hasBlockingReadError(data) && (
-        <WeekTimeGrid
-          week={week}
-          today={today}
-          events={events}
-          label="주간 근무 시간표"
-          emptyMessage="등록된 근무와 출퇴근 기록이 없어요."
-          getDayNotes={(date) =>
-            leaves
-              .filter((l) => l.startsOn <= date && l.endsOn >= date)
-              .map((l) => {
-                const name =
-                  lookups.employees.find((e) => e.id === l.employeeId)?.name ||
-                  l.employeeId;
-                return `${name} · 휴가 승인 (${l.amount}일)`;
-              })
-          }
-        />
+        <div
+          className="week-calendar-scroll"
+          role="region"
+          aria-label="주간 근무 시간표"
+          tabIndex={0}
+        >
+          {!planned.length &&
+            !leaves.length &&
+            ![...actual.values()].some((day) => day.size) && (
+              <p className="px-4 py-3 text-muted">
+                등록된 근무와 출퇴근 기록이 없어요.
+              </p>
+            )}
+          <div className="grid min-w-[1120px] grid-cols-7">
+            {days.map((day, index) => (
+              <div
+                className="week-calendar-day-heading"
+                key={day}
+                aria-current={day === today ? "date" : undefined}
+              >
+                <h3>
+                  <span>{weekdays[index]}</span>
+                  <time dateTime={day}>
+                    {Number(day.slice(5, 7))}/{Number(day.slice(8))}
+                  </time>
+                </h3>
+              </div>
+            ))}
+            {days.map((day, index) => {
+              const shifts = planned
+                .filter((shift) => shift.workDate === day)
+                .map((shift) => {
+                  const start = seoulInput(shift.startsAt).slice(11);
+                  const end = seoulInput(shift.endsAt);
+                  const endDay = end.slice(0, 10) === day ? "" : "다음 날 ";
+                  return {
+                    shift,
+                    time: start,
+                    range: `${start}–${endDay}${end.slice(11)}`,
+                  };
+                });
+              const lines = [
+                ...shifts.map(({ shift, time, range }) => ({
+                  time,
+                  key: `shift-${shift.id}`,
+                  content: (
+                    <button
+                      type="button"
+                      className="w-full rounded-md bg-soft px-2 py-1 text-left hover:underline"
+                      aria-label={`예정 근무 · ${employeeLabel(shift)} · ${range}`}
+                      onClick={() => onSelect(shift.id)}
+                    >
+                      <span className="block font-semibold tabular-nums">
+                        {range}
+                      </span>
+                      <span>예정 · {employeeLabel(shift)}</span>
+                    </button>
+                  ),
+                })),
+                ...[...(actual.get(day)?.values() ?? [])].map(
+                  ({ time, action, people }) => ({
+                    time,
+                    key: `${time} ${action}`,
+                    content: (
+                      <p className="break-words px-2 py-1">
+                        <span className="whitespace-nowrap">
+                          <time
+                            className="font-semibold tabular-nums"
+                            dateTime={`${day}T${time}+09:00`}
+                          >
+                            {time}
+                          </time>{" "}
+                          <span className="text-primary">{action}</span>
+                        </span>{" · "}
+                        <span>
+                          {[...people.values()]
+                            .sort((a, b) => a.localeCompare(b, "ko"))
+                            .join(", ")}
+                        </span>
+                      </p>
+                    ),
+                  }),
+                ),
+              ].sort((a, b) => a.time.localeCompare(b.time));
+              return (
+                <section
+                  key={day}
+                  aria-label={`${day} ${weekdays[index]}요일`}
+                  className="min-w-0 border-e border-line p-2 text-xs last:border-e-0"
+                >
+                  {leaves
+                    .filter(
+                      (leave) => leave.startsOn <= day && leave.endsOn >= day,
+                    )
+                    .map((leave) => {
+                      const name =
+                        lookups.employees.find((e) => e.id === leave.employeeId)
+                          ?.name || leave.employeeId;
+                      return (
+                        <p className="week-calendar-day-note" key={leave.id}>
+                          {name} · 휴가 승인 ({leave.amount}일)
+                        </p>
+                      );
+                    })}
+                  {lines.length > 0 && (
+                    <ul className="m-0 list-none divide-y divide-line p-0">
+                      {lines.map(({ key, content }) => (
+                        <li key={key}>{content}</li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </div>
       )}
     </section>
   );
