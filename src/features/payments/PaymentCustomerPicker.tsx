@@ -71,7 +71,11 @@ export function PaymentCustomerPicker({
                 ref={quickSearchInput}
                 type="search"
                 aria-label="고객 검색어"
-                placeholder="이름·회원번호·연락처"
+                placeholder={
+                  mode === "sale"
+                    ? "고객 이름·회원번호·연락처"
+                    : "이름·회원번호·연락처"
+                }
                 className="h-10 w-full"
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
@@ -91,11 +95,7 @@ export function PaymentCustomerPicker({
             </Button>
           </Dialog.Trigger>
         </div>
-        {!value && (
-          <span className="help">
-            {mode === "filter" ? "전체 고객" : "고객을 선택해 주세요."}
-          </span>
-        )}
+        {!value && mode === "filter" && <span className="help">전체 고객</span>}
       </div>
       <Dialog.Portal>
         <Dialog.Overlay className="panel-overlay z-[60]" />

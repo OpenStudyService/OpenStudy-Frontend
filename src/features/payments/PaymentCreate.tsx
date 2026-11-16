@@ -3,7 +3,8 @@ import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
-import { api, ApiError, MOCK, queryString } from "../../shared/api/client";
+import { api, ApiError, queryString } from "../../shared/api/client";
+import { readAllPages } from "../../shared/api/read-sorted-pages";
 import type { ProductPage } from "../products/model";
 import { saleAvailability, saleMessages } from "../../shared/domain/sale";
 import { can, won } from "../../shared/domain/schema";
@@ -48,8 +49,6 @@ export function PaymentCreate({
   );
   const [customerId, setCustomerId] = useState("");
   const [productId, setProductId] = useState("");
-  const [productSearch, setProductSearch] = useState("");
-  const [productPage, setProductPage] = useState(1);
   const [method, setMethod] = useState<CreateBody["method"]>("카드");
   const [mockOutcome, setMockOutcome] =
     useState<CreateBody["mockOutcome"]>("APPROVED");
@@ -66,41 +65,49 @@ export function PaymentCreate({
     createPayment,
   );
   const products = useQuery({
-    queryKey: [
-      "data",
-      session.user.id,
-      branchId,
-      "products",
-      "sale-selection",
-      productSearch,
-      productPage,
-    ],
+    queryKey: ["data", session.user.id, branchId, "products", "sale-selection"],
     queryFn: ({ signal }) =>
-      api<ProductPage>(
-        `/products?${queryString({ scope: branchId, status: MOCK ? undefined : "판매 중", q: productSearch, page: productPage, pageSize: 20, sort: "name", direction: "asc" })}`,
-        { signal },
+      readAllPages(
+        async (page, pageSize) => {
+          const result = await api<ProductPage>(
+            `/products?${queryString({
+              scope: branchId,
+              status: "판매 중",
+              page,
+              pageSize,
+              sort: "name",
+              direction: "asc",
+            })}`,
+            { signal },
+          );
+          return { items: result.items, total: result.meta.total };
+        },
+        (product) => product.id,
       ),
     enabled: !!branchId,
     retry: false,
   });
-  const selected = products.data?.items.find((p) => p.id === productId);
+  const saleProducts = products.data?.filter(
+    (product) =>
+      product.status === "판매 중" && product.branchIds.includes(branchId),
+  );
+  const selected = saleProducts?.find((product) => product.id === productId);
   const availability =
     selected?.soldQuantity === undefined
       ? selected?.saleAvailability
       : saleAvailability(selected, now, selected.soldQuantity);
   const saleCode =
-    selected?.status === "판매 중지"
-      ? "PRODUCT_NOT_ON_SALE"
-      : availability === "판매 전" || availability === "판매 종료"
-        ? "PRODUCT_NOT_IN_SALE_PERIOD"
-        : availability === "한도 소진"
-          ? "PRODUCT_SALE_LIMIT_REACHED"
-          : "";
+    availability === "판매 전" || availability === "판매 종료"
+      ? "PRODUCT_NOT_IN_SALE_PERIOD"
+      : availability === "한도 소진"
+        ? "PRODUCT_SALE_LIMIT_REACHED"
+        : "";
   const errorCode =
     write.error instanceof ApiError ? write.error.detail.code : "";
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (submitting.current || write.pending || saleCode) return;
+    if (submitting.current || write.pending || products.isError || saleCode)
+      return;
     if (
       !branchId ||
       !customerId ||
@@ -146,7 +153,6 @@ export function PaymentCreate({
             onChange={(e) => {
               setBranchId(e.target.value);
               setProductId("");
-              setProductPage(1);
             }}
           >
             <option value="">지점을 선택해 주세요</option>
@@ -162,60 +168,31 @@ export function PaymentCreate({
           value={customerId}
           onChange={setCustomerId}
         />
-        <Field label="판매 상품 검색">
-          <input
-            value={productSearch}
-            onChange={(e) => {
-              setProductSearch(e.target.value);
-              setProductPage(1);
-              setProductId("");
-            }}
-          />
-        </Field>
         <Field label="판매 상품">
           <select
             value={productId}
             required
-            disabled={!branchId || products.isPending || !!products.error}
+            disabled={!saleProducts?.length || products.isError}
             onChange={(e) => setProductId(e.target.value)}
           >
-            <option value="">상품을 선택해 주세요</option>
-            {products.data?.items
-              .filter((p) => p.branchIds.includes(branchId))
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} · {p.terms.kind}
-                </option>
-              ))}
+            <option value="">
+              {!branchId
+                ? "판매 지점을 먼저 선택해 주세요"
+                : products.isPending
+                  ? "상품을 불러오는 중이에요"
+                  : products.isError
+                    ? "상품을 불러오지 못했어요"
+                    : saleProducts?.length
+                      ? "상품을 선택해 주세요"
+                      : "판매 중인 상품이 없어요"}
+            </option>
+            {saleProducts?.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name} · {product.terms.kind}
+              </option>
+            ))}
           </select>
         </Field>
-        {products.data && (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              disabled={productPage <= 1}
-              onClick={() => {
-                setProductPage(productPage - 1);
-                setProductId("");
-              }}
-            >
-              상품 이전
-            </Button>
-            <span className="help">
-              {productPage}페이지 · 총 {products.data.meta.total}개
-            </span>
-            <Button
-              type="button"
-              disabled={productPage * 20 >= products.data.meta.total}
-              onClick={() => {
-                setProductPage(productPage + 1);
-                setProductId("");
-              }}
-            >
-              상품 다음
-            </Button>
-          </div>
-        )}
         {products.error && (
           <ErrorState
             error={products.error}
@@ -262,7 +239,12 @@ export function PaymentCreate({
         type="submit"
         variant="primary"
         disabled={
-          write.pending || !selected || !customerId || !branchId || !!saleCode
+          write.pending ||
+          products.isError ||
+          !selected ||
+          !customerId ||
+          !branchId ||
+          !!saleCode
         }
       >
         {write.pending
