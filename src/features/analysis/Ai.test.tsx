@@ -490,7 +490,7 @@ it("shows readiness reasons after a 503 and retries the same request as a normal
   expect(mocks.execute.mock.calls[1][0]).toEqual(
     mocks.execute.mock.calls[0][0],
   );
-  expect(await screen.findByText("순매출")).toBeVisible();
+  expect((await screen.findAllByText("순매출"))[0]).toBeVisible();
 });
 
 it.each([
@@ -549,22 +549,22 @@ it("announces truncation and clears old results on a scope change and on session
   ).toHaveAccessibleDescription("CSV에는 앞의 1,000행만 담겨요.");
   mocks.context.scope = "all";
   rerender();
-  expect(screen.queryByText("순매출")).toBeNull();
+  expect(screen.queryAllByText("순매출")).toHaveLength(0);
   await ask("새 범위 매출");
-  expect(await screen.findByText("순매출")).toBeVisible();
+  expect((await screen.findAllByText("순매출"))[0]).toBeVisible();
   expect(mocks.execute.mock.calls[1][0].scope).toBe("all");
   act(() => window.dispatchEvent(new Event("openstudy:session-expired")));
-  expect(screen.queryByText("순매출")).toBeNull();
+  expect(screen.queryAllByText("순매출")).toHaveLength(0);
 });
 
 it("clears sales results when permission is revoked within the same scope", async () => {
   mocks.execute.mockResolvedValue(response({}));
   const rerender = show();
   await ask("매출");
-  expect(await screen.findByText("순매출")).toBeVisible();
+  expect((await screen.findAllByText("순매출"))[0]).toBeVisible();
   mocks.context.session = session(["ai:read"]);
   rerender();
-  expect(screen.queryByText("순매출")).toBeNull();
+  expect(screen.queryAllByText("순매출")).toHaveLength(0);
 });
 
 it("blocks duplicate submissions and discards a response received after cancellation", async () => {
@@ -581,7 +581,7 @@ it("blocks duplicate submissions and discards a response received after cancella
   await user.click(screen.getByRole("button", { name: "질문 대기 취소" }));
   await act(async () => complete(response({})));
   expect(await screen.findByText("질문 대기를 취소했어요.")).toBeVisible();
-  expect(screen.queryByText("순매출")).toBeNull();
+  expect(screen.queryAllByText("순매출")).toHaveLength(0);
 });
 
 it.each([
@@ -633,7 +633,7 @@ it("clears earlier results when a successful response reports permission loss", 
   );
   show();
   await ask("지점별 매출");
-  await screen.findByText("순매출");
+  await screen.findAllByText("순매출");
   await ask("다시 조회");
   await screen.findByText(/이전 결과의 지점 권한이 바뀌어/);
   expect(screen.queryByText("지점별 매출")).not.toBeInTheDocument();
@@ -677,7 +677,7 @@ it("uses server page metadata and resets the page and sort when switching data k
   expect(await screen.findByText("2페이지 · 총 21개")).toBeVisible();
   const table = screen.getByRole("table", { name: "결과 데이터 표" });
   await user.click(
-    within(table).getByRole("button", { name: "net_krw (KRW)" }),
+    within(table).getByRole("button", { name: "순매출" }),
   );
   await waitFor(() =>
     expect(mocks.api).toHaveBeenCalledWith(

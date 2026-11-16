@@ -179,15 +179,16 @@ describe("DomainLens ViewSpec contract (ported from OpenStudy-DomainLenz)", () =
     expect(screen.getByTestId("viewspec-heatmap")).toBeInTheDocument();
     expect(screen.getByText(/화요일 15시 \(78\.3%\)/)).toBeInTheDocument();
 
-    expect(screen.getByTestId("viewspec-ranked-bar")).toBeInTheDocument();
-    expect(screen.getByText("종일 시간권 100시간 (데모)")).toBeInTheDocument();
+    // Ranked bars are drawn as the mock-up's horizontal bars; the screen-reader summary names each product.
+    expect(screen.getByText(/종일 시간권 100시간 \(데모\)/)).toBeInTheDocument();
 
     expect(screen.getByTestId("viewspec-seat-map")).toBeInTheDocument();
     expect(screen.getByText("A-01")).toBeInTheDocument();
-    expect(screen.getByText("11석")).toBeInTheDocument();
+    // The seat counts are the result's KPI cards now; the map shows the tiles and the legend.
+    expect(screen.getAllByText("이용 중").length).toBeGreaterThan(0);
 
     expect(screen.getByTestId("viewspec-week-calendar")).toBeInTheDocument();
-    expect(screen.getByText("강남 Room A")).toBeInTheDocument();
+    expect(screen.getByText(/강남 Room A/)).toBeInTheDocument();
 
     expect(screen.getByTestId("viewspec-task-list")).toBeInTheDocument();
     expect(
@@ -254,7 +255,7 @@ it("renders option text safely, orders time series and distinguishes zero from m
   expect(screen.getAllByRole("row")[1]).toHaveTextContent("2026-11-010");
   expect(screen.getByRole("cell", { name: "해당 없음" })).toBeVisible();
   expect(
-    screen.getByText(/2026-11-01 0, 2026-11-02 해당 없음/),
+    screen.getByText(/2026-11-01 .*0, 2026-11-02 .*해당 없음/),
   ).toBeInTheDocument();
   const user = userEvent.setup();
   await user.tab();

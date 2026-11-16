@@ -205,6 +205,31 @@ const GENERATED_COMPONENTS: Record<string, ViewComponentType> = {
   Heatmap: "HEATMAP",
 };
 
+/** Column names of the registered analyses' tables, as the DomainLens result mock-up heads them. */
+export const ANALYSIS_COLUMN_LABELS: Record<string, string> = {
+  branch_name: "지점",
+  approved_krw: "승인액",
+  refund_krw: "환불액",
+  net_krw: "순매출",
+  approved_count: "승인 건수",
+  refund_count: "환불 건수",
+  product: "상품",
+  issued_units: "발급",
+  refunded_units: "환불",
+  net_units: "순판매량",
+  date_kst: "날짜",
+  purpose_label: "구분",
+  weekday_label: "요일",
+  hour_label: "시간",
+  sampled_occupancy_pct: "점유율",
+  pass_id: "이용권 ID",
+  product_name: "상품명",
+  expires_at: "만료일",
+  days_left: "남은 일수",
+  employee_name: "직원",
+  work_hours: "근무시간",
+};
+
 /** Display names of the catalog fields and metrics a generated query can select (OpenStudy semantic catalog). */
 export const FIELD_LABELS: Record<string, string> = {
   "sales.approved_amount_krw": "결제 승인액",
@@ -331,7 +356,13 @@ export function parseAiResult(raw: unknown): ParsedAiResult {
           label: column.label ?? labels.get(column.alias),
         })),
       }))
-    : data.datasets;
+    : data.datasets.map((dataset) => ({
+        ...dataset,
+        columns: dataset.columns.map((column) => ({
+          ...column,
+          label: column.label ?? ANALYSIS_COLUMN_LABELS[column.alias],
+        })),
+      }));
   const generated: GeneratedConditions | undefined = isGenerated
     ? {
         metrics: [
