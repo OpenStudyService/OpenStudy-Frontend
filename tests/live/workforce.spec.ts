@@ -121,12 +121,10 @@ test("manager creates, edits and cancels a Sunday overnight shift in the correct
     await page.getByRole("button", { name: "근무 수정" }).click();
     expect((await updated).status()).toBe(200);
     await page.getByRole("button", { name: "닫기", exact: true }).click();
-    const cells = page
-      .getByRole("rowheader", { name: "QA Staff" })
-      .locator("..")
-      .getByRole("cell");
     await expect(
-      cells.nth(6).getByRole("button", { name: /예정 근무/ }),
+      page
+        .getByRole("region", { name: "2036-11-02 일요일" })
+        .getByRole("button", { name: /22:00–24:00 예정 근무.*QA Staff/ }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: /예정 근무 ·/ })).toHaveCount(
       1,
@@ -218,10 +216,10 @@ test("staff sees only their own schedule and cannot manage other employees", asy
     });
     await staff.page.goto("/app/1/attendance?week=2036-11-05");
     await expect(
-      staff.page.getByRole("rowheader", { name: "QA Staff" }),
+      staff.page.getByRole("button", { name: /예정 근무.*QA Staff/ }),
     ).toBeVisible();
     await expect(
-      staff.page.getByRole("rowheader", { name: "QA Other" }),
+      staff.page.getByRole("button", { name: /예정 근무.*QA Other/ }),
     ).toHaveCount(0);
     await expect(
       staff.page.getByRole("button", { name: "근무 등록" }),

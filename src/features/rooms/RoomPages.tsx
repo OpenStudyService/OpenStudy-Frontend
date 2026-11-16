@@ -20,7 +20,8 @@ import type { Room, RoomReservation } from "./model";
 import { RoomPanel } from "./RoomPanel";
 import { ReservationPanel } from "./ReservationPanel";
 import { displayTime, stamp } from "./shared";
-import { shiftDay, startOfWeek, WeekCalendar } from "./WeekCalendar";
+import { shiftDay, startOfWeek } from "../../shared/ui/WeekTimeGrid";
+import { WeekCalendar } from "./WeekCalendar";
 
 function useParamsState() {
   const [params, setParams] = useSearchParams();
@@ -438,8 +439,8 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
           <ErrorState error={rooms.error} retry={() => void rooms.refetch()} />
         )}
         {!listView && (
-          <div className="reservation-week-toolbar">
-            <div className="reservation-week-controls">
+          <div className="week-calendar-toolbar">
+            <div className="week-calendar-controls">
               <Button
                 aria-label="이전 주"
                 disabled={!week}

@@ -186,9 +186,11 @@ test("historical seconds fixture is calculated by the Backend as 498 minutes in 
     expect(detail.workedMinutes).toBe(498);
     expect(detail.breaks).toHaveLength(2);
     await staff.page.goto("/app/1/attendance?week=2026-11-01");
-    await expect(staff.page.getByText(/실제 출퇴근.*QA One/)).toContainText(
-      "실근무 498분",
-    );
+    await expect(
+      staff.page.getByRole("group", {
+        name: /실제 출퇴근.*QA One.*실근무 498분/,
+      }),
+    ).toBeVisible();
   } finally {
     await staff.context.close();
   }
