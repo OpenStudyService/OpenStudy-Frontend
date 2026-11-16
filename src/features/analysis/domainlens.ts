@@ -228,6 +228,11 @@ export const ANALYSIS_COLUMN_LABELS: Record<string, string> = {
   days_left: "남은 일수",
   employee_name: "직원",
   work_hours: "근무시간",
+  occupied: "이용 중",
+  available: "운영 좌석",
+  free: "빈자리",
+  blocked: "차단",
+  occupied_pct: "점유율",
 };
 
 /** Display names of the catalog fields and metrics a generated query can select (OpenStudy semantic catalog). */
