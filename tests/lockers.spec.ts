@@ -41,8 +41,14 @@ test("Mock assignment form exposes 28-day blocks and explicitly labels payment s
 }) => {
   await login(page);
   await page.goto("/app/gangnam/spaces?tab=lockers");
-  await page.getByRole("button", { name: "L-01", exact: true }).click();
+  const row = page.getByRole("row").filter({ hasText: "L-01" });
+  const number = row.getByRole("button", { name: "L-01", exact: true });
   const panel = page.getByRole("dialog");
+  await row.getByRole("cell", { name: "—", exact: true }).click();
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "닫기" }).click();
+  await expect(number).toBeFocused();
+  await page.keyboard.press("Enter");
   await panel.getByRole("button", { name: "유료 배정", exact: true }).click();
   await expect(
     panel.getByLabel("이용 기간 (4주 단위)", { exact: true }),
