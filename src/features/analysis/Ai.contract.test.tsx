@@ -238,10 +238,10 @@ it("saves changed conditions in the same conversation and deletes the whole hist
     name: "결과 데이터 표",
   });
   await user.click(
-    within(table).getByRole("button", { name: "net_krw (KRW)" }),
+    within(table).getByRole("button", { name: "순매출" }),
   );
   expect(
-    await within(answer).findByRole("columnheader", { name: "net_krw (KRW)" }),
+    await within(answer).findByRole("columnheader", { name: "순매출" }),
   ).toHaveAttribute("aria-sort", "descending");
   expect(within(answer).getByText(/표 기준 시각/)).toBeVisible();
 

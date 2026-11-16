@@ -24,7 +24,7 @@ describe("AI-generated results (OpenStudy-Frontend#122)", () => {
     render(<ViewSpecRenderer parsed={parseAiResult(generatedResponse())} />);
     const table = screen.getByRole("table");
     expect(within(table).getByRole("button", { name: "지점" })).toBeInTheDocument();
-    expect(within(table).getByRole("button", { name: "결제 승인액 (KRW)" })).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "결제 승인액" })).toBeInTheDocument();
     expect(within(table).getByText("가온점")).toBeInTheDocument();
     expect(screen.queryByText("d0")).not.toBeInTheDocument();
   });
@@ -92,7 +92,7 @@ describe("AI-generated results (OpenStudy-Frontend#122)", () => {
     expect(
       within(heatmap).getByText(/월요일 12시 \(37\.5%\)/),
     ).toBeInTheDocument();
-    expect(within(heatmap).getAllByText("37.5%")).toHaveLength(1);
+    expect(within(heatmap).getByTitle("월요일 12시: (37.5%)")).toHaveTextContent("38%");
     // The table panel lists the same rows under readable names, not d0/d1/m0.
     const table = screen.getByRole("table", { name: "결과 데이터 표" });
     expect(

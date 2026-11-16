@@ -3,6 +3,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  LabelList,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -180,11 +183,34 @@ export function SalesTable({ rows }: { rows: SalesRow[] }) {
   );
 }
 
-function cellText(value: unknown, unit?: string | null) {
+const NUMBER = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
+const DATE_ONLY = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** A cell as people read it: amounts in 원, counts and rates with their unit, instants as Asia/Seoul dates. */
+function cellText(
+  value: unknown,
+  unit?: string | null,
+  type?: string,
+  alias?: string,
+) {
   if (value == null) return "해당 없음";
-  return unit === "KRW" && typeof value === "number"
-    ? won(value)
-    : String(value);
+  // Identifiers ("pass_id") are codes, not quantities: no thousands separators.
+  if (alias?.endsWith("_id")) return String(value);
+  if (typeof value === "number") {
+    if (unit === "KRW") return won(value);
+    if (unit) return `${NUMBER.format(value)}${unit}`;
+    return NUMBER.format(value);
+  }
+  if (type === "TIMESTAMP" && typeof value === "string") {
+    const at = Date.parse(value);
+    if (Number.isFinite(at)) return DATE_ONLY.format(at);
+  }
+  return String(value);
 }
 
 type TableSort = { alias: string; desc: boolean };
@@ -255,7 +281,6 @@ export function DomainDataTable({
                   }}
                 >
                   {column.label ?? column.alias}
-                  {column.unit ? ` (${column.unit})` : ""}
                 </button>
               </th>
             ))}
@@ -270,7 +295,9 @@ export function DomainDataTable({
             .map((row, idx) => (
               <tr key={idx}>
                 {dataset.columns.map((c) => (
-                  <td key={c.alias}>{cellText(row[c.alias], c.unit)}</td>
+                  <td key={c.alias}>
+                    {cellText(row[c.alias], c.unit, c.type, c.alias)}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -382,6 +409,26 @@ export function ComponentView({
       invalid
     );
   }
+  if (type === "KPI" && Array.isArray(columns)) {
+    // Cards: the bound columns are a label, a display value and an optional note (DomainLens result mock-up).
+    const [label, shown, note] = columns as string[];
+    return (
+      <dl className="result-kpis">
+        {dataset.rows.map((row, index) => (
+          <div
+            key={index}
+            className={`result-kpi result-kpi-card tone-${index % 4}`}
+          >
+            <dt>{String(row[label] ?? "")}</dt>
+            <dd>{String(row[shown] ?? "")}</dd>
+            {note && row[note] ? (
+              <dd className="result-kpi-note">{String(row[note])}</dd>
+            ) : null}
+          </div>
+        ))}
+      </dl>
+    );
+  }
   if (type === "KPI") {
     if (!Array.isArray(values)) return invalid;
     return (
@@ -406,13 +453,24 @@ export function ComponentView({
   let chart;
   switch (type) {
     case "BAR_CHART":
+    case "RANKED_BAR_CHART":
     case "LINE_CHART": {
-      if (typeof category !== "string" || typeof value !== "string")
-        return invalid;
-      const metric = fields.find((column) => column.alias === value);
+      // One metric (value) or several (values, LINE_CHART: approved and net sales over the days).
+      const aliases =
+        typeof value === "string"
+          ? [value]
+          : Array.isArray(values)
+            ? (values as string[])
+            : [];
+      const metrics = aliases.map((alias) =>
+        fields.find((column) => column.alias === alias),
+      );
       if (
-        !metric ||
-        !["INTEGER", "DECIMAL"].includes(metric.type) ||
+        typeof category !== "string" ||
+        !metrics.length ||
+        metrics.some(
+          (metric) => !metric || !["INTEGER", "DECIMAL"].includes(metric.type),
+        ) ||
         (type === "LINE_CHART" &&
           dataset.rows.some(
             (row) =>
@@ -421,6 +479,8 @@ export function ComponentView({
           ))
       )
         return invalid;
+      const series = metrics as NonNullable<(typeof metrics)[number]>[];
+      // Lines run by date; bars rank by their value, largest first, as the mock-up's bar lists do.
       const ordered =
         type === "LINE_CHART"
           ? [...dataset.rows].sort(
@@ -428,16 +488,27 @@ export function ComponentView({
                 Date.parse(String(a[category])) -
                 Date.parse(String(b[category])),
             )
-          : dataset.rows;
-      const displayed = ordered.slice(0, 20).map((row) => ({
-        category: row[category],
-        value: row[value],
-      }));
+          : [...dataset.rows].sort(
+              (a, b) =>
+                Number(b[series[0].alias] ?? 0) -
+                Number(a[series[0].alias] ?? 0),
+            );
+      const limit = type === "LINE_CHART" ? 62 : 20;
+      const displayed = ordered.slice(0, limit).map((row) => {
+        const point: Record<string, unknown> = { category: row[category] };
+        series.forEach((metric, index) => {
+          point[`s${index}`] = row[metric.alias];
+        });
+        return point;
+      });
       const title =
         typeof component.options.title === "string"
           ? component.options.title
           : "결과 차트";
-      const Chart = type === "LINE_CHART" ? LineChart : BarChart;
+      const unit = series[0].unit;
+      const nameOf = (metric: (typeof series)[number]) =>
+        metric.label ?? KPI_LABELS[metric.alias] ?? metric.alias;
+      const colors = ["var(--primary)", "#4f7fb5", "#c47a2c"];
       chart = (
         <>
           <p className="sr-only">
@@ -445,7 +516,12 @@ export function ComponentView({
             {displayed
               .map(
                 (row) =>
-                  `${cellText(row.category)} ${cellText(row.value, metric.unit)}`,
+                  `${cellText(row.category)} ${series
+                    .map(
+                      (metric, index) =>
+                        `${nameOf(metric)} ${cellText(row[`s${index}`], metric.unit)}`,
+                    )
+                    .join(" ")}`,
               )
               .join(", ")}
           </p>
@@ -455,42 +531,103 @@ export function ComponentView({
                 ? {
                     title,
                     conditions: exportConditions,
-                    unit:
-                      metric.unit === "KRW"
-                        ? "원 (KRW)"
-                        : metric.unit || "단위 없음",
+                    unit: unit === "KRW" ? "원 (KRW)" : unit || "단위 없음",
                     asOf: `${formatDateTime(asOf)} · Asia/Seoul`,
                   }
                 : undefined
             }
           >
-            <ResponsiveContainer width="100%" height={220}>
-              <Chart data={displayed} accessibilityLayer>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" />
-                <YAxis />
-                <Tooltip />
-                {type === "LINE_CHART" ? (
-                  <Line
-                    dataKey="value"
-                    name={metric.label ?? metric.alias}
-                    stroke="var(--primary)"
-                    isAnimationActive={false}
+            {type === "LINE_CHART" ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={displayed} accessibilityLayer>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="category"
+                    tickFormatter={(day) => String(day).slice(5)}
+                    tick={{ fontSize: 11 }}
+                    minTickGap={24}
                   />
-                ) : (
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    width={56}
+                    tickFormatter={(amount) => NUMBER.format(Number(amount))}
+                  />
+                  <Tooltip
+                    formatter={(amount, name) => [
+                      cellText(amount, unit),
+                      String(name),
+                    ]}
+                  />
+                  {series.length > 1 && <Legend iconSize={10} />}
+                  {series.map((metric, index) => (
+                    <Line
+                      key={metric.alias}
+                      dataKey={`s${index}`}
+                      name={nameOf(metric)}
+                      stroke={colors[index % colors.length]}
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              // The mock-up's ranked bars: the label on the left, the bar, the value at its end.
+              <ResponsiveContainer
+                width="100%"
+                height={Math.max(96, displayed.length * 34 + 12)}
+              >
+                <BarChart
+                  data={displayed}
+                  layout="vertical"
+                  margin={{ top: 4, right: 88, bottom: 4, left: 4 }}
+                  accessibilityLayer
+                >
+                  <XAxis type="number" hide domain={[0, "dataMax"]} />
+                  <YAxis
+                    type="category"
+                    dataKey="category"
+                    width={104}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip
+                    formatter={(amount) => [
+                      cellText(amount, unit),
+                      nameOf(series[0]),
+                    ]}
+                  />
                   <Bar
-                    dataKey="value"
-                    name={metric.label ?? metric.alias}
-                    fill="var(--primary)"
+                    dataKey="s0"
+                    name={nameOf(series[0])}
+                    barSize={14}
+                    radius={[0, 7, 7, 0]}
+                    background={{ fill: "var(--soft)", radius: 7 }}
                     isAnimationActive={false}
-                  />
-                )}
-              </Chart>
-            </ResponsiveContainer>
+                  >
+                    {displayed.map((_, index) => (
+                      <Cell
+                        key={index}
+                        fill={index === 0 ? "var(--primary)" : "#6f9a86"}
+                      />
+                    ))}
+                    <LabelList
+                      dataKey="s0"
+                      position="right"
+                      formatter={(amount: unknown) => cellText(amount, unit)}
+                      style={{ fontSize: 12, fill: "var(--ink)" }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </ChartExport>
-          {ordered.length > 20 && (
+          {ordered.length > limit && (
             <p className="help">
-              차트에 20개 항목을 표시해요. 전체 조회 행은 표에서 볼 수 있어요.
+              차트에 {limit}개 항목을 표시해요. 전체 조회 행은 표에서 볼 수
+              있어요.
             </p>
           )}
         </>
@@ -529,15 +666,6 @@ export function ComponentView({
         />
       );
       break;
-    case "RANKED_BAR_CHART":
-      if (
-        category !== "product" ||
-        value !== "net_units" ||
-        dataset.rows.some((row) => typeof row.net_units !== "number")
-      )
-        return invalid;
-      chart = <RankedBarChart rows={dataset.rows.slice(0, 20)} />;
-      break;
     case "SEAT_MAP":
       if (!hasFields("seat_id", "seat_no", "occupancy_state")) return invalid;
       chart = <SeatMapCard seats={dataset.rows} summary={null} />;
@@ -565,15 +693,8 @@ export function ComponentView({
       chart = <UrgentTaskList rows={dataset.rows} scope={scope} />;
       break;
   }
-  return (
-    <>
-      {chart}
-      {type === "RANKED_BAR_CHART" && dataset.rows.length > 20 && (
-        <p>차트에 상위 20개 항목을 표시해요.</p>
-      )}
-      {withTable && table}
-    </>
-  );
+  // A heatmap, seat map, week calendar and task list show every row themselves; their tables are separate panels.
+  return <>{chart}</>;
 }
 
 const PANEL_TITLES: Record<string, string> = {
@@ -708,7 +829,11 @@ export function ViewSpecRenderer({
         ? component.options.title
         : (PANEL_TITLES[type] ?? "결과");
     const isTable = type === "DATA_TABLE";
-    const listsRows = !!dataset && (isTable || !tabled.has(dataset.id));
+    const isChart = ["BAR_CHART", "RANKED_BAR_CHART", "LINE_CHART"].includes(
+      type,
+    );
+    const listsRows =
+      !!dataset && (isTable || (isChart && !tabled.has(dataset.id)));
     const open = listsRows && !!detail && detail.datasetId === dataset.id;
     const body = open ? (
       <>
@@ -722,8 +847,13 @@ export function ViewSpecRenderer({
       <section key={component.id} className="result-panel" aria-label={title}>
         <header className="result-panel-head">
           <h4>{title}</h4>
-          {dataset && isTable && (
-            <span>{dataset.rows.length.toLocaleString("ko-KR")}행</span>
+          {typeof component.options.subtitle === "string" ? (
+            <span>{component.options.subtitle}</span>
+          ) : (
+            dataset &&
+            isTable && (
+              <span>{dataset.rows.length.toLocaleString("ko-KR")}행</span>
+            )
           )}
         </header>
         <div className="result-panel-body">

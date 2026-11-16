@@ -554,6 +554,128 @@
   .result-panel-body {
     @apply grid min-w-0 gap-2 p-3;
   }
+  /* KPI cards with a tone strip, as the DomainLens result mock-up (green, blue, orange, grey). */
+  .result-kpi-card {
+    @apply border-t-[3px] bg-surface;
+  }
+  .result-kpi-card dd {
+    @apply text-lg;
+  }
+  .result-kpi-card .result-kpi-note {
+    @apply mt-1 text-[11px] font-normal tracking-normal text-muted;
+  }
+  .result-kpi-card.tone-0 {
+    border-top-color: var(--primary);
+  }
+  .result-kpi-card.tone-1 {
+    border-top-color: #4f7fb5;
+  }
+  .result-kpi-card.tone-2 {
+    border-top-color: #d08a3c;
+  }
+  .result-kpi-card.tone-3 {
+    border-top-color: #8a94a3;
+  }
+  .heatmap-table {
+    @apply w-full border-separate text-center text-xs;
+    border-spacing: 4px;
+  }
+  .heatmap-table th {
+    @apply px-1 py-1 font-semibold text-muted;
+  }
+  .heat-cell {
+    @apply block rounded-md border border-transparent px-1 py-2 font-semibold text-ink;
+  }
+  .heat-none {
+    @apply bg-canvas text-muted;
+  }
+  .heat-0 {
+    background: #fdf6dc;
+  }
+  .heat-1 {
+    background: #fbe7a6;
+  }
+  .heat-2 {
+    background: #f7cd7c;
+  }
+  .heat-3 {
+    background: #f0a564;
+  }
+  .heat-4 {
+    @apply text-white;
+    background: #dd6550;
+  }
+  .heat-peak {
+    @apply border-2;
+    border-color: #b33a2a;
+  }
+  .heat-legend {
+    @apply flex flex-wrap items-center gap-3 text-[11px] text-muted;
+  }
+  .heat-legend span {
+    @apply inline-flex items-center gap-1;
+  }
+  .heat-swatch {
+    @apply inline-block h-2.5 w-2.5 rounded-sm;
+  }
+  .seat-grid {
+    @apply m-0 grid list-none gap-1.5 p-0;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  }
+  .seat-tile {
+    @apply rounded-md border py-2 text-center text-xs font-semibold;
+  }
+  .seat-occupied {
+    @apply text-white;
+    background: #4a7aa6;
+    border-color: #4a7aa6;
+  }
+  .seat-available {
+    @apply text-ink;
+    background: #e3f3ea;
+    border-color: #cfe8da;
+  }
+  .seat-blocked {
+    @apply text-muted;
+    background: var(--line);
+    border-color: var(--line);
+  }
+  .week-days {
+    @apply grid gap-1.5;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .week-day {
+    @apply grid gap-0.5 rounded-lg border border-line bg-surface px-1 py-2 text-center text-[11px] text-muted;
+  }
+  .week-day strong {
+    @apply text-sm text-ink;
+  }
+  .week-day.active {
+    @apply border-primary bg-soft;
+  }
+  .week-agenda {
+    @apply m-0 grid list-none gap-1 p-0;
+  }
+  .week-agenda li {
+    @apply flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-xs;
+  }
+  .week-agenda li.cancelled {
+    @apply text-muted line-through;
+  }
+  .status-pill {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold;
+  }
+  .status-pill.danger {
+    @apply bg-red-500/15 text-red-700;
+  }
+  .status-pill.warn {
+    @apply bg-amber-500/15 text-amber-800;
+  }
+  /* Tables inside a result panel are compact, like the mock-up's: they fit the narrow side of a split. */
+  .result-panel .data-table th,
+  .result-panel .data-table td {
+    @apply whitespace-nowrap px-2 py-1.5 text-[11.5px];
+  }
   .result-source {
     @apply flex flex-wrap justify-between gap-x-4 gap-y-1;
   }
