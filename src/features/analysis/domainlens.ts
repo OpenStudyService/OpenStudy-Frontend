@@ -530,23 +530,15 @@ export interface SuggestedQuestion extends PocQuestionSpec {
 }
 
 /**
- * The questions offered as suggestions. POC_QUESTIONS keeps one entry per registered analysis (its titles and names
- * look analyses up there); a suggestion can ask the same analysis over another period, since the server reads the
- * period a question names (OpenStudy-Backend, 2026-11-13). Last month's branch sales sit right beside this month's.
+ * The questions offered as suggestions, one per registered analysis (its titles and names look analyses up there).
+ * Branch sales are labelled "이번 달" since the server reads the period a question names (OpenStudy-Backend,
+ * 2026-11-13); last month's variant is no longer offered (2026-11-16), it can still be typed.
  */
-export const SUGGESTED_QUESTIONS: SuggestedQuestion[] = POC_QUESTIONS.flatMap(
-  (q) =>
-    q.code === "POC-001"
-      ? [
-          { ...q, label: "이번 달 지점별 매출 비교" },
-          {
-            ...q,
-            code: "POC-001-LAST-MONTH",
-            question: "지난 달 지점별 매출을 비교해줘",
-            label: "지난 달 지점별 매출 비교",
-          },
-        ]
-      : [{ ...q, label: q.shortLabel }],
+export const SUGGESTED_QUESTIONS: SuggestedQuestion[] = POC_QUESTIONS.map(
+  (q) => ({
+    ...q,
+    label: q.code === "POC-001" ? "이번 달 지점별 매출 비교" : q.shortLabel,
+  }),
 );
 
 /**
