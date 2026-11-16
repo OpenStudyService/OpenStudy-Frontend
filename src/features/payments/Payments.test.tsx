@@ -34,7 +34,9 @@ vi.mock("../../shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/client")>()),
   api: vi.fn(),
 }));
-vi.mock("../customers/api", () => ({ customerApi: { list: vi.fn() } }));
+vi.mock("../customers/api", () => ({
+  customerApi: { list: vi.fn(), detail: vi.fn() },
+}));
 vi.mock("./api", () => ({
   listPayments: vi.fn(),
   listPasses: vi.fn(),
@@ -116,6 +118,9 @@ beforeEach(() => {
     ],
     meta: { page: 1, pageSize: 20, total: 1 },
   });
+  vi.mocked(customerApi.detail).mockRejectedValue(
+    new Error("고객 상세 조회 불가"),
+  );
   vi.mocked(api).mockResolvedValue({
     items: [
       {
@@ -191,10 +196,31 @@ function mount(
 }
 async function fillSale() {
   const user = userEvent.setup();
-  await screen.findByRole("option", { name: /홍길동/ });
-  await screen.findByRole("option", { name: /무기한 시간권/ });
-  await user.selectOptions(screen.getByLabelText("고객 선택"), "c1");
-  await user.selectOptions(screen.getByLabelText("판매 상품"), "prod1");
+  const panel = screen.getByRole("dialog", { name: "Mock 결제" });
+  await within(panel).findByRole("option", { name: /무기한 시간권/ });
+  await user.selectOptions(within(panel).getByLabelText("판매 상품"), "prod1");
+  const keyword = within(panel).getByRole("searchbox", { name: "고객 검색어" });
+  await user.type(keyword, "C001{Enter}");
+  const searchDialog = screen.getByRole("dialog", { name: "고객 검색" });
+  expect(within(searchDialog).getByRole("searchbox")).toHaveValue("C001");
+  expect(createPayment).not.toHaveBeenCalled();
+  await user.keyboard("{Escape}");
+  expect(searchDialog).not.toBeInTheDocument();
+  expect(keyword).toHaveFocus();
+  expect(within(panel).getByLabelText("판매 상품")).toHaveValue("prod1");
+
+  await user.click(within(panel).getByRole("button", { name: "고객 검색" }));
+  const reopened = screen.getByRole("dialog", { name: "고객 검색" });
+  await user.click(
+    await within(reopened).findByRole("button", { name: "홍길동" }),
+  );
+  expect(reopened).not.toBeInTheDocument();
+  expect(within(panel).getByLabelText("선택한 고객")).toHaveTextContent(
+    "홍길동 · C001",
+  );
+  expect(
+    within(panel).getByRole("button", { name: "고객 선택 해제" }),
+  ).toBeVisible();
   return user;
 }
 
@@ -570,6 +596,133 @@ it("sorts payments on the server and keeps filters when returning to page one", 
   expect(amount.closest("th")).toHaveAttribute("aria-sort", "descending");
 });
 
+it("searches and pages through customers in a dialog before applying a payment filter", async () => {
+  const user = userEvent.setup();
+  const firstPage = await customerApi.list(
+    "gangnam",
+    {},
+    new AbortController().signal,
+  );
+  vi.mocked(customerApi.list).mockImplementation(async (_scope, { page }) => ({
+    items: page === 2 ? firstPage.items : [],
+    meta: { page: page ?? 1, pageSize: 20, total: 21 },
+  }));
+  vi.mocked(customerApi.list).mockClear();
+  mount(
+    <>
+      <Payments />
+      <LocationProbe />
+    </>,
+    "?page=3",
+  );
+  const trigger = screen.getByRole("button", { name: "고객 검색" });
+  expect(customerApi.list).not.toHaveBeenCalled();
+  await user.click(trigger);
+  const dialog = screen.getByRole("dialog", { name: "고객 검색" });
+  const input = within(dialog).getByRole("searchbox");
+  expect(input).toHaveFocus();
+  await user.type(input, "C001");
+  const pagination = await within(dialog).findByRole("navigation", {
+    name: "고객 검색 결과 페이지 이동",
+  });
+  const table = within(dialog).getByRole("table", { name: "고객 검색 결과" });
+  expect(table.compareDocumentPosition(pagination)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+  expect(
+    within(pagination).getByRole("button", { name: "이전" }),
+  ).toBeDisabled();
+  await user.click(within(pagination).getByRole("button", { name: "2페이지" }));
+  const row = await within(dialog).findByRole("row", { name: /홍길동.*C001/ });
+  expect(customerApi.list).toHaveBeenLastCalledWith(
+    "gangnam",
+    expect.objectContaining({ q: "C001", page: 2 }),
+    expect.any(AbortSignal),
+  );
+  await user.click(within(row).getByRole("button", { name: "홍길동" }));
+
+  expect(dialog).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+  expect(search().get("customerId")).toBe("c1");
+  expect(search().has("page")).toBe(false);
+  await waitFor(() =>
+    expect(listPayments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ customerId: "c1", page: 1 }),
+      expect.any(AbortSignal),
+    ),
+  );
+  expect(screen.getByLabelText("선택한 고객")).toHaveTextContent(
+    "홍길동 · C001",
+  );
+  expect(
+    screen.queryByRole("searchbox", { name: "고객 검색어" }),
+  ).not.toBeInTheDocument();
+
+  await user.click(trigger);
+  const reopened = screen.getByRole("dialog", { name: "고객 검색" });
+  expect(within(reopened).getByRole("searchbox")).toHaveValue("");
+  await user.keyboard("{Escape}");
+  expect(trigger).toHaveFocus();
+  expect(search().get("customerId")).toBe("c1");
+
+  await user.click(screen.getByRole("button", { name: "고객 필터 해제" }));
+  expect(search().has("customerId")).toBe(false);
+  const keyword = screen.getByRole("searchbox", { name: "고객 검색어" });
+  expect(keyword).toHaveValue("");
+  expect(keyword).toHaveFocus();
+});
+
+it("opens customer results with the filter bar keyword on Enter or click", async () => {
+  const user = userEvent.setup();
+  mount(<Payments />);
+
+  const keyword = screen.getByRole("searchbox", { name: "고객 검색어" });
+  await user.type(keyword, "  홍길동  ");
+  fireEvent.keyDown(keyword, { key: "Enter", isComposing: true });
+  expect(
+    screen.queryByRole("dialog", { name: "고객 검색" }),
+  ).not.toBeInTheDocument();
+  expect(customerApi.list).not.toHaveBeenCalled();
+
+  await user.keyboard("{Enter}");
+  const dialog = screen.getByRole("dialog", { name: "고객 검색" });
+  const input = within(dialog).getByRole("searchbox");
+  expect(input).toHaveValue("홍길동");
+  expect(input).toHaveFocus();
+  expect(customerApi.list).toHaveBeenCalledTimes(1);
+  expect(customerApi.list).toHaveBeenCalledWith(
+    "gangnam",
+    expect.objectContaining({ q: "홍길동", page: 1 }),
+    expect.any(AbortSignal),
+  );
+  await within(dialog).findByRole("button", { name: "홍길동" });
+  await user.keyboard("{Escape}");
+  expect(keyword).toHaveFocus();
+
+  await user.clear(keyword);
+  await user.type(keyword, "C001");
+  await user.click(screen.getByRole("button", { name: "고객 검색" }));
+  expect(
+    within(screen.getByRole("dialog", { name: "고객 검색" })).getByRole(
+      "searchbox",
+    ),
+  ).toHaveValue("C001");
+  expect(customerApi.list).toHaveBeenLastCalledWith(
+    "gangnam",
+    expect.objectContaining({ q: "C001", page: 1 }),
+    expect.any(AbortSignal),
+  );
+  await user.click(
+    await within(screen.getByRole("dialog", { name: "고객 검색" })).findByRole(
+      "button",
+      { name: "홍길동" },
+    ),
+  );
+  expect(screen.getByLabelText("선택한 고객")).toHaveTextContent(
+    "홍길동 · C001",
+  );
+});
+
 it("resets payment filters including advanced filters but keeps unrelated params", async () => {
   const user = userEvent.setup();
   mount(
@@ -580,8 +733,31 @@ it("resets payment filters including advanced filters but keeps unrelated params
     "?tab=payments&status=승인&from=2026-11-01&methods=카드&customerId=c1&page=3",
   );
   await screen.findByText("무기한 시간권");
+  const toggle = screen.getByRole("button", { name: /^고급 필터/ });
+  expect(within(toggle).getByText("1개 적용")).toBeInTheDocument();
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await user.click(toggle);
+  const advanced = screen.getByRole("region", { name: "결제 고급 필터" });
+  await user.click(
+    within(advanced).getByRole("button", { name: "결제 수단, 카드" }),
+  );
+  const methods = screen.getByRole("dialog", { name: "결제 수단" });
+  expect(within(methods).getByRole("checkbox", { name: "카드" })).toBeChecked();
+  await user.click(within(methods).getByRole("checkbox", { name: "현금" }));
+  expect(search().getAll("methods")).toEqual(["카드", "현금"]);
+  expect(search().has("page")).toBe(false);
+  await waitFor(() =>
+    expect(listPayments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ methods: ["카드", "현금"], page: 1 }),
+      expect.any(AbortSignal),
+    ),
+  );
+  await user.keyboard("{Escape}");
+
   await user.click(screen.getByRole("button", { name: "초기화" }));
   expect([...search().keys()]).toEqual(["tab"]);
+  expect(toggle).toHaveAccessibleName("고급 필터");
 });
 
 it.each([
@@ -613,12 +789,11 @@ it("shows the payment list states and Mock payment action inside the list card",
   expect(screen.getByText("항목 수 확인 불가")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+  const filters = screen.getByRole("region", { name: "결제 조회 조건" });
+  expect(table.closest(".card")).toContainElement(filters);
   expect(
-    table
-      .closest(".card")!
-      .querySelector(".filters")!
-      .contains(screen.getByRole("button", { name: "Mock 결제" })),
-  ).toBe(true);
+    within(filters).getByRole("button", { name: "Mock 결제" }),
+  ).toBeInTheDocument();
   expect(listPayments).not.toHaveBeenCalled();
 });
 

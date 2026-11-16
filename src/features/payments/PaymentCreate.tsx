@@ -16,13 +16,9 @@ import {
 import { Field } from "../organization/shared";
 import { createPayment } from "./api";
 import type { Payment, PaymentCreate as CreateBody } from "./model";
+import { PaymentCustomerPicker } from "./PaymentCustomerPicker";
 import { useSubmission } from "./useSubmission";
-import {
-  CustomerSelector,
-  MockPaymentNotice,
-  dateTime,
-  useSalesClock,
-} from "./shared";
+import { MockPaymentNotice, dateTime, useSalesClock } from "./shared";
 
 export function PaymentCreate({
   onSaved,
@@ -161,10 +157,10 @@ export function PaymentCreate({
             ))}
           </select>
         </Field>
-        <CustomerSelector
+        <PaymentCustomerPicker
+          mode="sale"
           value={customerId}
           onChange={setCustomerId}
-          disabled={write.pending}
         />
         <Field label="판매 상품 검색">
           <input

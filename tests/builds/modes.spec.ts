@@ -1,3 +1,4 @@
+import { selectPaymentCustomer } from "../payment-customer-picker";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { writeFile, unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -218,9 +219,10 @@ test("live keeps the official Mock payment outcome but never replaces a failed A
   await panel
     .getByRole("combobox", { name: "판매 지점", exact: true })
     .selectOption(branch.id);
-  await panel
-    .getByRole("combobox", { name: "고객 선택", exact: true })
-    .selectOption("customer-1");
+  await selectPaymentCustomer(page, {
+    name: "빌드 검증 고객",
+    memberNo: "BUILD001",
+  });
   await panel
     .getByRole("combobox", { name: "판매 상품", exact: true })
     .selectOption("product-1");
@@ -356,9 +358,9 @@ self.addEventListener("fetch", (event) => {
     await expect(
       page.getByText("과거 데모 워커 응답", { exact: true }),
     ).toHaveCount(0);
-    await expect(
-      page.getByText("실제 API 연결", { exact: true }),
-    ).toHaveCount(0);
+    await expect(page.getByText("실제 API 연결", { exact: true })).toHaveCount(
+      0,
+    );
     expect(
       await page.evaluate(() => navigator.serviceWorker.controller),
     ).toBeNull();

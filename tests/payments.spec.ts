@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { selectPaymentCustomer } from "./payment-customer-picker";
 import type { components } from "../src/shared/api/foundation.generated";
 
 type Payment = components["schemas"]["Payment"];
@@ -56,12 +57,9 @@ async function purchase(
   await page.getByRole("button", { name: "Mock 결제", exact: true }).click();
   const panel = page.getByRole("dialog");
   await expect(panel.getByText(notice, { exact: true })).toBeVisible();
-  await expect(
-    panel.getByRole("combobox", { name: "고객 선택", exact: true }),
-  ).toBeEnabled();
-  await panel
-    .getByRole("combobox", { name: "고객 선택", exact: true })
-    .selectOption(customerId);
+  const customer = await api(page, `/customers/${customerId}?scope=gangnam`);
+  expect(customer.status).toBe(200);
+  await selectPaymentCustomer(page, customer.data);
   await expect(
     panel
       .getByRole("combobox", { name: "판매 상품", exact: true })

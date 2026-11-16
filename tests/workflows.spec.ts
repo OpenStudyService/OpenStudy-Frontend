@@ -1,3 +1,4 @@
+import { selectPaymentCustomer } from "./payment-customer-picker";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
@@ -91,16 +92,7 @@ test("purchase/refund and room booking conflicts preserve input", async ({
   await page.goto("/app/gangnam/payments");
   await page.getByRole("button", { name: "Mock 결제", exact: true }).click();
   const panel = page.getByRole("dialog");
-  const customer = panel.getByLabel("고객 선택");
-  await expect(
-    customer.locator("option").filter({ hasText: "한유나" }),
-  ).toBeAttached();
-  await customer.selectOption(
-    (await customer
-      .locator("option")
-      .filter({ hasText: "한유나" })
-      .getAttribute("value"))!,
-  );
+  await selectPaymentCustomer(page, { name: "한유나" });
   const product = panel.getByRole("combobox", {
     name: "판매 상품",
     exact: true,
