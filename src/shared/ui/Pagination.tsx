@@ -1,6 +1,6 @@
 import { Button } from "./primitives";
 
-const PAGE_GROUP_SIZE = 10;
+const MAX_VISIBLE_PAGES = 10;
 
 export function Pagination({
   page,
@@ -17,9 +17,13 @@ export function Pagination({
 
   const lastAvailablePage = Math.max(1, totalPages);
   const visiblePage = Math.min(page, lastAvailablePage);
-  const group = Math.floor((visiblePage - 1) / PAGE_GROUP_SIZE);
-  const firstPage = group * PAGE_GROUP_SIZE + 1;
-  const lastPage = Math.min(firstPage + PAGE_GROUP_SIZE - 1, totalPages);
+  const pagesBeforeCurrent = Math.floor((MAX_VISIBLE_PAGES - 1) / 2);
+  const lastStartPage = Math.max(1, totalPages - MAX_VISIBLE_PAGES + 1);
+  const firstPage = Math.min(
+    Math.max(1, visiblePage - pagesBeforeCurrent),
+    lastStartPage,
+  );
+  const lastPage = Math.min(firstPage + MAX_VISIBLE_PAGES - 1, totalPages);
   const pages = Array.from(
     { length: lastPage - firstPage + 1 },
     (_, index) => firstPage + index,
