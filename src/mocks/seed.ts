@@ -253,6 +253,7 @@ export function seed(): Database {
   db.seats.find((s) => s.id === "gangnam-seat-12")!.status = "이용 중";
   db.seats.find((s) => s.id === "gangnam-seat-12")!.memberId = "member-1";
   db.passes[0].used = true;
+  // 기준 시각(10-17 11:00 KST) 이후의 서로 다른 시각으로 두어 데모 첫 화면에 기한 초과가 보이지 않게 한다.
   const taskData = [
     [
       "스터디룸 A 냉방 상태 확인",
@@ -261,6 +262,7 @@ export function seed(): Database {
       "진행 중",
       "높음",
       "시설 점검",
+      "2026-10-17T13:00:00+09:00",
     ],
     [
       "오후 근무 인수인계 전달",
@@ -269,26 +271,44 @@ export function seed(): Database {
       "할 일",
       "보통",
       "인수인계",
+      "2026-10-17T18:00:00+09:00",
     ],
-    ["집중존 저녁 청소", "seongsu", "doyun", "할 일", "보통", "청소"],
-    ["라운지 소모품 보충", "gangnam", "junho", "완료", "낮음", "소모품"],
+    [
+      "집중존 저녁 청소",
+      "seongsu",
+      "doyun",
+      "할 일",
+      "보통",
+      "청소",
+      "2026-10-17T21:30:00+09:00",
+    ],
+    [
+      "라운지 소모품 보충",
+      "gangnam",
+      "junho",
+      "완료",
+      "낮음",
+      "소모품",
+      "2026-10-17T10:00:00+09:00",
+    ],
   ] as const;
-  taskData.forEach(([title, b, assigneeId, status, priority, category], i) =>
-    add("tasks", `task-${i + 1}`, b, {
-      createdById: "owner",
-      title,
-      assigneeId,
-      status,
-      priority,
-      category,
-      due: "2026-10-17",
-      body: "쾌적한 공간을 위해 상태를 확인하고 운영 채널에 결과를 남겨 주세요.",
-      checks: [
-        { text: "현장 상태 확인", done: i === 3 },
-        { text: "운영 채널에 결과 공유", done: i === 3 },
-      ],
-      history: [{ at: AS_OF, actorId: "owner", text: "업무 등록" }],
-    }),
+  taskData.forEach(
+    ([title, b, assigneeId, status, priority, category, due], i) =>
+      add("tasks", `task-${i + 1}`, b, {
+        createdById: "owner",
+        title,
+        assigneeId,
+        status,
+        priority,
+        category,
+        due,
+        body: "쾌적한 공간을 위해 상태를 확인하고 운영 채널에 결과를 남겨 주세요.",
+        checks: [
+          { text: "현장 상태 확인", done: i === 3 },
+          { text: "운영 채널에 결과 공유", done: i === 3 },
+        ],
+        history: [{ at: AS_OF, actorId: "owner", text: "업무 등록" }],
+      }),
   );
   const channels = [
     ["general", "전체-공지", "all"],
