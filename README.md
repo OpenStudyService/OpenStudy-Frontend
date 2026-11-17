@@ -1,106 +1,144 @@
-# OpenStudy 프론트엔드
+# OpenStudy Frontend
 
-> **2026-11-06 명시적 갱신 정책**: SRS v1.15 POL-52·53에 따라 SSE·polling을 제거하고 메뉴 진입·재클릭·새로고침·사용자 조건 변경으로 조회한다. 본인 저장 결과·서버 인가·충돌 검증은 유지한다. [명시적 화면 갱신 정책](docs/design/data-refresh-policy.md)과 [#77](https://github.com/OpenStudyService/OpenStudy-Frontend/issues/77)을 따른다.
+스터디카페 지점 운영 백오피스 **OpenStudy**의 웹 화면입니다.
+사장님·지점 관리자·직원이 한 곳에서 지점 현황을 확인하고, 고객·이용권·결제, 좌석·룸·사물함, 업무·채팅, 근무·근태, 매출과 AI 분석을 처리합니다.
 
-승인된 `docs/mockup/openstudy/` 디자인을 React로 옮긴 스터디카페 백오피스입니다. 현재 완료 범위는 **프론트엔드와 MSW 기반 통합 시연**입니다. 실제 백엔드, 이메일 발송, DomainLens 엔진은 별도 연결합니다. 기존 HTML 목업은 보존했습니다.
+> 프로젝트 전체 소개는 [OpenStudy 대표 저장소](https://github.com/OpenStudyService/OpenStudy)를 참고하세요.
+> API 서버는 [OpenStudy-Backend](https://github.com/OpenStudyService/OpenStudy-Backend), AWS 인프라는 [OpenStudy-Infra](https://github.com/OpenStudyService/OpenStudy-Infra)에서 관리합니다.
 
-정상 입퇴실은 고객이 QR 등으로 직접 처리하는 흐름입니다. 현재 좌석 화면의 직원용 배정·퇴실은 정상 처리 실패 시 예외 지원을 위한 기능입니다. 고객 화면·인증·QR 연동은 후속 범위이며 현재 MSW 시연을 고객 입퇴실 연동 완료로 보지 않습니다.
+![운영 홈](docs/images/readme/home.png)
 
-## 실행
+| 좌석 배치도 | AI 자연어 분석 |
+|---|---|
+| ![좌석 배치도](docs/images/readme/seatmap.png) | ![AI 분석 결과](docs/images/readme/ai-answer.png) |
+| **업무 관리** | **모바일 홈** |
+| ![업무 관리](docs/images/readme/tasks.png) | <img src="docs/images/readme/mobile-home.png" alt="모바일 홈" width="260"> |
 
-Node.js **24.19.0**, npm **11.10.1**에서 검증했습니다. npm과 `package-lock.json`을 사용합니다.
+<sub>화면은 데모 모드(MSW 가상 데이터)에서 캡처했습니다.</sub>
+
+## 기술 스택
+
+| 구분 | 사용 기술 |
+|---|---|
+| 기반 | React 19, TypeScript 5.9(strict), Vite 8 |
+| 상태·데이터 | TanStack Query(서버 상태), Zustand(UI 상태), Zod(데이터 계약) |
+| UI | Radix UI, 자체 디자인 토큰(포레스트·네이비·샌드 테마) |
+| API | OpenAPI 생성 타입, fetch 클라이언트(CSRF·오류·취소 처리) |
+| 데모 | MSW(Mock Service Worker) 기반 가상 서버 |
+| 테스트 | Vitest·Testing Library, Playwright(Chrome) |
+| 배포 | GitHub Actions → Amazon S3 + CloudFront |
+
+## 주요 화면
+
+| 영역 | 화면 |
+|---|---|
+| 계정 | 로그인, 초대 수락·승인 대기, 비밀번호 재설정, 프로필 |
+| 홈 | 이용 좌석·오늘 업무·미처리 문의·근무 계획 카드, 좌석 점유율 |
+| 협업 | 업무·체크리스트, 채널·DM·스레드, 업무와 대화 연결 |
+| 고객·거래 | 회원·보유 이용권, 상품·요율, 결제·환불, 이용 이력 |
+| 공간 | 좌석 배치도·입퇴실, 스터디룸 예약 달력·목록, 사물함 |
+| 운영 | 시설·점검, 고객 문의, 공지 |
+| 인력 | 주간 근무표, 출퇴근·휴게, 근태 정정, 휴가, 대체근무 |
+| 분석 | 지점별 매출, AI 자연어 질문 → 표·막대·선 차트 |
+| 관리 | 지점, 직원·초대·권한 프리셋, 설정 |
+
+## 설계 포인트
+
+- **명시적 화면 갱신**: 실시간 푸시(SSE·polling) 대신 메뉴 진입·재클릭·새로고침·조건 변경 시 다시 조회합니다. 본인이 저장한 결과는 즉시 반영하고, 권한·충돌 검증은 서버가 담당합니다. [명시적 화면 갱신 정책](docs/design/data-refresh-policy.md)
+- **서버 상태 단일화**: 조회는 TanStack Query, 변경은 mutation으로 처리하고 서버 응답 후 목록·홈·연결 카드를 다시 조회합니다. 업무 데이터를 클라이언트 저장소에 중복 보관하지 않습니다.
+- **주소로 화면 복원**: `/app/:scope/...`의 상세·편집·스레드·탭·검색·필터·정렬·페이지·날짜를 URL에서 복원합니다.
+- **안전한 입력**: 민감 명령은 멱등 키와 버전을 함께 보내고, 409 충돌이나 실패 시 입력을 보존한 뒤 최신 값을 확인해 다시 저장할 수 있습니다.
+- **반응형 3단 탐색**: 1100px 이상 전체 탐색, 641~1099px 보조 서랍, 640px 이하 하단 탐색과 모바일 대화 구조.
+- **접근성**: 본문 건너뛰기, 오류 레이블 연결, 패널 포커스 복귀, 모션 감소를 적용했습니다.
+- **live / demo 빌드 분리**: 실제 API 빌드에는 MSW·데모 코드·소스맵이 섞이지 않도록 산출물의 모듈 출처까지 검사합니다.
+
+## 실행하기
+
+Node.js **24.19.0**, npm **11.10.1**에서 검증했습니다.
 
 ```sh
-cd openstudy-frontend
 npm ci
-npm run dev
+npm run dev        # 데모 모드(MSW), 백엔드 없이 실행
+npm run dev:live   # 실제 /api 서버 연결
 ```
 
-표시되는 localhost 주소로 접속합니다. `index.html`을 파일로 열면 React 앱과 MSW가 실행되지 않습니다. Playwright는 설치된 Google Chrome을 사용합니다.
+표시되는 localhost 주소로 접속합니다. 개인별 API 주소 등은 `.env.local`, `.env.mock.local`, `.env.live.local`에 작성하며 커밋하지 않습니다(`.env.example` 참고).
 
-공개 실행 설정인 `.env.mock`과 `.env.live`는 Git에 포함합니다. 개인별 API 주소나 환경 설정은 `.env.local`, `.env.mock.local`, `.env.live.local`에 작성합니다. 로컬 환경 파일과 비밀 값은 커밋하지 않습니다. 사용할 설정은 `.env.example`을 참고하세요.
+| 명령 | 동작 |
+|---|---|
+| `npm run build` | 실제 API 배포 빌드(`dist/`)와 산출물 검사 |
+| `npm run build:demo` | 데모 빌드(`dist-demo/`)와 산출물 검사 |
+| `npm run check` | strict 타입 검사, ESLint, Vitest |
+| `npm run test:e2e` | Chrome에서 사용자 흐름·반응형 검증(데모 모드) |
+| `npm run test:builds` | live·demo 두 배포 결과의 동작·모드 분리 검증 |
 
-| 명령                       | 동작                                                                      |
-| -------------------------- | ------------------------------------------------------------------------- |
-| `npm run dev`              | mock 모드, MSW HTTP 사용                                              |
-| `npm run dev:live`         | live 모드, 실제 `/api` 서버 사용                                          |
-| `npm run build`            | 실제 API 배포 빌드(`dist/`) 및 운영 산출물 검사                           |
-| `npm run build:demo`       | MSW 시연 빌드(`dist-demo/`) 및 데모 산출물 검사                           |
-| `npm run check:build:live` | 기존 `dist/` 전체의 모드·모듈 출처·데모 코드 혼입 검사                    |
-| `npm run check:build:mock` | 기존 `dist-demo/`의 MSW·데모 초기화 포함 여부 검사                        |
-| `npm run preview`          | 마지막 빌드 결과 미리보기                                                 |
-| `npm run check`            | strict 타입 검사, ESLint, Vitest·Testing Library                          |
-| `npm run test:e2e`         | Chrome에서 사용자 흐름과 반응형 검증                                      |
-| `npm run test:builds`      | live·demo 빌드 후 두 배포 결과의 동작·모드 분리 검증                      |
-| `npm run api:foundation`   | 인접 `openstudy-backend`의 정본 foundation OpenAPI에서 기반 API 타입 생성 |
-| `npm run api:generate`     | Zod·폼 정의 → OpenAPI → TypeScript 타입 재생성                            |
+<details>
+<summary>그 밖의 명령</summary>
 
-로그인 화면에는 데모 모드일 때 **데모 데이터**를 표시합니다. 앱 상단에는 **실제 API 연결** / **데모 데이터**로 두 모드를 구분합니다. `--mode`와 `VITE_API_MODE`가 서로 다르면 빌드를 거부합니다. live 결과에는 MSW 워커와 소스맵을 만들지 않으며, 청크의 모듈 출처를 담은 `build-provenance.json`과 모든 산출물 내용을 검사합니다. 정식 API의 **Mock 결제·실제 금전 이동 없음** 안내와 `mockOutcome`은 live에서도 유지합니다.
+| 명령 | 동작 |
+|---|---|
+| `npm run preview` | 마지막 빌드 결과 미리보기 (데모: `npm run preview -- --outDir dist-demo`) |
+| `npm run check:build:live` / `check:build:mock` | 기존 빌드 결과의 모드·출처 검사 |
+| `npm run test:e2e:<기능>:live` | 실제 Backend·MySQL에 연결한 기능별 브라우저 검증 ([절차](docs/testing/)) |
+| `npm run test:e2e:<기능>:mock` | 같은 기능의 MSW 회귀 |
+| `npm run api:foundation` | 인접 `openstudy-backend`의 기반 OpenAPI에서 타입 생성 |
+| `npm run api:generate` | Zod·폼 정의 → OpenAPI → TypeScript 타입 재생성 |
 
-데모 빌드는 `npm run preview -- --outDir dist-demo`로 미리 봅니다. `test:builds`의 HTTP 응답 fixture 검증은 실제 Backend·DB 연동 검증과 구분합니다.
+</details>
 
-## S3 자동 배포
+## 데모 체험
 
-GitHub Actions가 검사·live 빌드 후 비공개 Amazon S3에 게시한다. Amazon CloudFront가 HTTPS로 제공한다.
-인프라는 OpenStudy-Infra의 `terraform/frontend`가 관리한다.
-처음 생성, Actions 변수 등록과 전체 삭제는 [자동 배포 순서](docs/deployment.md)를 따른다.
-실제 API는 Backend 연결 후 사용할 수 있다.
+로그인 화면의 **사장님으로 체험 / 직원으로 체험** 버튼으로 시작합니다. 앱 상단에 **데모 데이터** / **실제 API 연결** 표시로 모드를 구분합니다.
 
-## 체험
+- 계정: `owner@openstudy.test`, `minji@openstudy.test`, `junho@openstudy.test`, `yujin@openstudy.test`, `doyun@openstudy.test` + **8자 이상 임의 비밀번호**
+- 지점: 강남점·성수점. 기준 시각 **2026-10-17 11:00 KST**부터 흐르는 시계
+- 사용자 메뉴 → 데모·검증 도구에서 역할과 API 시나리오를 바꿀 수 있습니다.
+- 데모 데이터는 탭의 sessionStorage에만 저장되며, 설정의 **가상 데이터 초기화**로 되돌립니다.
+- 비밀번호 재설정은 `/password-reset#token=demo-password-reset`로 체험합니다(한 번 사용하면 만료).
 
-실서버 모드에서도 업무 데이터가 없어도 메뉴·홈 카드·목록의 열과 필터·예약 달력 등의 화면 구조를 유지합니다. 빈 배열, 빈 객체, `null`, 204 및 비어 있는 성공 응답은 빈 상태로 표시합니다. `/lookups`가 없거나 일시적으로 실패해도 현재 로그인 정보의 지점·본인 정보를 사용하여 본문을 표시합니다. API 미구현(404/501)과 연결 오류는 안내와 재시도 버튼으로 표시하고, 확인하지 못한 홈·매출 수치는 `—`로 구분합니다. 인증·권한 오류(401/403)는 빈 데이터로 처리하지 않습니다.
+**추천 흐름**: 강남점 업무 등록 → 담당 박준호 지정 → 상세에서 운영 채널에 공유 → 설정에서 직원 박준호로 전환 → 스레드에 보고 → 연결 업무 완료 → 홈·목록 카드 확인.
 
-로그인 화면의 **사장님으로 체험 / 직원으로 체험** 버튼으로 시작합니다. 사용자 메뉴 → 데모·검증 도구에서 사장님, 지점 관리자, 직원과 API 시나리오를 선택할 수 있습니다.
+AI 데모는 **지난달 지점별 매출** 질문을 지원합니다. SQL이나 HTML을 실행하지 않고 JSON 결과로 표·차트를 그립니다.
 
-- 이메일: `owner@openstudy.test`, `minji@openstudy.test`, `junho@openstudy.test`, `yujin@openstudy.test`, `doyun@openstudy.test`.
-- mock 로그인은 위 이메일과 **8자 이상의 임의 비밀번호**로 역할을 선택합니다. 데모에서 변경·재설정한 비밀번호와 잠금 상태는 탭 메모리에서만 적용합니다.
-- 재설정 화면은 데모 서버의 `/password-reset#token=demo-password-reset`에서 직원 샘플 링크로 체험할 수 있습니다. 링크는 한 번 사용하면 만료됩니다. 직원 관리에서 요청한 메일은 테스트용 발송 대기 상태로 처리합니다.
-- 두 지점: 강남점·성수점. 기준 시각: **2026-10-17 11:00 KST**에서 탭 실행 중 흐르는 시계. 지난달 매출 기준 구간은 **2026-09-01 이상 ~ 2026-10-01 미만**입니다.
-- 테마는 `openstudy-theme` localStorage에 저장합니다. 모킹 원장과 선택 계정은 `openstudy-mock-v1` sessionStorage에 저장하여 같은 탭의 새로고침 후 유지합니다. 채팅 작성 초안은 메모리에만 둡니다.
-- 설정의 **가상 데이터 초기화**로 원장을 초기화합니다. 다른 탭·다른 사용자의 브라우저와 원장을 공유하지 않습니다.
+## 실제 서버 연결과 검증 범위
 
-추천 흐름: 강남점 업무 등록 → 담당 박준호 지정 → 상세의 운영 채널에 공유 → 설정에서 직원 박준호로 전환 → 채팅 스레드 보고 → 연결 업무 완료 → 홈·목록·카드 확인.
-
-## 구현한 화면과 흐름
-
-로그인·초대 수락·승인 대기, 홈, 업무, 채널·DM·스레드, 회원·보유 이용권, 상품·요율, 결제·환불, 좌석 배치·입퇴실·사물함·룸, 예약 달력·목록, 시설·점검, 문의, 공지, 주간 근무표·출퇴근·휴게·정정·휴가·대체근무, 직원·초대·권한, 매출, AI, 설정을 제공합니다.
-
-목록과 상세·등록·수정·승인 화면은 API를 통합니다. 조회는 TanStack Query, 변경은 mutation/API 클라이언트를 사용하며 서버 응답 후 목록·홈·연결 카드 등을 다시 조회합니다. 업무 원장을 Zustand에 중복 저장하지 않습니다. `all`은 허용된 전체 지점이며 변경 폼에서는 대상 지점을 선택합니다.
-
-로그인 이메일은 변경 불가 ID입니다. 설정에서는 읽기 전용으로 표시하며 프로필은 닉네임·사진만 수정합니다. 관리자 직원 수정에서도 이메일을 변경할 수 없고, MSW는 직접 요청의 email 필드도 거절합니다. 계정 생성·초대 입력과 고객 원장의 연락용 이메일은 이 제한과 구분합니다.
-
-- `/app/:scope/...`의 `detail`, `edit`, `action`, `thread`, `tab`, 검색·필터·정렬·페이지·날짜·보기 매개변수는 주소에서 복원합니다.
-- 1100px 이상 전체 탐색, 641~1099px 보조 탐색 서랍, 640px 이하 하단 탐색과 모바일 대화·스레드 구조를 사용합니다.
-- 포레스트·네이비·샌드 토큰, Radix 상세 패널·메뉴의 포커스, 본문 건너뛰기, 오류 레이블, 모션 감소를 적용했습니다.
-- AI 시연은 **지난달 지점별 매출**만 지원합니다. JSON 요청으로 처리 결과·확인 질문·실패를 표시하고 표·막대·선 차트를 렌더링합니다. SQL이나 HTML을 실행하지 않습니다.
+- 고객·결제·좌석·룸·사물함·업무·채팅·초대·근무표·근태·매출 등 주요 기능은 실제 Backend와 MySQL에 연결한 Playwright 시나리오로 검증했습니다. 기능별 절차와 결과는 [docs/testing](docs/testing/)에 있습니다.
+- `live` 모드는 API 실패를 데모 데이터로 대체하지 않습니다. 데이터가 없으면 빈 상태를, 미구현(404/501)·연결 오류는 안내와 재시도 버튼을, 인증·권한 오류(401/403)는 별도 처리로 보여 줍니다.
+- 결제는 **Mock 결제**이며 실제 금전 이동이 없습니다.
+- 아직 남은 항목:
+  - AI 대화·상태·취소·확인 선택의 실제 API 연결 ([#32](https://github.com/OpenStudyService/OpenStudy-Frontend/issues/32))
+  - 실제 API·DB를 연결한 전체 업무 회귀 ([#36](https://github.com/OpenStudyService/OpenStudy-Frontend/issues/36))
+  - 데스크톱 반응형·이탈 경고·기본 접근성 최종 점검 ([#35](https://github.com/OpenStudyService/OpenStudy-Frontend/issues/35))
+- 고객이 QR로 직접 입퇴실하는 고객용 화면은 범위 밖입니다. 좌석 화면의 직원용 배정·퇴실은 예외 지원 기능입니다.
 
 ## 코드 구조
 
 ```text
 src/app/             초기화, 라우트, 공통 레이아웃, 테마·UI 상태
-src/features/        인증, 홈, 운영 폼·상세, 채팅, 근태, 매출·AI, 설정
+src/features/        기능별 화면(인증, 홈, 업무, 채팅, 고객, 결제, 좌석, 근태, 분석, 설정 …)
 src/shared/api/      fetch·CSRF·오류·취소, 생성 타입
 src/shared/domain/   Zod 데이터 계약, 권한 함수, 화면·폼 정의
-src/shared/ui/       디자인 컴포넌트, SVG 아이콘·목업 일러스트
+src/shared/ui/       디자인 컴포넌트, SVG 아이콘·일러스트
 src/mocks/           seed, 탭 세션 원장, 승인 규칙, MSW HTTP
-tests/               브라우저 시나리오, 화면 크기·테마 캡처
-docs/api/            OpenAPI와 API 인계 계약
+tests/               Playwright 시나리오(데모·실서버), 화면 크기·테마 캡처
+docs/                API 인계, 설계, 테스트 절차, 개발 기록
 ```
 
-일반 목록은 페이지, 채팅·답글은 커서 기반입니다. 민감 명령은 멱등 키와 버전을 검사하며 실패한 폼은 입력을 보존합니다. Mock 결제는 실제 금전 이동이 없습니다. 실패 거래의 재결제는 조건을 확인하고 새 결제를 등록합니다. 예약 변경은 기존 미사용 예약 취소·환불 후 새 예약 등록으로 표현합니다.
+## 배포
 
-## 서버 연결과 검증 경계
+GitHub Actions가 검사와 live 빌드 후 비공개 Amazon S3에 게시하고, Amazon CloudFront가 HTTPS로 제공합니다. 인프라는 OpenStudy-Infra의 `terraform/frontend`가 관리합니다. 처음 생성·변수 등록·전체 삭제는 [자동 배포 순서](docs/deployment.md)를 따릅니다.
 
-백엔드 구현 전 API 정본은 [OpenStudy API 명세서 v1.0](../docs/api/README.md)입니다. 현재 MSW와의 차이 및 연결할 때 필요한 프론트 변경은 [호환 차이표](../docs/api/compatibility.md)를 따릅니다.
+## 문서
 
-환경 변수는 `.env.example`, 상세 계약은 [API 인계 문서](docs/api/README.md), 요구사항 연결은 [화면 추적표](docs/traceability.md), 실제 수행 결과는 [검증 기록](docs/verification.md)에 있습니다.
-
-`live` 모드는 API 실패를 데모 데이터로 대체하지 않습니다. **실제 HttpOnly 세션·CSRF 보안, 서버 권한·동시 트랜잭션, 실제 초대 메일, 두 브라우저 사이 실시간 전달, DomainLens 실엔진·DB 값은 이 프로젝트의 모킹 테스트로 보장하지 않습니다.** 서버 연결 뒤 별도 통합 검증합니다.
-
-기반 API 타입은 `src/shared/api/foundation.generated.ts`를 사용합니다. 정본은 [backend 기반 OpenAPI](https://github.com/OpenStudyService/OpenStudy-Backend/blob/main/docs/design/foundation/openapi.json)이며 프론트에 복제하지 않습니다. 설정의 지점 관리와 직원 목록·지점 소속·권한 프리셋은 이 계약을 사용합니다. 초대·상품 등 아직 전환하지 않은 전체 업무 데모 화면은 기존 계약(`generated.ts`)을 유지합니다.
-
-조직 관리는 `src/features/organization/`에서 정본 DTO와 별도 폼을 관리합니다. 지점 운영시간은 월~일 7개 구조화 값, 직원 소속 저장은 한 지점의 PUT과 계정·소속 두 버전을 사용합니다. 409에서는 입력을 보존하고 최신 서버 내용을 확인한 후 저장할 수 있습니다. 지점·직원 API가 아직 기존 미리보기 응답을 반환하면 부족한 운영시간·버전을 만들어 편집하지 않고 계약 미지원 오류를 표시합니다. MSW 검증은 실제 서버 권한·DB 동시 수정·세션 폐기 검증을 대신하지 않습니다.
+| 문서 | 내용 |
+|---|---|
+| [docs/api](docs/api/README.md) | API 인계 계약 |
+| [docs/design](docs/design/data-refresh-policy.md) | 화면 갱신 정책 등 설계 결정 |
+| [docs/traceability.md](docs/traceability.md) | 요구사항 ↔ 화면 추적표 |
+| [docs/verification.md](docs/verification.md) | 데모 모드 검증 기록 |
+| [docs/testing](docs/testing/) | 실서버 연결 검증 절차 |
+| [docs/development-log](docs/development-log/) | 날짜별 작업·의사결정 기록 |
 
 ## GitHub 이슈 관리 규칙
 
-이슈 제목은 `[F01]`, `[B01]`, `[M1]` 같은 작업·마일스톤 접두사 없이 작업명을 그대로 사용합니다. 고유 식별은 GitHub 이슈 번호, 개발 단계는 Milestone, 작업 유형·진행 상태는 Label과 Projects에서 관리합니다. 의존성은 같은 저장소의 `#번호` 또는 다른 저장소의 `owner/repo#번호`·링크로 연결합니다. 과거 검증 문서의 개발 단위 ID는 역사적 기록으로 보존할 수 있습니다.
+이슈 제목은 `[F01]`, `[M1]` 같은 접두사 없이 작업명을 그대로 씁니다. 식별은 이슈 번호, 개발 단계는 Milestone, 유형·진행 상태는 Label과 Projects로 관리합니다. 다른 저장소 의존성은 `owner/repo#번호`나 링크로 연결합니다.
