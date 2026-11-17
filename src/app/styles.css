@@ -604,6 +604,33 @@
   .chat-trace-scrim {
     display: none;
   }
+  .trace-specs {
+    @apply grid gap-2 border-t border-line px-4 py-3;
+  }
+  .trace-specs h4 {
+    @apply text-xs font-bold;
+  }
+  .trace-spec {
+    @apply rounded-lg border border-line;
+  }
+  .trace-spec summary {
+    @apply flex cursor-pointer select-none items-baseline gap-2 px-3 py-2 text-xs;
+  }
+  .trace-spec summary span {
+    @apply text-[10.5px] text-muted;
+  }
+  .trace-spec[open] summary {
+    @apply border-b border-line;
+  }
+  .trace-spec-body {
+    @apply relative;
+  }
+  .trace-spec-copy {
+    @apply absolute right-2 top-2 rounded-md border border-line bg-surface px-2 py-0.5 text-[10.5px] text-muted hover:border-primary hover:text-primary;
+  }
+  .trace-spec pre {
+    @apply max-h-80 overflow-auto whitespace-pre bg-soft px-3 pb-3 pt-9 font-mono text-[10.5px] leading-relaxed text-ink;
+  }
   /* AI result assembled by its ViewSpec layout (DomainLens result mock-up): KPI row, chart beside its table. */
   .ai-result {
     container-type: inline-size;

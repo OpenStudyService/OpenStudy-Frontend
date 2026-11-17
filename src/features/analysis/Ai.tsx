@@ -67,6 +67,9 @@ interface Turn {
   editableFilters?: AiEditableFilters | null;
   context?: AiContext | null;
   refined?: boolean;
+  /** The answer's QuerySpec and ViewSpec as the server sent them, for the process sidebar. */
+  querySpec?: unknown;
+  viewSpec?: unknown;
 }
 
 const DOMAINS = ["전체", "매출", "좌석", "이용권", "스터디룸", "업무", "근태"];
@@ -568,6 +571,8 @@ function AiChat() {
             askedAt: traced.askedAt,
             loading: traced.state === "loading",
             stages: traced.stages,
+            querySpec: traced.querySpec,
+            viewSpec: traced.viewSpec,
           }
         }
         open={traceOpen}
@@ -1004,6 +1009,8 @@ function outcome(res: AiQueryResponseDto): Partial<Turn> {
       stages,
       state: "completed",
       parsed,
+      querySpec: res.querySpec ?? null,
+      viewSpec: res.viewSpec ?? res.envelope.view ?? null,
       executionId: res.executionId,
       conditions: res.conditions,
       context: res.context,

@@ -850,3 +850,30 @@ it("shows the picked answer's processing steps in the process sidebar", async ()
   expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
   expect(within(panel).getAllByRole("listitem")).toHaveLength(3);
 });
+
+it("shows the answer's QuerySpec and ViewSpec in the process sidebar", async () => {
+  mocks.execute.mockResolvedValueOnce(
+    response({
+      message: "명세가 있는 답변이에요.",
+      querySpec: { id: "q0", source: "payment", analysisId: "openstudy.sales.branchComparison" } as never,
+      stages: [
+        { stage: "generating", label: "조회 명세(QuerySpec) 생성", status: "COMPLETED", durationMs: 3, detail: "" },
+      ],
+    }),
+  );
+  show();
+  const user = await ask("이번 달 매출");
+  expect(await screen.findByText("명세가 있는 답변이에요.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /처리 과정 1단계/ }));
+  const panel = screen.getByRole("complementary", { name: "처리 과정" });
+  const specs = within(panel).getByRole("region", { name: "조회 명세" });
+  // Folded until opened, like the mock-up's developer view.
+  await user.click(within(specs).getByText("QuerySpec"));
+  expect(within(specs).getByLabelText("QuerySpec")).toHaveTextContent('"source": "payment"');
+  await user.click(within(specs).getByText("ViewSpec"));
+  expect(within(specs).getByLabelText("ViewSpec")).toHaveTextContent('"catalogVersion": "openstudy-ui-1.0.0"');
+  await user.click(within(specs).getByRole("button", { name: "QuerySpec 복사" }));
+  expect(await within(specs).findByRole("button", { name: "복사됨" })).toBeInTheDocument();
+  // user-event's clipboard stub holds what the button wrote.
+  expect(await navigator.clipboard.readText()).toContain('"analysisId": "openstudy.sales.branchComparison"');
+});
