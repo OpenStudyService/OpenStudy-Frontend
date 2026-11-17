@@ -360,7 +360,7 @@ it("keeps list columns and filters with an empty canonical task page", async () 
   const table = screen.getByRole("table");
   expect(within(table).getAllByRole("columnheader").length).toBeGreaterThan(0);
   expect(screen.getByRole("searchbox", { name: "업무 검색" })).toBeVisible();
-  expect(screen.getByText("총 0건 · 1페이지")).toBeVisible();
+  expect(screen.getByText("총 0건")).toBeVisible();
 });
 
 it("shows a missing sales response as an error instead of zero revenue", async () => {

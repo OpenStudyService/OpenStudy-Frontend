@@ -557,5 +557,5 @@ it("shows an empty product result inside the table", async () => {
   expect(
     await within(table).findByText("조건에 맞는 상품이 없어요"),
   ).toBeInTheDocument();
-  expect(screen.getByText("총 0건 · 1페이지")).toBeInTheDocument();
+  expect(screen.getByText("총 0건")).toBeInTheDocument();
 });

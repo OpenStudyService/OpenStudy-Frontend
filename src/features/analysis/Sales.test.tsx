@@ -334,6 +334,30 @@ it("keeps branch, purpose and refund conditions in URL and resets ledger page on
     purpose: "사물함",
   });
 });
+it("opens a numbered ledger page and keeps the entry filter", async () => {
+  mocks.ledger.mockResolvedValue({
+    ...ledger,
+    meta: { ...ledger.meta, total: 45 },
+  });
+  show("?view=ledger&entryType=환불");
+  const pagination = await screen.findByRole("navigation", {
+    name: "원장 페이지",
+  });
+  await userEvent.click(
+    within(pagination).getByRole("button", { name: "3페이지" }),
+  );
+  await waitFor(() =>
+    expect(mocks.ledger.mock.lastCall?.[1]).toMatchObject({
+      page: 3,
+      entryType: "환불",
+    }),
+  );
+  expect(
+    await screen.findByRole("button", { name: "3페이지" }),
+  ).toHaveAttribute("aria-current", "page");
+  expect(screen.getByLabelText("원장 항목")).toHaveValue("환불");
+});
+
 it("warns before downloading ledger and product reports using their total row counts", async () => {
   mocks.ledger.mockResolvedValue({
     ...ledger,

@@ -1,5 +1,6 @@
 import { readListPage } from "../../shared/api/read-sorted-pages";
 import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { Pagination } from "../../shared/ui/Pagination";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -84,9 +85,7 @@ export function Tasks() {
     retry: false,
   });
   const candidates = useTaskAssignees(scope);
-  const page = rows.data?.meta.page ?? 1,
-    pageSize = rows.data?.meta.pageSize ?? 20,
-    total = rows.data?.meta.total ?? 0;
+  const listMeta = rows.data?.meta;
   const filter = (key: string, value: string) =>
     setParams(
       (p) => {
@@ -373,40 +372,27 @@ export function Tasks() {
             </tbody>
           </table>
         </div>
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-xs text-muted">
-          <span>
+        <footer className="grid justify-items-center gap-1 border-t border-line px-4 py-3">
+          <span className="help" aria-live="polite">
             {rows.error
               ? "항목 수 확인 불가"
-              : rows.isPending
-                ? "항목 수 확인 중"
-                : `총 ${total}건 · ${page}페이지`}
+              : listMeta
+                ? `총 ${listMeta.total}건`
+                : "항목 수 확인 중"}
           </span>
-          <div className="flex gap-2">
-            <Button
-              disabled={rows.isPending || !!rows.error || page <= 1}
-              onClick={() =>
+          {listMeta && !rows.error && (
+            <Pagination
+              page={listMeta.page}
+              totalPages={Math.ceil(listMeta.total / listMeta.pageSize)}
+              label="업무 목록 페이지 이동"
+              onPageChange={(page) =>
                 setParams((p) => {
-                  p.set("page", String(page - 1));
+                  p.set("page", String(page));
                   return p;
                 })
               }
-            >
-              이전
-            </Button>
-            <Button
-              disabled={
-                rows.isPending || !!rows.error || page * pageSize >= total
-              }
-              onClick={() =>
-                setParams((p) => {
-                  p.set("page", String(page + 1));
-                  return p;
-                })
-              }
-            >
-              다음
-            </Button>
-          </div>
+            />
+          )}
         </footer>
       </div>
       {params.get("detail") && (

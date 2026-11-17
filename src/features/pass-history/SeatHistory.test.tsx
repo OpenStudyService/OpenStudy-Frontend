@@ -109,7 +109,7 @@ it("opens the session detail from the customer name cell link", async () => {
   expect(
     screen.queryByRole("columnheader", { name: "상세" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByText("총 1건 · 1페이지")).toBeInTheDocument();
+  expect(screen.getByText("총 1건")).toBeInTheDocument();
 });
 
 it("shows the empty state and an invalid period inside the table", async () => {

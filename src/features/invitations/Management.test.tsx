@@ -318,7 +318,7 @@ it("places the invite button in the list filter bar and shows list states inside
     screen.getByLabelText("초대 상태 필터").closest(".filters"),
   );
   expect(screen.queryByLabelText("초대 이름")).not.toBeInTheDocument();
-  expect(screen.getByText("총 0건 · 1페이지")).toBeVisible();
+  expect(screen.getByText("총 0건")).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /초대 상세:/ }),
   ).not.toBeInTheDocument();

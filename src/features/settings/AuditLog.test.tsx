@@ -218,12 +218,16 @@ it("updates URL search conditions and uses the response meta for pagination", as
     expect(router.state.location.search).toContain("action=LOGIN_FAILED"),
   );
   expect(router.state.location.search).toContain("page=1");
-  fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+  fireEvent.click(await screen.findByRole("button", { name: "2페이지" }));
   await waitFor(() => expect(router.state.location.search).toContain("page=2"));
   expect(router.state.location.search).toContain("action=LOGIN_FAILED");
   expect(router.state.location.search).toContain("pageSize=2");
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "다음" })).toBeDisabled(),
+  );
+  expect(screen.getByRole("button", { name: "2페이지" })).toHaveAttribute(
+    "aria-current",
+    "page",
   );
 });
 

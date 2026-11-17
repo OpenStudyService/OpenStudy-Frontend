@@ -330,7 +330,7 @@ it("does not expose editing through a direct URL to unrelated staff", async () =
   ).toBeVisible();
   expect(screen.queryByLabelText("업무 제목")).not.toBeInTheDocument();
 });
-it("keeps list conditions and uses the returned page size", async () => {
+it("keeps list conditions after closing a detail on a single-page list", async () => {
   vi.mocked(taskApi.list).mockResolvedValue({
     items: [current],
     meta: { total: 11, page: 1, pageSize: 20 },
@@ -342,7 +342,58 @@ it("keeps list conditions and uses the returned page size", async () => {
   expect(screen.getByRole("searchbox", { name: "업무 검색" })).toHaveValue(
     "업무",
   );
+  expect(screen.getByText("총 11건")).toBeVisible();
+  expect(
+    screen.queryByRole("navigation", { name: "업무 목록 페이지 이동" }),
+  ).not.toBeInTheDocument();
+});
+
+it("opens a numbered page using the returned page size and keeps list conditions", async () => {
+  vi.mocked(taskApi.list).mockImplementation(async (_scope, search) => {
+    const page = Number(new URLSearchParams(search).get("page") ?? 1);
+    return {
+      items: [{ ...current, title: `${page}페이지 업무` }],
+      meta: { total: 23, page, pageSize: 10 },
+    };
+  });
+  const { user, router } = mount(
+    "?q=업무&status=할+일&sort=dueAt&direction=asc&pageSize=5",
+  );
+  const pagination = await screen.findByRole("navigation", {
+    name: "업무 목록 페이지 이동",
+  });
+  expect(
+    within(pagination).getByRole("button", { name: "1페이지" }),
+  ).toHaveAttribute("aria-current", "page");
+  expect(
+    within(pagination).getByRole("button", { name: "이전" }),
+  ).toBeDisabled();
+  expect(
+    within(pagination).queryByRole("button", { name: "4페이지" }),
+  ).not.toBeInTheDocument();
+
+  await user.click(within(pagination).getByRole("button", { name: "3페이지" }));
+  expect(
+    await screen.findByRole("button", { name: "3페이지 업무" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "3페이지" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+  const expected = {
+    q: "업무",
+    status: "할 일",
+    sort: "dueAt",
+    direction: "asc",
+    pageSize: "5",
+    page: "3",
+  };
+  const [, search] = vi.mocked(taskApi.list).mock.lastCall!;
+  expect(Object.fromEntries(new URLSearchParams(search))).toEqual(expected);
+  expect(
+    Object.fromEntries(new URLSearchParams(router.state.location.search)),
+  ).toEqual(expected);
 });
 it("hides an editor and aborts its in-flight write after permission revocation", async () => {
   let signal: AbortSignal | undefined;
@@ -626,7 +677,10 @@ it("preserves filters after a list reload failure and closing a detail", async (
     "aria-pressed",
     "true",
   );
-  expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+  expect(screen.getByText("항목 수 확인 불가")).toBeVisible();
+  expect(
+    screen.queryByRole("navigation", { name: "업무 목록 페이지 이동" }),
+  ).not.toBeInTheDocument();
 });
 
 it("loads processing history independently and shows its actor and changed values", async () => {

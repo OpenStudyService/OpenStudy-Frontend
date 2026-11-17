@@ -110,35 +110,39 @@ function footer(props: Partial<Parameters<typeof ListFooter>[0]> = {}) {
       {...props}
     />,
   );
-  return {
-    onChange,
-    previous: screen.getByRole("button", { name: "이전" }),
-    next: screen.getByRole("button", { name: "다음" }),
-  };
+  return onChange;
 }
 
-it("shows the total and current page and disables previous on the first page", async () => {
-  const { previous, next, onChange } = footer();
-  expect(screen.getByText("총 45건 · 1페이지")).toBeInTheDocument();
-  expect(previous).toBeDisabled();
-  expect(next).toBeEnabled();
-  await userEvent.click(next);
-  expect(onChange).toHaveBeenCalledWith(2);
+it("shows the total and lets users jump to a numbered page", async () => {
+  const onChange = footer();
+  expect(screen.getByText("총 45건")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "1페이지" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await userEvent.click(screen.getByRole("button", { name: "3페이지" }));
+  expect(onChange).toHaveBeenCalledWith(3);
 });
 
 it("disables next on the last page", async () => {
-  const { previous, next, onChange } = footer({ page: 3 });
-  expect(next).toBeDisabled();
-  await userEvent.click(previous);
+  const onChange = footer({ page: 3 });
+  expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+  await userEvent.click(screen.getByRole("button", { name: "이전" }));
   expect(onChange).toHaveBeenCalledWith(2);
+});
+
+it("only shows the total for a single page", () => {
+  footer({ total: 20 });
+  expect(screen.getByText("총 20건")).toBeInTheDocument();
+  expect(screen.queryByRole("navigation", { name: "페이지 이동" })).toBeNull();
 });
 
 it.each([
   [{ loading: true }, "항목 수 확인 중"],
   [{ error: true }, "항목 수 확인 불가"],
-])("disables paging while the count is unknown (%o)", (state, text) => {
-  const { previous, next } = footer({ page: 2, ...state });
+])("hides paging while the count is unknown (%o)", (state, text) => {
+  footer({ page: 2, ...state });
   expect(screen.getByText(text)).toBeInTheDocument();
-  expect(previous).toBeDisabled();
-  expect(next).toBeDisabled();
+  expect(screen.queryByRole("navigation", { name: "페이지 이동" })).toBeNull();
 });

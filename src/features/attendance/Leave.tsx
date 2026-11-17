@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../../app/context";
 import { admin } from "../../shared/domain/schema";
 import { DataNotice } from "../../shared/ui/DataNotice";
+import { ListFooter } from "../../shared/ui/ListLayout";
 import { Button } from "../../shared/ui/primitives";
 import { RequestFeedback } from "./RequestFeedback";
 import { RequestList } from "./RequestLists";
@@ -442,20 +443,15 @@ export function LeaveGrants() {
           <GrantHistoryToggle id={row.id} />
         </article>
       ))}
-      <div className="flex items-center gap-3">
-        <Button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          이전
-        </Button>
-        <span>
-          {page}페이지 · {rows.data?.total ?? 0}건
-        </span>
-        <Button
-          disabled={!rows.data || page * 20 >= rows.data.total}
-          onClick={() => setPage(page + 1)}
-        >
-          다음
-        </Button>
-      </div>
+      <ListFooter
+        page={page}
+        pageSize={rows.data?.pageSize ?? 20}
+        total={rows.data?.total ?? 0}
+        loading={rows.isPending}
+        error={!!rows.error}
+        label="휴가 부여 목록 페이지 이동"
+        onChange={setPage}
+      />
     </section>
   );
 }
