@@ -202,7 +202,9 @@ it("asks with the current scope and shows the answer with its sales totals", asy
     expect.any(AbortSignal),
   );
   expect(await screen.findByText("강남점 매출이에요.")).toBeInTheDocument();
-  expect(screen.getByText("이번 달 매출")).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("article", { name: "내 질문" })).getByText("이번 달 매출"),
+  ).toBeInTheDocument();
   expect(screen.getAllByText("25,000원")[0]).toBeInTheDocument();
   // Assembled as the mock-up: the badge names the visual, the KPI cards and the chart panel are shown together.
   expect(screen.getByText("BAR")).toBeInTheDocument();
@@ -777,4 +779,74 @@ it("offers this month's branch sales but not last month's among the suggestions"
   show();
   expect(await screen.findByRole("button", { name: /이번 달 지점별 매출을 비교해줘/ })).toBeVisible();
   expect(screen.queryByRole("button", { name: /지난 달 지점별 매출을 비교해줘/ })).not.toBeInTheDocument();
+});
+
+it("shows the picked answer's processing steps in the process sidebar", async () => {
+  const stage = (
+    stage: string,
+    label: string,
+    durationMs: number,
+    detail = "",
+  ) => ({
+    stage,
+    label,
+    status: "COMPLETED",
+    durationMs,
+    detail,
+  });
+  mocks.execute
+    .mockResolvedValueOnce(
+      response({
+        message: "첫 답변이에요.",
+        stages: [
+          stage("accepted", "질문 접수 및 정규화", 2),
+          stage(
+            "generating",
+            "Qwen LLM 조회 명세(QuerySpec) 생성 (qwen3.8-flash)",
+            2400,
+            "Model: qwen3.8-flash",
+          ),
+          stage("executing", "데이터베이스 집계 실행", 40),
+        ],
+      }),
+    )
+    .mockResolvedValueOnce(
+      response({
+        message: "두 번째 답변이에요.",
+        stages: [
+          stage("generating", "저장된 조회 계획 재사용 (LLM 호출 없음)", 0),
+          {
+            stage: "validating",
+            label: "권한·스코프·예산 가드레일 검증",
+            status: "REJECTED",
+            durationMs: 1,
+            detail: "허용되지 않은 지점",
+          },
+        ],
+      }),
+    );
+  show();
+  const user = await ask("이번 달 매출");
+  expect(await screen.findByText("첫 답변이에요.")).toBeInTheDocument();
+  const panel = screen.getByRole("complementary", { name: "처리 과정" });
+  // The latest answer: its steps, times and how its plan was made.
+  expect(within(panel).getByText("이번 달 매출")).toBeInTheDocument();
+  expect(within(panel).getAllByRole("listitem")).toHaveLength(3);
+  // The total (2,442ms), the model's time in the summary and the model step (2,400ms) all read 2.4초.
+  expect(within(panel).getAllByText("2.4초")).toHaveLength(3);
+  expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
+
+  await ask("지난달 매출");
+  expect(await screen.findByText("두 번째 답변이에요.")).toBeInTheDocument();
+  expect(within(panel).getByText("캐시 재사용")).toBeInTheDocument();
+  expect(within(panel).getByText("거절")).toBeInTheDocument();
+  expect(within(panel).getByText("허용되지 않은 지점")).toBeInTheDocument();
+
+  // Picking the first answer's summary shows its steps again.
+  const chips = screen.getAllByRole("button", { name: /처리 과정 \d단계/ });
+  expect(chips[1]).toHaveAttribute("aria-pressed", "true");
+  await user.click(chips[0]);
+  expect(chips[0]).toHaveAttribute("aria-pressed", "true");
+  expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
+  expect(within(panel).getAllByRole("listitem")).toHaveLength(3);
 });

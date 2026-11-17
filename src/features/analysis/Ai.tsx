@@ -1,3 +1,5 @@
+import { ProcessPanel } from "./ProcessPanel";
+import { planSource } from "./processStages";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, MOCK } from "../../shared/api/client";
@@ -104,6 +106,9 @@ function AiChat() {
   const [reuseBusy, setReuseBusy] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [reopenError, setReopenError] = useState("");
+  // The answer the process sidebar shows: the one picked, else the latest. Narrow screens open it as a drawer.
+  const [traceTurnId, setTraceTurnId] = useState<string | null>(null);
+  const [traceOpen, setTraceOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
   const client = useQueryClient();
@@ -171,6 +176,7 @@ function AiChat() {
     const turn = emptyTurn(trimmed, new Date().toISOString());
     const id = turn.id;
     setTurns((all) => [...all.map((t) => ({ ...t, retry: undefined })), turn]);
+    setTraceTurnId(null);
     setHistoryOpen(false);
     setReopenError("");
     setQuestion("");
@@ -233,6 +239,8 @@ function AiChat() {
   function startNew() {
     abort.current?.abort();
     setTurns([]);
+    setTraceTurnId(null);
+    setTraceOpen(false);
     setQuestion("");
     setConversationId(undefined);
     setReopenError("");
@@ -372,6 +380,8 @@ function AiChat() {
   const examples = SUGGESTED_QUESTIONS.filter(
     (q) => domain === "전체" || q.domain === domain,
   );
+  const traced =
+    turns.find((t) => t.id === traceTurnId) ?? turns[turns.length - 1] ?? null;
   return (
     // has-channel shows the conversation on phones; without it the history list is shown (as in the team chat).
     <div className={`chat-shell ${historyOpen ? "" : "has-channel"}`}>
@@ -469,6 +479,11 @@ function AiChat() {
                 onRefine={(body) => refine(turn, body)}
                 onRetry={() => void ask(turn.question, undefined, turn.retry)}
                 onChoose={(option) => void ask(turn.question, option.id)}
+                traced={traced?.id === turn.id}
+                onTrace={() => {
+                  setTraceTurnId(turn.id);
+                  setTraceOpen(true);
+                }}
               />
             ))
           )}
@@ -546,6 +561,26 @@ function AiChat() {
           </div>
         </form>
       </section>
+      <ProcessPanel
+        turn={
+          traced && {
+            question: traced.refined ? "조건 변경" : traced.question,
+            askedAt: traced.askedAt,
+            loading: traced.state === "loading",
+            stages: traced.stages,
+          }
+        }
+        open={traceOpen}
+        onClose={() => setTraceOpen(false)}
+      />
+      {traceOpen && (
+        <button
+          type="button"
+          className="chat-trace-scrim"
+          aria-label="처리 과정 닫기"
+          onClick={() => setTraceOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -624,6 +659,8 @@ function TurnView({
   onChoose,
   onRetry,
   onRefine,
+  traced,
+  onTrace,
 }: {
   turn: Turn;
   userName: string;
@@ -632,6 +669,8 @@ function TurnView({
   onChoose: (option: ClarificationOptionDto) => void;
   onRetry: () => void;
   onRefine: (body: AiRefinement) => Promise<void>;
+  traced: boolean;
+  onTrace: () => void;
 }) {
   const time = new Date(turn.askedAt).toLocaleTimeString("ko-KR", {
     hour: "2-digit",
@@ -662,7 +701,7 @@ function TurnView({
           <b className="text-xs">업무 AI</b>
           {turn.state === "loading" && <Working />}
           {turn.state !== "loading" && turn.stages.length > 0 && (
-            <Stages stages={turn.stages} />
+            <Stages stages={turn.stages} traced={traced} onTrace={onTrace} />
           )}
           {turn.state === "completed" && turn.parsed && (
             <Answer
@@ -869,27 +908,36 @@ function Working() {
   );
 }
 
-/** The engine's stage record of one answer (접수 → 검색 → 조회 명세 → 검증 → 조회 → 결과 검증). */
-function Stages({ stages }: { stages: StageSpanDto[] }) {
+/**
+ * The answer's processing summary (steps, time, how its plan was made); the steps themselves open in the process
+ * sidebar (접수 → 검색 → 조회 명세 → 검증 → 조회 → 결과 검증).
+ */
+function Stages({
+  stages,
+  traced,
+  onTrace,
+}: {
+  stages: StageSpanDto[];
+  traced: boolean;
+  onTrace: () => void;
+}) {
   const elapsedMs = stages.reduce(
     (total, stage) => total + (stage.durationMs ?? 0),
     0,
   );
+  const source = planSource(stages);
   return (
-    <details className="mt-1 text-[11px] text-muted">
-      <summary className="cursor-pointer select-none">
-        처리 과정 {stages.length}단계 · {(elapsedMs / 1000).toFixed(1)}초
-      </summary>
-      <ol className="mt-1 grid gap-0.5 pl-4">
-        {stages.map((stage, i) => (
-          <li key={`${stage.stage}-${i}`} className="list-decimal">
-            {stage.label}
-            {stage.status !== "COMPLETED" && ` (${stage.status})`}
-            <span className="tabular-nums"> · {stage.durationMs}ms</span>
-          </li>
-        ))}
-      </ol>
-    </details>
+    <button
+      type="button"
+      className={`trace-chip ${traced ? "active" : ""}`}
+      aria-pressed={traced}
+      onClick={onTrace}
+    >
+      <Icon name="clock" size={12} />
+      처리 과정 {stages.length}단계 · {(elapsedMs / 1000).toFixed(1)}초
+      {source && <span className="trace-chip-source">{source.label}</span>}
+      <Icon name="chevron" size={11} />
+    </button>
   );
 }
 
