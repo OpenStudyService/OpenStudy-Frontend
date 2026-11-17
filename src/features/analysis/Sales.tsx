@@ -3,7 +3,7 @@ import {
   readSortedPages,
 } from "../../shared/api/read-sorted-pages";
 import { useTableSort } from "../../shared/ui/table-sort";
-import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { ListColumnHeader, ListFooter } from "../../shared/ui/ListLayout";
 import { useLocalTableSort } from "../../shared/ui/table-sort";
 import type { ReactNode } from "react";
 import { ApiError } from "../../shared/api/client";
@@ -793,33 +793,16 @@ function SalesWorkspace() {
                             }
                           />
                         )}
-                        <nav
-                          className="flex items-center justify-between gap-3 p-5"
-                          aria-label="상품 순위 페이지"
-                        >
-                          <Button
-                            disabled={productPage <= 1}
-                            onClick={() =>
-                              change("productPage", String(productPage - 1))
-                            }
-                          >
-                            이전
-                          </Button>
-                          <span className="text-xs">
-                            {formatNumber(meta.total)}개 상품 행 · {productPage}{" "}
-                            /{" "}
-                            {Math.max(1, Math.ceil(meta.total / meta.pageSize))}
-                            페이지
-                          </span>
-                          <Button
-                            disabled={productPage * meta.pageSize >= meta.total}
-                            onClick={() =>
-                              change("productPage", String(productPage + 1))
-                            }
-                          >
-                            다음
-                          </Button>
-                        </nav>
+                        <ListFooter
+                          page={productPage}
+                          pageSize={meta.pageSize}
+                          total={meta.total}
+                          unit="개 상품 행"
+                          label="상품 순위 페이지"
+                          onChange={(page) =>
+                            change("productPage", String(page))
+                          }
+                        />
                         <AggregationMeta
                           meta={aggregation}
                           branches={session.branches}
@@ -1020,37 +1003,13 @@ function SalesWorkspace() {
                           }
                         />
                       )}
-                      <nav
-                        className="flex items-center justify-between gap-3 p-5"
-                        aria-label="원장 페이지"
-                      >
-                        <Button
-                          disabled={page <= 1}
-                          onClick={() => change("ledgerPage", String(page - 1))}
-                        >
-                          이전
-                        </Button>
-                        <span className="text-xs">
-                          {formatNumber(ledger.data.meta.total)}건 · {page} /{" "}
-                          {Math.max(
-                            1,
-                            Math.ceil(
-                              ledger.data.meta.total /
-                                ledger.data.meta.pageSize,
-                            ),
-                          )}
-                          페이지
-                        </span>
-                        <Button
-                          disabled={
-                            page * ledger.data.meta.pageSize >=
-                            ledger.data.meta.total
-                          }
-                          onClick={() => change("ledgerPage", String(page + 1))}
-                        >
-                          다음
-                        </Button>
-                      </nav>
+                      <ListFooter
+                        page={page}
+                        pageSize={ledger.data.meta.pageSize}
+                        total={ledger.data.meta.total}
+                        label="원장 페이지"
+                        onChange={(page) => change("ledgerPage", String(page))}
+                      />
                       <AggregationMeta
                         meta={ledger.data.aggregation}
                         branches={session.branches}

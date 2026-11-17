@@ -1,5 +1,5 @@
 import { readFlatListPage } from "../../shared/api/read-sorted-pages";
-import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { ListColumnHeader, ListFooter } from "../../shared/ui/ListLayout";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
@@ -183,23 +183,15 @@ export function Shifts() {
               )}
             </div>
           )}
-          <div className="flex gap-3 p-4">
-            <Button
-              disabled={page <= 1}
-              onClick={() => filter("page", String(page - 1))}
-            >
-              이전
-            </Button>
-            <span>
-              {page}페이지 · {rows.data?.total ?? 0}건
-            </span>
-            <Button
-              disabled={!rows.data || page * 20 >= rows.data.total}
-              onClick={() => filter("page", String(page + 1))}
-            >
-              다음
-            </Button>
-          </div>
+          <ListFooter
+            page={page}
+            pageSize={rows.data?.pageSize ?? 20}
+            total={rows.data?.total ?? 0}
+            loading={rows.isPending}
+            error={!!rows.error}
+            label="근무 목록 페이지 이동"
+            onChange={(page) => filter("page", String(page))}
+          />
         </>
       )}
       <Panel

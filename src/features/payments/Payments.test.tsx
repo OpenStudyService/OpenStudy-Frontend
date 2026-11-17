@@ -872,8 +872,7 @@ it("shows the payment list states and Mock payment action inside the list card",
     within(table).getByText("시작일은 종료일보다 늦을 수 없어요"),
   ).toBeInTheDocument();
   expect(screen.getByText("항목 수 확인 불가")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+  expect(screen.queryByRole("navigation", { name: "페이지 이동" })).toBeNull();
   const filters = screen.getByRole("region", { name: "결제 조회 조건" });
   expect(table.closest(".card")).toContainElement(filters);
   expect(
@@ -892,5 +891,5 @@ it("shows an empty pass list inside the table with a page footer", async () => {
   expect(
     await within(table).findByText("조건에 맞는 보유 이용권이 없어요"),
   ).toBeInTheDocument();
-  expect(screen.getByText("총 0건 · 1페이지")).toBeInTheDocument();
+  expect(screen.getByText("총 0건")).toBeInTheDocument();
 });

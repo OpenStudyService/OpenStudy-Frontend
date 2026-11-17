@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { formatNumber } from "../domain/format";
 import { Icon } from "./Icon";
-import { Button, ErrorState, State } from "./primitives";
+import { Pagination } from "./Pagination";
+import { ErrorState, State } from "./primitives";
 
 type SortableColumn = {
   label: string;
@@ -134,6 +136,8 @@ export function ListFooter({
   page,
   pageSize,
   total,
+  unit = "건",
+  label,
   loading = false,
   error = false,
   onChange,
@@ -141,34 +145,29 @@ export function ListFooter({
   page: number;
   pageSize: number;
   total: number;
+  unit?: string;
+  label?: string;
   loading?: boolean;
   error?: boolean;
   onChange: (page: number) => void;
 }) {
-  const unavailable = loading || error;
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-xs text-muted">
-      <span>
+    <footer className="grid justify-items-center gap-1 border-t border-line px-4 py-3">
+      <span className="help" aria-live="polite">
         {error
           ? "항목 수 확인 불가"
           : loading
             ? "항목 수 확인 중"
-            : `총 ${total}건 · ${page}페이지`}
+            : `총 ${formatNumber(total)}${unit}`}
       </span>
-      <div className="flex gap-2">
-        <Button
-          disabled={unavailable || page <= 1}
-          onClick={() => onChange(page - 1)}
-        >
-          이전
-        </Button>
-        <Button
-          disabled={unavailable || page * pageSize >= total}
-          onClick={() => onChange(page + 1)}
-        >
-          다음
-        </Button>
-      </div>
+      {!loading && !error && (
+        <Pagination
+          page={page}
+          totalPages={Math.ceil(total / pageSize)}
+          label={label}
+          onPageChange={onChange}
+        />
+      )}
     </footer>
   );
 }

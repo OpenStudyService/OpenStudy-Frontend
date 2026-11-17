@@ -51,7 +51,7 @@ test("owner creates a branch with structured overnight hours", async ({
   const search = filters.getByRole("searchbox", { name: "지점 검색" });
   await search.fill("없는 지점 이름");
   await expect(table.getByText("조건에 맞는 지점이 없어요")).toBeVisible();
-  await expect(page.getByText("총 0건 · 1페이지")).toBeVisible();
+  await expect(page.getByText("총 0건")).toBeVisible();
   await filters.getByRole("button", { name: "초기화", exact: true }).click();
   await expect(search).toHaveValue("");
   await expect(page).toHaveURL(/\/app\/all\/branches$/);

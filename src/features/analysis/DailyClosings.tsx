@@ -1,4 +1,4 @@
-import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { ListColumnHeader, ListFooter } from "../../shared/ui/ListLayout";
 import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -180,19 +180,13 @@ export function DailyClosings({
                 </li>
               ))}
             </ul>
-            {list.data.meta.total > 20 && (
-              <div>
-                <Button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                  이전
-                </Button>
-                <Button
-                  disabled={page * 20 >= list.data.meta.total}
-                  onClick={() => setPage(page + 1)}
-                >
-                  다음
-                </Button>
-              </div>
-            )}
+            <ListFooter
+              page={page}
+              pageSize={list.data.meta.pageSize}
+              total={list.data.meta.total}
+              label="일별 마감 페이지 이동"
+              onChange={setPage}
+            />
           </>
         )
       )}

@@ -298,9 +298,11 @@ it("shows attendance records in the list layout with empty state inside the tabl
   ).toBeVisible();
   expect(screen.getByLabelText("근태 상태")).toHaveValue("퇴근");
   expect(screen.getByLabelText("출근 시작일")).toHaveValue("2026-11-01");
-  expect(screen.getByText("총 0건 · 2페이지")).toBeVisible();
+  expect(screen.getByText("총 0건")).toBeVisible();
+  expect(screen.getByRole("button", { name: "이전" })).toBeEnabled();
   await user.click(screen.getByRole("button", { name: "초기화" }));
   expect(screen.getByLabelText("근태 상태")).toHaveValue("");
   expect(screen.getByLabelText("출근 시작일")).toHaveValue("");
-  expect(await screen.findByText("총 0건 · 1페이지")).toBeVisible();
+  expect(await screen.findByText("총 0건")).toBeVisible();
+  expect(screen.queryByRole("navigation", { name: "페이지 이동" })).toBeNull();
 });
