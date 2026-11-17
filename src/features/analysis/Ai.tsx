@@ -179,7 +179,9 @@ function AiChat() {
     const turn = emptyTurn(trimmed, new Date().toISOString());
     const id = turn.id;
     setTurns((all) => [...all.map((t) => ({ ...t, retry: undefined })), turn]);
+    // A new question closes the process sidebar; its own "처리 과정" button opens it again.
     setTraceTurnId(null);
+    setTraceOpen(false);
     setHistoryOpen(false);
     setReopenError("");
     setQuestion("");
@@ -258,6 +260,8 @@ function AiChat() {
     setReopening(true);
     setReopenError("");
     setHistoryOpen(false);
+    setTraceTurnId(null);
+    setTraceOpen(false);
     setTurns([]);
     setConversationId(id);
     try {

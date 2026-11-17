@@ -839,9 +839,12 @@ it("shows the picked answer's processing steps in the process sidebar", async ()
   expect(within(panel).getAllByText("2.4초")).toHaveLength(3);
   expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
 
-  // While open, it follows the next answer.
+  // A new question closes it; that answer's own button opens it again.
   await ask("지난달 매출");
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
   expect(await screen.findByText("두 번째 답변이에요.")).toBeInTheDocument();
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: /처리 과정 2단계/ }));
   panel = screen.getByRole("complementary", { name: "처리 과정" });
   expect(within(panel).getByText("캐시 재사용")).toBeInTheDocument();
   expect(within(panel).getByText("거절")).toBeInTheDocument();
