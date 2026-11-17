@@ -828,26 +828,39 @@ it("shows the picked answer's processing steps in the process sidebar", async ()
   show();
   const user = await ask("이번 달 매출");
   expect(await screen.findByText("첫 답변이에요.")).toBeInTheDocument();
-  const panel = screen.getByRole("complementary", { name: "처리 과정" });
-  // The latest answer: its steps, times and how its plan was made.
+  // Closed until the answer's "처리 과정" button is pressed.
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: /처리 과정 3단계/ }));
+  let panel = screen.getByRole("complementary", { name: "처리 과정" });
+  // That answer: its steps, times and how its plan was made.
   expect(within(panel).getByText("이번 달 매출")).toBeInTheDocument();
   expect(within(panel).getAllByRole("listitem")).toHaveLength(3);
   // The total (2,442ms), the model's time in the summary and the model step (2,400ms) all read 2.4초.
   expect(within(panel).getAllByText("2.4초")).toHaveLength(3);
   expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
 
+  // While open, it follows the next answer.
   await ask("지난달 매출");
   expect(await screen.findByText("두 번째 답변이에요.")).toBeInTheDocument();
+  panel = screen.getByRole("complementary", { name: "처리 과정" });
   expect(within(panel).getByText("캐시 재사용")).toBeInTheDocument();
   expect(within(panel).getByText("거절")).toBeInTheDocument();
   expect(within(panel).getByText("허용되지 않은 지점")).toBeInTheDocument();
 
-  // Picking the first answer's summary shows its steps again.
+  // The first answer's button shows its steps; pressing it again closes the panel.
   const chips = screen.getAllByRole("button", { name: /처리 과정 \d단계/ });
   expect(chips[1]).toHaveAttribute("aria-pressed", "true");
   await user.click(chips[0]);
   expect(chips[0]).toHaveAttribute("aria-pressed", "true");
+  expect(chips[1]).toHaveAttribute("aria-pressed", "false");
+  panel = screen.getByRole("complementary", { name: "처리 과정" });
   expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
+  await user.click(chips[0]);
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
+  expect(chips[0]).toHaveAttribute("aria-pressed", "false");
+
+  await user.click(chips[0]);
+  panel = screen.getByRole("complementary", { name: "처리 과정" });
   expect(within(panel).getAllByRole("listitem")).toHaveLength(3);
 });
 

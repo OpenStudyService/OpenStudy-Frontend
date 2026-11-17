@@ -482,8 +482,13 @@ function AiChat() {
                 onRefine={(body) => refine(turn, body)}
                 onRetry={() => void ask(turn.question, undefined, turn.retry)}
                 onChoose={(option) => void ask(turn.question, option.id)}
-                traced={traced?.id === turn.id}
+                traced={traceOpen && traced?.id === turn.id}
                 onTrace={() => {
+                  // The same answer's button closes the panel again; another answer's shows that answer.
+                  if (traceOpen && traced?.id === turn.id) {
+                    setTraceOpen(false);
+                    return;
+                  }
                   setTraceTurnId(turn.id);
                   setTraceOpen(true);
                 }}
@@ -564,27 +569,30 @@ function AiChat() {
           </div>
         </form>
       </section>
-      <ProcessPanel
-        turn={
-          traced && {
-            question: traced.refined ? "조건 변경" : traced.question,
-            askedAt: traced.askedAt,
-            loading: traced.state === "loading",
-            stages: traced.stages,
-            querySpec: traced.querySpec,
-            viewSpec: traced.viewSpec,
-          }
-        }
-        open={traceOpen}
-        onClose={() => setTraceOpen(false)}
-      />
+      {/* Shown only after an answer's "처리 과정" button is pressed; a new question closes it. */}
       {traceOpen && (
-        <button
-          type="button"
-          className="chat-trace-scrim"
-          aria-label="처리 과정 닫기"
-          onClick={() => setTraceOpen(false)}
-        />
+        <>
+          <ProcessPanel
+            turn={
+              traced && {
+                question: traced.refined ? "조건 변경" : traced.question,
+                askedAt: traced.askedAt,
+                loading: traced.state === "loading",
+                stages: traced.stages,
+                querySpec: traced.querySpec,
+                viewSpec: traced.viewSpec,
+              }
+            }
+            open={traceOpen}
+            onClose={() => setTraceOpen(false)}
+          />
+          <button
+            type="button"
+            className="chat-trace-scrim"
+            aria-label="처리 과정 닫기"
+            onClick={() => setTraceOpen(false)}
+          />
+        </>
       )}
     </div>
   );
