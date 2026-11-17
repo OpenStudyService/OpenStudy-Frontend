@@ -1,6 +1,12 @@
 import { useTableSort } from "../../shared/ui/table-sort";
 import { readListPage } from "../../shared/api/read-sorted-pages";
-import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
+import { Icon } from "../../shared/ui/Icon";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -13,7 +19,6 @@ import {
   Heading,
   State,
 } from "../../shared/ui/primitives";
-import { Pager } from "../organization/shared";
 import { lockerApi } from "./api";
 import type { Locker } from "./model";
 import { LockerPanel } from "./LockerPanel";
@@ -107,18 +112,7 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
       <Heading
         title="사물함 관리"
         description="사물함 운영과 4주 단위 유료 배정·연장·반납을 관리하세요."
-      >
-        {management && (
-          <>
-            <Button variant="primary" onClick={() => change("detail", "new")}>
-              사물함 등록
-            </Button>
-            <Button onClick={() => change("detail", "rate")}>
-              지점 요금 일괄 적용
-            </Button>
-          </>
-        )}
-      </Heading>
+      />
       {occupancy.isPending ? (
         <State loading title="점유 현황을 불러오고 있어요" />
       ) : !occupancy.data || hasBlockingReadError(occupancy) ? (
@@ -142,8 +136,25 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
           ))}
         </div>
       )}
-      <div className="card overflow-hidden">
-        <div className="filters">
+      <ListCard>
+        <ListFilters
+          actions={
+            management && (
+              <>
+                <Button onClick={() => change("detail", "rate")}>
+                  지점 요금 일괄 적용
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => change("detail", "new")}
+                >
+                  <Icon name="plus" size={16} />
+                  사물함 등록
+                </Button>
+              </>
+            )
+          }
+        >
           <select
             aria-label="사물함 점유 상태 필터"
             value={assignmentState}
@@ -154,95 +165,76 @@ function LockerWorkspace({ embedded }: { embedded: boolean }) {
             <option>사용 중</option>
             <option>운영 중단</option>
           </select>
-        </div>
-        {list.isPending ? (
-          <State loading />
-        ) : !list.data || hasBlockingReadError(list) ? (
-          <ErrorState error={list.error!} retry={() => void list.refetch()} />
-        ) : !list.data.items.length ? (
-          <State title="등록된 사물함이 없어요" />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-[650px]">
-              <thead>
-                <tr>
-                  <ListColumnHeader
-                    column={sorting.column("사물함 번호", "lockerNo")}
-                  />
-                  <ListColumnHeader column={sorting.column("지점", "branch")} />
-                  <ListColumnHeader
-                    column={sorting.column("4주 요금", "rate")}
-                  />
-                  <ListColumnHeader
-                    column={sorting.column("운영 상태", "status")}
-                  />
-                  <ListColumnHeader
-                    column={sorting.column("점유 상태", "assignment")}
-                  />
-                  <ListColumnHeader
-                    column={sorting.column("현재 이용", "customer")}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {list.data.items.map((r) => (
-                  <tr
-                    key={r.id}
-                    className="cursor-pointer hover:bg-canvas"
-                    onClick={(event) => {
-                      event.currentTarget.cells[0]
-                        .querySelector("button")
-                        ?.focus({ preventScroll: true });
-                      change("detail", r.id);
-                    }}
-                  >
-                    <td>
-                      <button
-                        type="button"
-                        className="border-0 bg-transparent p-0 text-inherit"
-                      >
-                        {r.lockerNo}
-                      </button>
-                    </td>
-                    <td>
-                      {session.branches.find((b) => b.id === r.branchId)
-                        ?.name ?? r.branchId}
-                    </td>
-                    <td>{won(r.ratePer4WeeksKrw)}</td>
-                    <td>
-                      <Badge>{r.status}</Badge>
-                    </td>
-                    <td>
-                      <Badge>{r.assignmentState}</Badge>
-                    </td>
-                    <td>
-                      {r.activeAssignment ? (
-                        <>
-                          {r.activeAssignment.customer.name} ·{" "}
-                          {r.activeAssignment.startDate} ~{" "}
-                          {r.activeAssignment.endDate}
-                          {r.activeAssignment.overdue && (
-                            <Badge>기간 만료·미반납</Badge>
-                          )}
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {list.data && !hasBlockingReadError(list) && (
-          <Pager
-            page={list.data.meta.page}
-            total={list.data.meta.total}
-            onChange={(p) => change("page", String(p))}
-          />
-        )}
-      </div>
+        </ListFilters>
+        <ListTable
+          label="사물함 목록"
+          columns={[
+            sorting.column("사물함 번호", "lockerNo"),
+            sorting.column("지점", "branch"),
+            sorting.column("4주 요금", "rate"),
+            sorting.column("운영 상태", "status"),
+            sorting.column("점유 상태", "assignment"),
+            sorting.column("현재 이용", "customer"),
+          ]}
+          loading={list.isPending}
+          error={!list.data || hasBlockingReadError(list) ? list.error : null}
+          onRetry={() => void list.refetch()}
+          isEmpty={!list.data?.items.length}
+          empty={{ title: "등록된 사물함이 없어요" }}
+        >
+          {list.data?.items.map((r) => (
+            <tr
+              key={r.id}
+              className="cursor-pointer hover:bg-canvas"
+              onClick={(event) => {
+                event.currentTarget.cells[0]
+                  .querySelector("button")
+                  ?.focus({ preventScroll: true });
+                change("detail", r.id);
+              }}
+            >
+              <td>
+                <button type="button" className="cell-link">
+                  {r.lockerNo}
+                </button>
+              </td>
+              <td>
+                {session.branches.find((b) => b.id === r.branchId)?.name ??
+                  r.branchId}
+              </td>
+              <td>{won(r.ratePer4WeeksKrw)}</td>
+              <td>
+                <Badge>{r.status}</Badge>
+              </td>
+              <td>
+                <Badge>{r.assignmentState}</Badge>
+              </td>
+              <td>
+                {r.activeAssignment ? (
+                  <>
+                    {r.activeAssignment.customer.name} ·{" "}
+                    {r.activeAssignment.startDate} ~{" "}
+                    {r.activeAssignment.endDate}
+                    {r.activeAssignment.overdue && (
+                      <Badge>기간 만료·미반납</Badge>
+                    )}
+                  </>
+                ) : (
+                  "—"
+                )}
+              </td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={list.data?.meta.page ?? page}
+          pageSize={list.data?.meta.pageSize ?? 20}
+          total={list.data?.meta.total ?? 0}
+          loading={list.isPending}
+          error={!!list.error}
+          onChange={(p) => change("page", String(p))}
+        />
+      </ListCard>
       {params.get("assignment") ? (
         <AssignmentPanel
           key={params.get("assignment")}

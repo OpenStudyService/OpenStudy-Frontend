@@ -1,6 +1,12 @@
 import { useTableSort } from "../../shared/ui/table-sort";
 import { readListPage } from "../../shared/api/read-sorted-pages";
-import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
+import { Icon } from "../../shared/ui/Icon";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -14,7 +20,6 @@ import {
   Heading,
   State,
 } from "../../shared/ui/primitives";
-import { Pager } from "../organization/shared";
 import { roomApi } from "./api";
 import type { Room, RoomReservation } from "./model";
 import { RoomPanel } from "./RoomPanel";
@@ -102,8 +107,17 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
         title="스터디룸 관리"
         description="룸의 정원·시간당 요금과 운영 상태를 관리하세요."
       />
-      <div className="card overflow-hidden">
-        <div className="filters">
+      <ListCard>
+        <ListFilters
+          actions={
+            writable && (
+              <Button variant="primary" onClick={() => change("detail", "new")}>
+                <Icon name="plus" size={16} />
+                스터디룸 등록
+              </Button>
+            )
+          }
+        >
           <select
             aria-label="룸 운영 상태 필터"
             value={status}
@@ -113,71 +127,54 @@ export function Rooms({ embedded = false }: { embedded?: boolean }) {
             <option>사용 가능</option>
             <option>운영 중단</option>
           </select>
-          {writable && (
-            <Button
-              variant="primary"
-              className="ml-auto"
-              onClick={() => change("detail", "new")}
-            >
-              스터디룸 등록
-            </Button>
-          )}
-        </div>
-        {data.isPending ? (
-          <State loading />
-        ) : !data.data || hasBlockingReadError(data) ? (
-          <ErrorState error={data.error!} retry={() => void data.refetch()} />
-        ) : data.data.items.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-[600px]">
-              <thead>
-                <tr>
-                  <ListColumnHeader column={sorting.column("룸", "roomNo")} />
-                  <ListColumnHeader column={sorting.column("지점", "branch")} />
-                  <ListColumnHeader
-                    column={sorting.column("정원", "capacity")}
-                  />
-                  <ListColumnHeader
-                    column={sorting.column("시간당 요금", "rate")}
-                  />
-                  <ListColumnHeader
-                    column={sorting.column("운영 상태", "status")}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {data.data.items.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <Button onClick={() => change("detail", r.id)}>
-                        {r.roomNo} · {r.name}
-                      </Button>
-                    </td>
-                    <td>
-                      {session.branches.find((b) => b.id === r.branchId)
-                        ?.name ?? r.branchId}
-                    </td>
-                    <td>{r.capacity}명</td>
-                    <td>{won(r.ratePerHourKrw)}</td>
-                    <td>
-                      <Badge>{r.status}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <State title="등록된 스터디룸이 없어요" />
-        )}
-        {data.data && !hasBlockingReadError(data) && (
-          <Pager
-            page={data.data.meta.page}
-            total={data.data.meta.total}
-            onChange={(p) => change("page", String(p))}
-          />
-        )}
-      </div>
+        </ListFilters>
+        <ListTable
+          label="스터디룸 목록"
+          columns={[
+            sorting.column("룸", "roomNo"),
+            sorting.column("지점", "branch"),
+            sorting.column("정원", "capacity"),
+            sorting.column("시간당 요금", "rate"),
+            sorting.column("운영 상태", "status"),
+          ]}
+          loading={data.isPending}
+          error={!data.data || hasBlockingReadError(data) ? data.error : null}
+          onRetry={() => void data.refetch()}
+          isEmpty={!data.data?.items.length}
+          empty={{ title: "등록된 스터디룸이 없어요" }}
+        >
+          {data.data?.items.map((r) => (
+            <tr key={r.id}>
+              <td>
+                <button
+                  type="button"
+                  className="cell-link"
+                  onClick={() => change("detail", r.id)}
+                >
+                  {r.roomNo} · {r.name}
+                </button>
+              </td>
+              <td>
+                {session.branches.find((b) => b.id === r.branchId)?.name ??
+                  r.branchId}
+              </td>
+              <td>{r.capacity}명</td>
+              <td>{won(r.ratePerHourKrw)}</td>
+              <td>
+                <Badge>{r.status}</Badge>
+              </td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={data.data?.meta.page ?? page}
+          pageSize={data.data?.meta.pageSize ?? 20}
+          total={data.data?.meta.total ?? 0}
+          loading={data.isPending}
+          error={!!data.error}
+          onChange={(p) => change("page", String(p))}
+        />
+      </ListCard>
       {params.get("detail") && (
         <RoomPanel id={params.get("detail")!} onClose={close} />
       )}
@@ -311,7 +308,6 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
       can(session.user, b.id, "payments:write"),
   );
   const show = (id: string) => change("detail", id);
-  const current = listView ? list : calendar;
   const items = list.data?.items ?? [];
   const bookings = (calendar.data ?? []).flatMap(({ branchName, items }) =>
     items
@@ -327,8 +323,17 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
         title="스터디룸 예약"
         description="한국 시간 기준의 예약 일정과 실제 이용 상태를 확인하세요."
       />
-      <div className="card overflow-hidden">
-        <div className="filters">
+      <ListCard>
+        <ListFilters
+          actions={
+            writable && (
+              <Button variant="primary" onClick={() => show("new")}>
+                <Icon name="plus" size={16} />
+                예약 등록
+              </Button>
+            )
+          }
+        >
           {scope === "all" && (
             <select
               aria-label="예약 지점 필터"
@@ -409,16 +414,7 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
               목록 보기
             </Button>
           </div>
-          {writable && (
-            <Button
-              variant="primary"
-              className="ml-auto"
-              onClick={() => show("new")}
-            >
-              예약 등록
-            </Button>
-          )}
-        </div>
+        </ListFilters>
         {rooms.data && rooms.data.meta.total > 100 && (
           <div className="flex gap-2 px-4">
             <Button
@@ -468,23 +464,75 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
             <span>한국 시간</span>
           </div>
         )}
-        {!(listView ? validListRange : week) ? (
+        {listView ? (
+          <>
+            <ListTable
+              label="스터디룸 예약 목록"
+              columns={[
+                sorting.column("룸 · 고객", "room"),
+                sorting.column("예약 시간", "start"),
+                sorting.column("상태", "status"),
+                sorting.column("확정 결제 금액", "amount"),
+              ]}
+              state={
+                !validListRange && (
+                  <State
+                    title="조회 기간을 확인하세요"
+                    message="시작일보다 뒤인 종료일을 선택하세요. 최대 62일을 조회할 수 있습니다."
+                  />
+                )
+              }
+              loading={list.isPending}
+              error={list.error}
+              onRetry={() => void list.refetch()}
+              isEmpty={!items.length}
+              empty={{ title: "조회 기간의 예약이 없어요" }}
+            >
+              {items.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <button
+                      type="button"
+                      className="cell-link"
+                      onClick={() => show(r.id)}
+                    >
+                      {r.room.name} · {r.customer.name}
+                    </button>
+                  </td>
+                  <td>
+                    {displayTime(r.startAt)} ~ {displayTime(r.endAt)}
+                  </td>
+                  <td>
+                    <Badge>{r.status}</Badge>
+                  </td>
+                  <td>{r.billing ? won(r.billing.amountKrw) : "—"}</td>
+                </tr>
+              ))}
+            </ListTable>
+            {validListRange && (
+              <ListFooter
+                page={list.data?.meta.page ?? page}
+                pageSize={list.data?.meta.pageSize ?? 20}
+                total={list.data?.meta.total ?? 0}
+                loading={list.isPending}
+                error={!!list.error}
+                onChange={(p) => change("page", String(p))}
+              />
+            )}
+          </>
+        ) : !week ? (
           <State
             title="조회 기간을 확인하세요"
-            message={
-              listView
-                ? "시작일보다 뒤인 종료일을 선택하세요. 최대 62일을 조회할 수 있습니다."
-                : "이번 주 버튼으로 조회 기간을 다시 선택할 수 있습니다."
-            }
+            message="이번 주 버튼으로 조회 기간을 다시 선택할 수 있습니다."
           />
-        ) : current.isPending ? (
+        ) : calendar.isPending ? (
           <State loading />
-        ) : current.error ? (
+        ) : calendar.error ? (
           <ErrorState
-            error={current.error}
-            retry={() => void current.refetch()}
+            error={calendar.error}
+            retry={() => void calendar.refetch()}
           />
-        ) : !listView ? (
+        ) : (
           <WeekCalendar
             week={week}
             today={today}
@@ -493,19 +541,8 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
             showBranch={!branch}
             show={show}
           />
-        ) : items.length ? (
-          <ReservationTable rows={items} show={show} sorting={sorting} />
-        ) : (
-          <State title="조회 기간의 예약이 없어요" />
         )}
-        {listView && list.data && !list.error && (
-          <Pager
-            page={list.data.meta.page}
-            total={list.data.meta.total}
-            onChange={(p) => change("page", String(p))}
-          />
-        )}
-      </div>
+      </ListCard>
       <p className="help mt-3">
         {listView
           ? "종료일은 조회 기간에 포함되지 않습니다."
@@ -519,49 +556,5 @@ export function Reservations({ embedded = false }: { embedded?: boolean }) {
         />
       )}
     </section>
-  );
-}
-function ReservationTable({
-  rows,
-  show,
-  sorting,
-}: {
-  rows: RoomReservation[];
-  show: (id: string) => void;
-  sorting: ReturnType<typeof useTableSort>;
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-[660px]">
-        <thead>
-          <tr>
-            <ListColumnHeader column={sorting.column("룸 · 고객", "room")} />
-            <ListColumnHeader column={sorting.column("예약 시간", "start")} />
-            <ListColumnHeader column={sorting.column("상태", "status")} />
-            <ListColumnHeader
-              column={sorting.column("확정 결제 금액", "amount")}
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <Button onClick={() => show(r.id)}>
-                  {r.room.name} · {r.customer.name}
-                </Button>
-              </td>
-              <td>
-                {displayTime(r.startAt)} ~ {displayTime(r.endAt)}
-              </td>
-              <td>
-                <Badge>{r.status}</Badge>
-              </td>
-              <td>{r.billing ? won(r.billing.amountKrw) : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
