@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "../../shared/ui/Icon";
 import type { StageSpanDto } from "./domainlens";
 import { planSource, seconds } from "./processStages";
@@ -9,6 +9,8 @@ export interface ProcessTurn {
   askedAt: string;
   loading: boolean;
   stages: StageSpanDto[];
+  querySpec?: unknown;
+  viewSpec?: unknown;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -159,8 +161,75 @@ export function ProcessPanel({
               );
             })}
           </ol>
+          <Specs querySpec={turn.querySpec} viewSpec={turn.viewSpec} />
         </>
       )}
     </aside>
+  );
+}
+
+/**
+ * The answer's QuerySpec (what was read) and ViewSpec (how it was drawn) as the server sent them, folded like the
+ * mock-up's developer view.
+ */
+function Specs({
+  querySpec,
+  viewSpec,
+}: {
+  querySpec?: unknown;
+  viewSpec?: unknown;
+}) {
+  const specs = [
+    { name: "QuerySpec", note: "조회 조건", value: querySpec },
+    { name: "ViewSpec", note: "화면 구성", value: viewSpec },
+  ].filter((spec) => spec.value != null);
+  if (!specs.length) return null;
+  return (
+    <section className="trace-specs" aria-labelledby="ai-trace-specs-title">
+      <h4 id="ai-trace-specs-title">조회 명세</h4>
+      {specs.map((spec) => (
+        <SpecBlock key={spec.name} {...spec} />
+      ))}
+    </section>
+  );
+}
+
+function SpecBlock({
+  name,
+  note,
+  value,
+}: {
+  name: string;
+  note: string;
+  value: unknown;
+}) {
+  const [copied, setCopied] = useState(false);
+  const text = JSON.stringify(value, null, 2);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <details className="trace-spec">
+      <summary>
+        <b>{name}</b>
+        <span>{note}</span>
+      </summary>
+      <div className="trace-spec-body">
+        <button
+          type="button"
+          className="trace-spec-copy"
+          onClick={() => void copy()}
+        >
+          {copied ? "복사됨" : `${name} 복사`}
+        </button>
+        <pre aria-label={name}>{text}</pre>
+      </div>
+    </details>
   );
 }

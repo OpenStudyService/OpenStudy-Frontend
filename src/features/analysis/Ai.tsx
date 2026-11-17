@@ -67,6 +67,9 @@ interface Turn {
   editableFilters?: AiEditableFilters | null;
   context?: AiContext | null;
   refined?: boolean;
+  /** The answer's QuerySpec and ViewSpec as the server sent them, for the process sidebar. */
+  querySpec?: unknown;
+  viewSpec?: unknown;
 }
 
 const DOMAINS = ["전체", "매출", "좌석", "이용권", "스터디룸", "업무", "근태"];
@@ -176,7 +179,9 @@ function AiChat() {
     const turn = emptyTurn(trimmed, new Date().toISOString());
     const id = turn.id;
     setTurns((all) => [...all.map((t) => ({ ...t, retry: undefined })), turn]);
+    // A new question closes the process sidebar; its own "처리 과정" button opens it again.
     setTraceTurnId(null);
+    setTraceOpen(false);
     setHistoryOpen(false);
     setReopenError("");
     setQuestion("");
@@ -255,6 +260,8 @@ function AiChat() {
     setReopening(true);
     setReopenError("");
     setHistoryOpen(false);
+    setTraceTurnId(null);
+    setTraceOpen(false);
     setTurns([]);
     setConversationId(id);
     try {
@@ -479,8 +486,13 @@ function AiChat() {
                 onRefine={(body) => refine(turn, body)}
                 onRetry={() => void ask(turn.question, undefined, turn.retry)}
                 onChoose={(option) => void ask(turn.question, option.id)}
-                traced={traced?.id === turn.id}
+                traced={traceOpen && traced?.id === turn.id}
                 onTrace={() => {
+                  // The same answer's button closes the panel again; another answer's shows that answer.
+                  if (traceOpen && traced?.id === turn.id) {
+                    setTraceOpen(false);
+                    return;
+                  }
                   setTraceTurnId(turn.id);
                   setTraceOpen(true);
                 }}
@@ -561,25 +573,30 @@ function AiChat() {
           </div>
         </form>
       </section>
-      <ProcessPanel
-        turn={
-          traced && {
-            question: traced.refined ? "조건 변경" : traced.question,
-            askedAt: traced.askedAt,
-            loading: traced.state === "loading",
-            stages: traced.stages,
-          }
-        }
-        open={traceOpen}
-        onClose={() => setTraceOpen(false)}
-      />
+      {/* Shown only after an answer's "처리 과정" button is pressed; a new question closes it. */}
       {traceOpen && (
-        <button
-          type="button"
-          className="chat-trace-scrim"
-          aria-label="처리 과정 닫기"
-          onClick={() => setTraceOpen(false)}
-        />
+        <>
+          <ProcessPanel
+            turn={
+              traced && {
+                question: traced.refined ? "조건 변경" : traced.question,
+                askedAt: traced.askedAt,
+                loading: traced.state === "loading",
+                stages: traced.stages,
+                querySpec: traced.querySpec,
+                viewSpec: traced.viewSpec,
+              }
+            }
+            open={traceOpen}
+            onClose={() => setTraceOpen(false)}
+          />
+          <button
+            type="button"
+            className="chat-trace-scrim"
+            aria-label="처리 과정 닫기"
+            onClick={() => setTraceOpen(false)}
+          />
+        </>
       )}
     </div>
   );
@@ -1004,6 +1021,8 @@ function outcome(res: AiQueryResponseDto): Partial<Turn> {
       stages,
       state: "completed",
       parsed,
+      querySpec: res.querySpec ?? null,
+      viewSpec: res.viewSpec ?? res.envelope.view ?? null,
       executionId: res.executionId,
       conditions: res.conditions,
       context: res.context,

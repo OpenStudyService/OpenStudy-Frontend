@@ -828,25 +828,68 @@ it("shows the picked answer's processing steps in the process sidebar", async ()
   show();
   const user = await ask("이번 달 매출");
   expect(await screen.findByText("첫 답변이에요.")).toBeInTheDocument();
-  const panel = screen.getByRole("complementary", { name: "처리 과정" });
-  // The latest answer: its steps, times and how its plan was made.
+  // Closed until the answer's "처리 과정" button is pressed.
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: /처리 과정 3단계/ }));
+  let panel = screen.getByRole("complementary", { name: "처리 과정" });
+  // That answer: its steps, times and how its plan was made.
   expect(within(panel).getByText("이번 달 매출")).toBeInTheDocument();
   expect(within(panel).getAllByRole("listitem")).toHaveLength(3);
   // The total (2,442ms), the model's time in the summary and the model step (2,400ms) all read 2.4초.
   expect(within(panel).getAllByText("2.4초")).toHaveLength(3);
   expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
 
+  // A new question closes it; that answer's own button opens it again.
   await ask("지난달 매출");
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
   expect(await screen.findByText("두 번째 답변이에요.")).toBeInTheDocument();
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: /처리 과정 2단계/ }));
+  panel = screen.getByRole("complementary", { name: "처리 과정" });
   expect(within(panel).getByText("캐시 재사용")).toBeInTheDocument();
   expect(within(panel).getByText("거절")).toBeInTheDocument();
   expect(within(panel).getByText("허용되지 않은 지점")).toBeInTheDocument();
 
-  // Picking the first answer's summary shows its steps again.
+  // The first answer's button shows its steps; pressing it again closes the panel.
   const chips = screen.getAllByRole("button", { name: /처리 과정 \d단계/ });
   expect(chips[1]).toHaveAttribute("aria-pressed", "true");
   await user.click(chips[0]);
   expect(chips[0]).toHaveAttribute("aria-pressed", "true");
+  expect(chips[1]).toHaveAttribute("aria-pressed", "false");
+  panel = screen.getByRole("complementary", { name: "처리 과정" });
   expect(within(panel).getByText("LLM 호출")).toBeInTheDocument();
+  await user.click(chips[0]);
+  expect(screen.queryByRole("complementary", { name: "처리 과정" })).toBeNull();
+  expect(chips[0]).toHaveAttribute("aria-pressed", "false");
+
+  await user.click(chips[0]);
+  panel = screen.getByRole("complementary", { name: "처리 과정" });
   expect(within(panel).getAllByRole("listitem")).toHaveLength(3);
+});
+
+it("shows the answer's QuerySpec and ViewSpec in the process sidebar", async () => {
+  mocks.execute.mockResolvedValueOnce(
+    response({
+      message: "명세가 있는 답변이에요.",
+      querySpec: { id: "q0", source: "payment", analysisId: "openstudy.sales.branchComparison" } as never,
+      stages: [
+        { stage: "generating", label: "조회 명세(QuerySpec) 생성", status: "COMPLETED", durationMs: 3, detail: "" },
+      ],
+    }),
+  );
+  show();
+  const user = await ask("이번 달 매출");
+  expect(await screen.findByText("명세가 있는 답변이에요.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /처리 과정 1단계/ }));
+  const panel = screen.getByRole("complementary", { name: "처리 과정" });
+  const specs = within(panel).getByRole("region", { name: "조회 명세" });
+  // Folded until opened, like the mock-up's developer view.
+  await user.click(within(specs).getByText("QuerySpec"));
+  expect(within(specs).getByLabelText("QuerySpec")).toHaveTextContent('"source": "payment"');
+  await user.click(within(specs).getByText("ViewSpec"));
+  expect(within(specs).getByLabelText("ViewSpec")).toHaveTextContent('"catalogVersion": "openstudy-ui-1.0.0"');
+  await user.click(within(specs).getByRole("button", { name: "QuerySpec 복사" }));
+  expect(await within(specs).findByRole("button", { name: "복사됨" })).toBeInTheDocument();
+  // user-event's clipboard stub holds what the button wrote.
+  expect(await navigator.clipboard.readText()).toContain('"analysisId": "openstudy.sales.branchComparison"');
 });

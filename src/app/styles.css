@@ -521,7 +521,7 @@
     @apply mt-1 line-clamp-2 text-[11px] text-muted;
   }
   .chat-trace-close {
-    @apply hidden rounded-md p-1 text-muted hover:bg-soft;
+    @apply inline-flex rounded-md p-1 text-muted hover:bg-soft;
   }
   .chat-trace-summary {
     @apply grid grid-cols-3 gap-2 border-b border-line px-4 py-3;
@@ -603,6 +603,33 @@
   }
   .chat-trace-scrim {
     display: none;
+  }
+  .trace-specs {
+    @apply grid gap-2 border-t border-line px-4 py-3;
+  }
+  .trace-specs h4 {
+    @apply text-xs font-bold;
+  }
+  .trace-spec {
+    @apply rounded-lg border border-line;
+  }
+  .trace-spec summary {
+    @apply flex cursor-pointer select-none items-baseline gap-2 px-3 py-2 text-xs;
+  }
+  .trace-spec summary span {
+    @apply text-[10.5px] text-muted;
+  }
+  .trace-spec[open] summary {
+    @apply border-b border-line;
+  }
+  .trace-spec-body {
+    @apply relative;
+  }
+  .trace-spec-copy {
+    @apply absolute right-2 top-2 rounded-md border border-line bg-surface px-2 py-0.5 text-[10.5px] text-muted hover:border-primary hover:text-primary;
+  }
+  .trace-spec pre {
+    @apply max-h-80 overflow-auto whitespace-pre bg-soft px-3 pb-3 pt-9 font-mono text-[10.5px] leading-relaxed text-ink;
   }
   /* AI result assembled by its ViewSpec layout (DomainLens result mock-up): KPI row, chart beside its table. */
   .ai-result {
@@ -984,7 +1011,7 @@
   }
 }
 
-/* Below 1440px the process sidebar would squeeze the results (chart beside table): it opens as a drawer instead. */
+/* Below 1440px the opened process sidebar would squeeze the results (chart beside table): it is a drawer instead. */
 @media (max-width: 1439px) {
   .chat-trace {
     position: fixed;
@@ -994,18 +1021,6 @@
     z-index: 50;
     width: min(340px, 100vw);
     box-shadow: var(--shadow);
-    transform: translateX(100%);
-    visibility: hidden;
-    transition:
-      transform 0.2s ease,
-      visibility 0.2s;
-  }
-  .chat-trace.open {
-    transform: none;
-    visibility: visible;
-  }
-  .chat-trace-close {
-    display: inline-flex;
   }
   .chat-trace-scrim {
     display: block;
