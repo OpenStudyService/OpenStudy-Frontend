@@ -1,20 +1,19 @@
 import { readListPage } from "../../shared/api/read-sorted-pages";
-import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import {
+  ListCard,
+  ListFilters,
+  ListFooter,
+  ListTable,
+} from "../../shared/ui/ListLayout";
+import { Icon } from "../../shared/ui/Icon";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { useApp } from "../../app/context";
 import { can } from "../../shared/domain/schema";
-import {
-  Badge,
-  Button,
-  ErrorState,
-  Heading,
-  State,
-} from "../../shared/ui/primitives";
+import { Badge, Button, Heading } from "../../shared/ui/primitives";
 import { DataNotice } from "../../shared/ui/DataNotice";
-import { Pager } from "../organization/shared";
 import { recordApi, type Resource, type Item } from "./api";
 import { RecordDetail } from "./RecordDetail";
 
@@ -166,8 +165,17 @@ export function Records({
           )}
         </div>
       )}
-      <div className="card overflow-hidden">
-        <div className="filters">
+      <ListCard>
+        <ListFilters
+          actions={
+            creatable && (
+              <Button variant="primary" onClick={() => change("detail", "new")}>
+                <Icon name="plus" size={16} />
+                {titles[resource]} 등록
+              </Button>
+            )
+          }
+        >
           <input
             type="search"
             aria-label={`${titles[resource]} 검색`}
@@ -185,102 +193,67 @@ export function Records({
               <option key={s}>{s}</option>
             ))}
           </select>
-          {creatable && (
-            <Button
-              variant="primary"
-              className="ml-auto"
-              onClick={() => change("detail", "new")}
-            >
-              {titles[resource]} 등록
-            </Button>
-          )}
-        </div>
-        {rows.isPending ? (
-          <State loading />
-        ) : hasBlockingReadError(rows) ? (
-          <ErrorState error={rows.error!} retry={() => void rows.refetch()} />
-        ) : rows.data?.items.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-[640px]">
-              <thead>
-                <tr>
-                  <ListColumnHeader
-                    column={
-                      resource === "facilities"
-                        ? sorting.column("제목", "name")
-                        : sorting.column("제목", "title")
-                    }
-                  />
-                  <ListColumnHeader column={sorting.column("상태", "status")} />
-                  <ListColumnHeader
-                    column={sorting.column(
-                      resource === "facilities"
-                        ? "처리 상태 · 담당자"
-                        : resource === "inquiries"
-                          ? "고객 · 담당자"
-                          : "대상",
-                      "target",
-                    )}
-                  />
-                  <ListColumnHeader
-                    column={
-                      resource === "facilities"
-                        ? sorting.column("다음 점검일", "nextInspectionOn")
-                        : resource === "inquiries"
-                          ? sorting.column("등록일", "createdAt", "desc")
-                          : sorting.column("등록일", "noticeDate", "desc")
-                    }
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.data.items.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <Button onClick={() => change("detail", row.id)}>
-                        {"pinned" in row && row.pinned ? "중요 · " : ""}
-                        {itemTitle(row)}
-                      </Button>
-                    </td>
-                    <td>
-                      <Badge>{row.status}</Badge>
-                    </td>
-                    <td>
-                      {"openWork" in row
-                        ? `${row.openWork.status} · ${row.openWork.assignee?.name ?? "미지정"}`
-                        : "customer" in row
-                          ? `${row.customer.name} · ${row.assignee?.name ?? "미지정"}`
-                          : row.target === "전체"
-                            ? "전체"
-                            : row.branchIds
-                                .map(
-                                  (id) =>
-                                    session.branches.find((b) => b.id === id)
-                                      ?.name ?? id,
-                                )
-                                .join(", ")}
-                    </td>
-                    <td>
-                      {"nextInspectionOn" in row
-                        ? row.nextInspectionOn
-                        : row.createdAt.slice(0, 10)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <State title="조회 결과가 없어요" />
-        )}
-        {rows.data && !hasBlockingReadError(rows) && (
-          <Pager
-            page={rows.data.meta.page}
-            total={rows.data.meta.total}
-            onChange={(page) => change("page", String(page))}
-          />
-        )}
-      </div>
+        </ListFilters>
+        <ListTable
+          label={`${titles[resource]} 목록`}
+          columns={[
+            resource === "facilities"
+              ? sorting.column("제목", "name")
+              : sorting.column("제목", "title"),
+            sorting.column("상태", "status"),
+            sorting.column(
+              resource === "facilities"
+                ? "처리 상태 · 담당자"
+                : resource === "inquiries"
+                  ? "고객 · 담당자"
+                  : "대상",
+              "target",
+            ),
+            resource === "facilities"
+              ? sorting.column("다음 점검일", "nextInspectionOn")
+              : resource === "inquiries"
+                ? sorting.column("등록일", "createdAt", "desc")
+                : sorting.column("등록일", "noticeDate", "desc"),
+          ]}
+          loading={rows.isPending}
+          error={hasBlockingReadError(rows) ? rows.error : null}
+          onRetry={() => void rows.refetch()}
+          isEmpty={!rows.data?.items.length}
+          empty={{ title: "조회 결과가 없어요" }}
+        >
+          {rows.data?.items.map((row) => (
+            <tr key={row.id}>
+              <td>
+                <button
+                  type="button"
+                  className="cell-link"
+                  onClick={() => change("detail", row.id)}
+                >
+                  {"pinned" in row && row.pinned ? "중요 · " : ""}
+                  {itemTitle(row)}
+                </button>
+              </td>
+              <td>
+                <Badge>{row.status}</Badge>
+              </td>
+              <td>{assigneeOrTarget(row)}</td>
+              <td>
+                {"nextInspectionOn" in row
+                  ? row.nextInspectionOn
+                  : row.createdAt.slice(0, 10)}
+              </td>
+            </tr>
+          ))}
+        </ListTable>
+        <ListFooter
+          page={rows.data?.meta.page ?? Number(search.get("page") || 1)}
+          pageSize={rows.data?.meta.pageSize ?? 20}
+          total={rows.data?.meta.total ?? 0}
+          loading={rows.isPending}
+          error={hasBlockingReadError(rows)}
+          onChange={(page) => change("page", String(page))}
+        />
+      </ListCard>
       {params.get("detail") && (
         <RecordDetail
           resource={resource}
