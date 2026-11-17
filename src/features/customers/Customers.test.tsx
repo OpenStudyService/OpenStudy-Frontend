@@ -265,6 +265,36 @@ it("shows an inactive member with the warning badge in the list and detail", asy
   expect(await within(panel).findByText("비활성")).toHaveClass("badge", "warn");
 });
 
+it("centers the member list pagination and keeps the search on a page change", async () => {
+  vi.mocked(customerApi.list).mockImplementation(async (_scope, filters) => ({
+    items: [listItem()],
+    meta: { page: filters.page ?? 1, pageSize: 20, total: 460 },
+  }));
+  mount("?q=기존&page=12", true);
+  const navigation = within(
+    await screen.findByRole("navigation", { name: "페이지 이동" }),
+  );
+  const buttons = navigation.getAllByRole("button", { name: /^\d+페이지$/ });
+  expect(buttons[4]).toHaveAccessibleName("12페이지");
+  await userEvent.click(navigation.getByRole("button", { name: "13페이지" }));
+  await waitFor(() =>
+    expect(customerApi.list).toHaveBeenLastCalledWith(
+      "gangnam",
+      expect.objectContaining({ q: "기존", page: 13 }),
+      expect.any(AbortSignal),
+    ),
+  );
+  const nextNavigation = within(
+    await screen.findByRole("navigation", { name: "페이지 이동" }),
+  );
+  expect(
+    nextNavigation.getAllByRole("button", { name: /^\d+페이지$/ })[4],
+  ).toHaveAttribute("aria-current", "page");
+  expect(
+    nextNavigation.getByRole("button", { name: "13페이지" }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
 it("sorts the full member query from the column headers and resets pagination", async () => {
   const { router } = mount("?q=기존&status=정상&page=2&pageSize=50");
   const table = await screen.findByRole("table", { name: "회원 목록" });

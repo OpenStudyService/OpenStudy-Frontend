@@ -638,6 +638,20 @@ it.each([
   },
 );
 
+it("centers the current page in the held pass list", async () => {
+  vi.mocked(listPasses).mockResolvedValue({
+    items: [pass],
+    meta: { page: 12, pageSize: 20, total: 460 },
+  });
+  mount(<Passes embedded />, "?tab=passes&page=12");
+  const navigation = within(
+    await screen.findByRole("navigation", { name: "페이지 이동" }),
+  );
+  const buttons = navigation.getAllByRole("button", { name: /^\d+페이지$/ });
+  expect(buttons[4]).toHaveAccessibleName("12페이지");
+  expect(buttons[4]).toHaveAttribute("aria-current", "page");
+});
+
 it("drops the page on pass filter change and resets only filter params", async () => {
   const user = userEvent.setup();
   mount(
