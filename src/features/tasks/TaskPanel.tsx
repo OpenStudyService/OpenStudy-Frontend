@@ -619,8 +619,9 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
         </section>
       )}
       {enabled && (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex w-full min-w-0 gap-2">
           <input
+            className="min-w-0 flex-1"
             aria-label="새 체크 항목"
             placeholder="체크 항목을 입력해 주세요"
             value={body}
@@ -630,6 +631,7 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
           />
           <Button
             variant="primary"
+            className="shrink-0"
             disabled={blocked || task.checklist.length >= 100}
             onClick={() => void change("add")}
           >
