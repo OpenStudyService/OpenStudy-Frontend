@@ -165,9 +165,15 @@ function TaskPanelSession({
                 </section>
                 {editable && (
                   <div className="mt-6 flex flex-wrap gap-2">
-                    <Button onClick={() => mode("edit", "1")}>수정하기</Button>
+                    <Button variant="primary" onClick={() => mode("edit", "1")}>
+                      수정하기
+                    </Button>
                     {[...taskActions(task)].map((key) => (
-                      <Button key={key} onClick={() => mode("action", key)}>
+                      <Button
+                        variant="primary"
+                        key={key}
+                        onClick={() => mode("action", key)}
+                      >
                         {actionLabels[key]}
                       </Button>
                     ))}
@@ -571,6 +577,7 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
           />
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
+              variant="primary"
               disabled={blocked || task.checklist.length >= 100}
               onClick={() => void change("add", undefined, { body: editBody })}
             >
@@ -593,6 +600,7 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
             onChange={(event) => setBody(event.target.value)}
           />
           <Button
+            variant="primary"
             disabled={blocked || task.checklist.length >= 100}
             onClick={() => void change("add")}
           >
