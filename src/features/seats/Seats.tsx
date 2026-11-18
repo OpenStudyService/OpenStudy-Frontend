@@ -440,6 +440,7 @@ function SeatPanel({
                     {canManageSeats(session.user, branchId) &&
                       seat.status !== "사용 중" && (
                         <Button
+                          variant={seat.status === "운영 중단" ? "" : "danger"}
                           onClick={() => {
                             setResult(null);
                             setAction("status");
@@ -746,7 +747,10 @@ function StatusEditor({ seat, onSaved }: { seat: Seat; onSaved: () => void }) {
       <fieldset className="contents" disabled={!allowed || write.busy}>
         <p className="tip">운영 상태를 {status}(으)로 변경해요.</p>
         <Reason value={reason} onChange={setReason} required />
-        <Button variant="primary" disabled={!reason.trim()}>
+        <Button
+          variant={status === "운영 중단" ? "danger" : "primary"}
+          disabled={!reason.trim()}
+        >
           운영 상태 저장
         </Button>
       </fieldset>

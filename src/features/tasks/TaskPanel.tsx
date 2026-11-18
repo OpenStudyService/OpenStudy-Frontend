@@ -514,6 +514,7 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
                     onChange={(event) => setEditBody(event.target.value)}
                   />
                   <Button
+                    variant="primary"
                     disabled={blocked}
                     onClick={() =>
                       void change("update", item.id, { body: editBody.trim() })
@@ -541,6 +542,7 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
                     수정
                   </Button>
                   <Button
+                    variant="danger"
                     disabled={blocked}
                     aria-label={`${item.body} 삭제`}
                     onClick={() => void change("delete", item.id)}

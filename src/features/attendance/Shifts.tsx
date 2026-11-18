@@ -522,6 +522,7 @@ function ShiftEditor({
             </Button>
             {row && (
               <Button
+                variant="danger"
                 type="button"
                 disabled={busy}
                 onClick={() => void save(true)}

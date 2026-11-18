@@ -345,6 +345,7 @@ export function InvitationManagement() {
                   )}
                   {selected.status === "초대 대기" && (
                     <Button
+                      variant="danger"
                       disabled={commandDisabled}
                       onClick={() => void action(selected, "cancel")}
                     >
@@ -358,6 +359,7 @@ export function InvitationManagement() {
                         승인 뒤 다시 로그인해야 합니다.
                       </p>
                       <Button
+                        variant="primary"
                         disabled={commandDisabled}
                         onClick={() => void action(selected, "approve")}
                       >
@@ -372,6 +374,7 @@ export function InvitationManagement() {
                         />
                       </Field>
                       <Button
+                        variant="danger"
                         disabled={commandDisabled || !reason.trim()}
                         onClick={() => void action(selected, "reject")}
                       >

@@ -547,7 +547,16 @@ function EmployeeProfile({
           }
         }}
       />
-      <Button type="submit" disabled={busy}>
+      <Button
+        variant={
+          status !== employee.status &&
+          (status === "이용 제한" || status === "비활성")
+            ? "danger"
+            : "primary"
+        }
+        type="submit"
+        disabled={busy}
+      >
         계정 정보 저장
       </Button>
     </form>
@@ -749,7 +758,15 @@ export function MembershipForm({
           }
         }}
       />
-      <Button type="submit" disabled={busy || blocked}>
+      <Button
+        variant={
+          draft.status !== membership.status && draft.status === "회수"
+            ? "danger"
+            : "primary"
+        }
+        type="submit"
+        disabled={busy || blocked}
+      >
         이 지점 소속 저장
       </Button>
     </form>

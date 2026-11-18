@@ -268,7 +268,7 @@ export function ProductDetail({
                     : "이 상품의 판매를 다시 시작할까요?"}
                 </span>
                 <Button
-                  variant="primary"
+                  variant={pending === "판매 중지" ? "danger" : "primary"}
                   disabled={busy}
                   onClick={() =>
                     void run(
@@ -293,6 +293,7 @@ export function ProductDetail({
             ) : (
               <div>
                 <Button
+                  variant={nextStatus === "판매 중지" ? "danger" : ""}
                   disabled={busy}
                   onClick={() => {
                     setNotice("");
@@ -335,6 +336,7 @@ export function ProductDetail({
             </fieldset>
             <div>
               <Button
+                variant="primary"
                 disabled={busy || !selection.length}
                 onClick={() =>
                   void run(

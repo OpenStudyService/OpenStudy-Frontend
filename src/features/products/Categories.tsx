@@ -118,7 +118,7 @@ function CategoryManagementSession() {
                 ))}
               </select>
             </Field>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               분류 등록
             </Button>
           </fieldset>
@@ -159,6 +159,7 @@ function CategoryManagementSession() {
                     분류 수정: {category.name}
                   </Button>
                   <Button
+                    variant={category.status === "활성" ? "danger" : ""}
                     disabled={busy}
                     onClick={() =>
                       void guard(async () => {
@@ -312,7 +313,11 @@ function CategoryNameEditor({
         <ErrorState error={reloadError} retry={() => void reload()} />
       )}
       <div className="flex gap-2">
-        <Button type="submit" disabled={busy || (conflict && !latest)}>
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={busy || (conflict && !latest)}
+        >
           {busy ? "처리 중…" : latest ? "최신 기준으로 이름 저장" : "이름 저장"}
         </Button>
         <Button

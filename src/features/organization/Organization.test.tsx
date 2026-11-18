@@ -645,7 +645,13 @@ it("sends seven structured days including a closed day and separate status comma
     .mockResolvedValueOnce({ ...branch, version: 2 })
     .mockResolvedValueOnce({ ...branch, version: 3, status: "운영 중지" });
   render(<BranchForm branch={branch} scope="1" onSaved={onSaved} />);
+  expect(screen.getByRole("button", { name: "지점 저장" })).toHaveClass(
+    "primary",
+  );
   await user.selectOptions(screen.getByLabelText("운영 상태"), "운영 중지");
+  expect(screen.getByRole("button", { name: "지점 저장" })).toHaveClass(
+    "danger",
+  );
   await user.click(screen.getAllByRole("checkbox", { name: "휴무" })[0]);
   await user.click(screen.getByRole("button", { name: "지점 저장" }));
   expect(api).toHaveBeenCalledTimes(2);
@@ -740,6 +746,34 @@ describe("employee detail version baselines", () => {
       .map((button) => within(button.closest("form")!));
     return { server, profile, memberships, user: userEvent.setup() };
   }
+  it("distinguishes account restrictions and membership revocation from ordinary editing", async () => {
+    const { profile, memberships, user } = setupDetail();
+    const accountSave = profile.getByRole("button", { name: "계정 정보 저장" });
+    const membershipSave = memberships[0].getByRole("button", {
+      name: "이 지점 소속 저장",
+    });
+    expect(accountSave).toHaveClass("primary");
+    await user.selectOptions(
+      profile.getByLabelText("계정 전체 상태"),
+      "이용 제한",
+    );
+    expect(accountSave).toHaveClass("danger");
+    await user.selectOptions(profile.getByLabelText("계정 전체 상태"), "활성");
+    await user.type(profile.getByLabelText("직원 이름"), "수정");
+    expect(accountSave).toHaveClass("primary");
+    expect(membershipSave).toHaveClass("primary");
+    await user.selectOptions(
+      memberships[0].getByLabelText("지점 소속 상태"),
+      "회수",
+    );
+    expect(membershipSave).toHaveClass("danger");
+    await user.selectOptions(
+      memberships[0].getByLabelText("지점 소속 상태"),
+      "활성",
+    );
+    expect(membershipSave).toHaveClass("primary");
+    expect(api).not.toHaveBeenCalled();
+  });
   async function save(
     user: ReturnType<typeof userEvent.setup>,
     form: ReturnType<typeof within>,

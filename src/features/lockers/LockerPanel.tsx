@@ -76,7 +76,12 @@ export function LockerPanel({
                   {writable && (
                     <>
                       <Button onClick={() => setMode("edit")}>수정하기</Button>
-                      <Button onClick={() => setMode("status")}>
+                      <Button
+                        variant={
+                          row.data.status === "운영 중단" ? "" : "danger"
+                        }
+                        onClick={() => setMode("status")}
+                      >
                         {row.data.status === "운영 중단"
                           ? "운영 재개"
                           : "운영 중단"}
@@ -420,7 +425,11 @@ function LockerForm({
           latest={latest && <LockerInfo locker={latest} />}
         />
         <Button
-          variant="primary"
+          variant={
+            mode === "status" && requestedStatus === "운영 중단"
+              ? "danger"
+              : "primary"
+          }
           type="submit"
           disabled={!branch || (versionError(error) && !latest)}
         >

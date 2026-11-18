@@ -71,7 +71,10 @@ function RoomSession({ id, onClose }: { id: string; onClose: () => void }) {
                 {editable && (
                   <div className="mt-6 flex gap-2">
                     <Button onClick={() => setMode("edit")}>수정하기</Button>
-                    <Button onClick={() => setMode("status")}>
+                    <Button
+                      variant={row.data.status === "운영 중단" ? "" : "danger"}
+                      onClick={() => setMode("status")}
+                    >
                       {row.data.status === "운영 중단"
                         ? "운영 재개"
                         : "운영 중단"}
@@ -308,7 +311,11 @@ function RoomForm({
       )}
       <Button
         type="submit"
-        variant="primary"
+        variant={
+          mode === "status" && original?.status !== "운영 중단"
+            ? "danger"
+            : "primary"
+        }
         className="mt-5"
         disabled={
           write.busy ||

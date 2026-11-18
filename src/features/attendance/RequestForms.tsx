@@ -117,7 +117,11 @@ function IntervalRequest({
           신청 사유
           <textarea required name="reason" maxLength={500} />
         </label>
-        <Button type="submit" disabled={write.busy || success}>
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={write.busy || success}
+        >
           신청하기
         </Button>
       </fieldset>

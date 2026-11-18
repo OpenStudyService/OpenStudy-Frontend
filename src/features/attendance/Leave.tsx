@@ -254,7 +254,11 @@ function LeaveRequestForm() {
           <textarea name="reason" required maxLength={500} />
         </label>
         {issue && <p role="alert">{issue}</p>}
-        <Button type="submit" disabled={write.busy || !!issue || saved}>
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={write.busy || !!issue || saved}
+        >
           휴가 신청 등록
         </Button>
       </fieldset>
@@ -402,7 +406,11 @@ function GrantForm() {
           부여 사유
           <textarea name="reason" required maxLength={500} />
         </label>
-        <Button type="submit" disabled={write.busy || !branch || saved}>
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={write.busy || !branch || saved}
+        >
           휴가 부여하기
         </Button>
       </fieldset>

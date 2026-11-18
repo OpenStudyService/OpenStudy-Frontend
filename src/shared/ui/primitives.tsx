@@ -4,11 +4,13 @@ import { useId, useRef, useState } from "react";
 import { PanelDrafts, confirmDiscard } from "./leaveGuard";
 import type { RefObject } from "react";
 import { Icon } from "./Icon";
+export type ButtonVariant = "" | "primary" | "quiet" | "danger";
+
 export function Button({
   variant = "",
   className = "",
   ...props
-}: ComponentPropsWithRef<"button"> & { variant?: string }) {
+}: ComponentPropsWithRef<"button"> & { variant?: ButtonVariant }) {
   return <button className={`btn ${variant} ${className}`} {...props} />;
 }
 type BadgeTone = "good" | "bad" | "warn" | "neutral";
@@ -124,7 +126,7 @@ export function Panel({
   children: ReactNode;
   wide?: boolean;
   closeDisabled?: boolean;
-  closeButtonVariant?: string;
+  closeButtonVariant?: ButtonVariant;
 }) {
   const headingId = useId();
   const [drafts] = useState(() => new Set<RefObject<boolean>>());

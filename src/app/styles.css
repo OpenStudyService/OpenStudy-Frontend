@@ -11,6 +11,11 @@
 }
 :root,
 [data-theme="forest"] {
+  --danger-ink: #9f2d27;
+  --danger-line: #e8bdb7;
+  --danger-surface: #fff4f2;
+  --danger-hover: #fde5e0;
+  --danger-ring: #b43c33;
   --rail: #163b31;
   --rail-hover: #285345;
   --side: #edf2ed;
@@ -159,7 +164,20 @@
     @apply border-transparent bg-transparent text-muted;
   }
   .btn.danger {
-    color: #a13c30;
+    color: var(--danger-ink);
+    border-color: var(--danger-line);
+    background-color: var(--danger-surface);
+  }
+  .btn.danger:hover:not(:disabled),
+  .danger-action:hover:not(:disabled) {
+    background-color: var(--danger-hover);
+  }
+  .btn.danger:focus-visible,
+  .danger-action:focus-visible {
+    outline-color: var(--danger-ring);
+  }
+  .danger-action {
+    color: var(--danger-ink);
   }
   .badge {
     @apply inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold;

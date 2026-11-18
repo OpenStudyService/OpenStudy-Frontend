@@ -116,7 +116,9 @@ export function BranchClosures({ branch }: { branch: Branch }) {
                 onChange={(e) => setNote(e.target.value)}
               />
             </Field>
-            <Button type="submit">휴무일 등록</Button>
+            <Button variant="primary" type="submit">
+              휴무일 등록
+            </Button>
           </fieldset>
         </form>
       )}
@@ -225,7 +227,7 @@ export function BranchClosures({ branch }: { branch: Branch }) {
                     disabled={busy}
                   />
                 </Field>
-                <Button type="submit" disabled={busy}>
+                <Button variant="primary" type="submit" disabled={busy}>
                   안내 저장
                 </Button>
                 <Button
@@ -249,6 +251,7 @@ export function BranchClosures({ branch }: { branch: Branch }) {
             ))}
           {writable && row.canDelete && row.date > today && (
             <Button
+              variant="danger"
               disabled={busy}
               onClick={() => {
                 if (!window.confirm(`${row.date} 휴무일을 삭제할까요?`)) return;

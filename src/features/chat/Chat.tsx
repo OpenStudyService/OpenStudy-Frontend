@@ -319,6 +319,7 @@ function ChatWorkspace() {
               <>
                 <Button onClick={() => void transmit(j, query)}>재전송</Button>
                 <Button
+                  variant="danger"
                   onClick={() =>
                     useChatSession.getState().remove(j.clientMessageId)
                   }

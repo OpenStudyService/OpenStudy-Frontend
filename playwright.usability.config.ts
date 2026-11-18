@@ -10,6 +10,7 @@ export default defineConfig({
     "tasks.spec.ts",
     "customers.spec.ts",
     "workforce.spec.ts",
+    "button-styles.spec.ts",
   ],
   testIgnore: ["**/builds/**", "**/live/**"],
   timeout: 120000,

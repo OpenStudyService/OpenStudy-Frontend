@@ -12,6 +12,33 @@ import { emptyLookups } from "../../app/context";
 import { ApiError } from "../../shared/api/client";
 import type { LookupData } from "../../shared/domain/schema";
 afterEach(cleanup);
+it.each(["primary", "danger"] as const)(
+  "preserves command validation and payload for a %s submit",
+  async (submitVariant) => {
+    const submit = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <ResourceForm
+        fields={[{ key: "reason", label: "사유", required: true }]}
+        scope="gangnam"
+        lookups={emptyLookups}
+        onSubmit={submit}
+        label="작업 확정"
+        submitVariant={submitVariant}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "작업 확정" });
+    expect(button).toHaveClass(submitVariant);
+    await user.click(button);
+    expect(submit).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("사유"), "검증 사유");
+    await user.click(button);
+    expect(submit).toHaveBeenCalledWith(
+      { reason: "검증 사유" },
+      expect.any(Function),
+    );
+  },
+);
 it("keeps failed input protected and clears the guard only on confirmed commit", async () => {
   const submit = vi
     .fn()

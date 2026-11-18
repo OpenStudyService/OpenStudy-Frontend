@@ -867,6 +867,11 @@ function GenericRecordPanel({
                       condition: value(r, "condition"),
                     }}
                     label={actionLabel}
+                    submitVariant={
+                      def.actions?.find((item) => item.key === action)?.danger
+                        ? "danger"
+                        : "primary"
+                    }
                     onSubmit={(data, committed) =>
                       perform(action, data, committed)
                     }

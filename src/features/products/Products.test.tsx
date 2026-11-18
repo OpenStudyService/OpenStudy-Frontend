@@ -401,10 +401,19 @@ it("keeps the input after a version conflict and never overwrites the newer fiel
 
 it("asks for confirmation before stopping sales and then sends the status", async () => {
   const dialog = await open();
+  expect(within(dialog).getByRole("button", { name: "판매 중지" })).toHaveClass(
+    "danger",
+  );
   await userEvent.click(
     within(dialog).getByRole("button", { name: "판매 중지" }),
   );
   expect(calls()).toEqual([]);
+  expect(within(dialog).getByRole("button", { name: "중지 확인" })).toHaveClass(
+    "danger",
+  );
+  expect(within(dialog).getByRole("button", { name: "취소" })).not.toHaveClass(
+    "danger",
+  );
   await userEvent.click(within(dialog).getByRole("button", { name: "취소" }));
   expect(calls()).toEqual([]);
   await userEvent.click(
@@ -420,6 +429,21 @@ it("asks for confirmation before stopping sales and then sends the status", asyn
       body: { version: 3, status: "판매 중지" },
     },
   ]);
+});
+
+it("uses a primary confirmation when resuming a stopped product", async () => {
+  products[0] = { ...products[0], status: "판매 중지" };
+  const dialog = await open();
+  expect(
+    within(dialog).getByRole("button", { name: "판매 재개" }),
+  ).not.toHaveClass("danger");
+  await userEvent.click(
+    within(dialog).getByRole("button", { name: "판매 재개" }),
+  );
+  expect(within(dialog).getByRole("button", { name: "재개 확인" })).toHaveClass(
+    "primary",
+  );
+  expect(calls()).toEqual([]);
 });
 
 it("keeps an unsaved product draft when a different section would replace it", async () => {
