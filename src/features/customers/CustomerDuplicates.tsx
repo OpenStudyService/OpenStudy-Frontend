@@ -326,7 +326,7 @@ function CompareCustomers({
         </Button>
         <Button
           type="submit"
-          variant="primary"
+          variant="danger"
           disabled={!ready || !reason.trim() || needsRefresh || write.busy}
         >
           고객 병합

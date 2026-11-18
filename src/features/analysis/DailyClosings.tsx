@@ -114,6 +114,7 @@ export function DailyClosings({
             />
           </Field>
           <Button
+            variant="primary"
             type="submit"
             disabled={!date || date >= today || create.isPending}
           >

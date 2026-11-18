@@ -120,7 +120,10 @@ function ReservationSession({
                     data.canCancel &&
                     data.status === "확정" &&
                     clock < Date.parse(data.startAt) && (
-                      <Button onClick={() => setMode("cancel")}>
+                      <Button
+                        variant="danger"
+                        onClick={() => setMode("cancel")}
+                      >
                         예약 취소
                       </Button>
                     )}
@@ -342,7 +345,7 @@ function ReservationAction({
         <Button
           className="mt-5"
           type="submit"
-          variant="primary"
+          variant={action === "cancel" ? "danger" : "primary"}
           disabled={
             write.busy ||
             blocked ||

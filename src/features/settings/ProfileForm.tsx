@@ -132,6 +132,7 @@ export function ProfileForm() {
           </label>
           {session.user.avatar && (
             <Button
+              variant="danger"
               type="button"
               disabled={busy || !allowed}
               onClick={() => void updatePhoto()}

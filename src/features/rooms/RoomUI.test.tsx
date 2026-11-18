@@ -347,6 +347,9 @@ it("keeps the originally requested room status through background changes and ex
     .mockResolvedValue(stopped);
   const { user, client } = mount(<RoomPanel id="r1" onClose={vi.fn()} />);
   await user.click(await screen.findByRole("button", { name: "운영 중단" }));
+  expect(screen.getByRole("button", { name: "저장하기" })).toHaveClass(
+    "danger",
+  );
   await user.type(screen.getByLabelText("운영 변경 사유"), "시설 정비");
   client.setQueryData(
     ["data", "owner", "gangnam", "rooms", "detail", "r1"],
@@ -358,6 +361,9 @@ it("keeps the originally requested room status through background changes and ex
     await screen.findByRole("button", { name: "최신 내용 확인" }),
   );
   await screen.findByRole("heading", { name: "최신 서버 내용" });
+  expect(
+    screen.getByRole("button", { name: "최신 기준으로 다시 저장" }),
+  ).toHaveClass("danger");
   await user.click(
     screen.getByRole("button", { name: "최신 기준으로 다시 저장" }),
   );
@@ -383,6 +389,9 @@ it("retries a lost cancellation response with the same key and original version 
     <ReservationPanel id="booking1" onClose={vi.fn()} onSelected={vi.fn()} />,
   );
   await user.click(await screen.findByRole("button", { name: "예약 취소" }));
+  expect(
+    screen.getByRole("button", { name: "예약 취소·전액 환불" }),
+  ).toHaveClass("danger");
   await user.type(screen.getByLabelText("취소 사유"), "일정 변경");
   vi.mocked(roomApi.reservation).mockResolvedValue(cancelled);
   await user.click(screen.getByRole("button", { name: "예약 취소·전액 환불" }));

@@ -159,6 +159,7 @@ function RequestCard({
           .filter(([, allowed]) => allowed)
           .map(([action]) => (
             <Button
+              variant={action === "approve" ? "primary" : "danger"}
               key={action}
               disabled={write.busy}
               onClick={() => {
@@ -188,7 +189,11 @@ function RequestCard({
               onChange={(event) => setReason(event.target.value)}
             />
           </label>
-          <Button type="submit" disabled={write.busy || !reason.trim()}>
+          <Button
+            variant="danger"
+            type="submit"
+            disabled={write.busy || !reason.trim()}
+          >
             반려 확정
           </Button>
         </form>

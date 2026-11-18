@@ -458,7 +458,17 @@ export function BranchForm({
             </table>
           </div>
         </fieldset>
-        <Button type="submit" variant="primary" disabled={busy}>
+        <Button
+          type="submit"
+          variant={
+            branch &&
+            draft.status !== branch.status &&
+            draft.status === "운영 중지"
+              ? "danger"
+              : "primary"
+          }
+          disabled={busy}
+        >
           {busy ? "저장 중" : "지점 저장"}
         </Button>
       </fieldset>

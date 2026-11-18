@@ -504,6 +504,7 @@ function SalesWorkspace() {
                 message={invalid}
                 action={
                   <Button
+                    variant="quiet"
                     onClick={() => {
                       if (isPassUsage) {
                         changeFilters({

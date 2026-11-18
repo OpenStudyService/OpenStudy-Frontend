@@ -237,7 +237,10 @@ function PaymentsSession({ embedded }: { embedded: boolean }) {
                 onChange={(id) => update("customerId", id)}
               />
               <div className="ml-auto flex flex-wrap justify-end gap-2">
-                <Button onClick={() => reset(PAYMENT_FILTER_KEYS)}>
+                <Button
+                  variant="quiet"
+                  onClick={() => reset(PAYMENT_FILTER_KEYS)}
+                >
                   초기화
                 </Button>
                 {createButton}

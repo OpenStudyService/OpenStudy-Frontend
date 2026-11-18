@@ -337,7 +337,9 @@ function CustomerStatusForm({
       {denied && <p className="help">이 회원의 상태를 변경할 수 없어요.</p>}
       <Button
         type="submit"
-        variant="primary"
+        variant={
+          status !== base.status && status !== "정상" ? "danger" : "primary"
+        }
         disabled={write.busy || denied || (conflict && !latest)}
       >
         {write.busy

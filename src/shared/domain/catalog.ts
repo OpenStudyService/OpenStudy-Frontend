@@ -229,7 +229,7 @@ export const catalog: Partial<Record<Resource, Definition>> = {
     actions: [
       { key: "assign", label: "현장 배정" },
       { key: "move", label: "좌석 이동" },
-      { key: "checkout", label: "퇴실 처리", danger: true },
+      { key: "checkout", label: "퇴실 처리" },
     ],
   },
   usage: {
@@ -265,7 +265,7 @@ export const catalog: Partial<Record<Resource, Definition>> = {
     actions: [
       { key: "assign", label: "사물함 배정" },
       { key: "extend", label: "기간 연장" },
-      { key: "return", label: "반납", danger: true },
+      { key: "return", label: "반납" },
     ],
   },
   rooms: {

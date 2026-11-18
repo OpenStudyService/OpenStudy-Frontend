@@ -476,6 +476,7 @@ it("requires a reason for a status change and does not send editable identity fi
   mount("?detail=c1&action=status");
   await screen.findByLabelText("변경 사유");
   await userEvent.selectOptions(screen.getByLabelText("상태"), "이용 제한");
+  expect(screen.getByRole("button", { name: "상태 저장" })).toHaveClass("danger");
   await userEvent.click(screen.getByRole("button", { name: "상태 저장" }));
   expect(
     await screen.findByText("변경 사유를 1~500자로 입력해 주세요."),
@@ -495,6 +496,20 @@ it("requires a reason for a status change and does not send editable identity fi
     reason: "반복적인 규정 위반",
   });
 });
+
+it.each(["정상", "이용 제한", "비활성"] as const)(
+  "keeps an unchanged %s customer neutral to restrictions and restores with a primary action",
+  async (status) => {
+    current.status = status;
+    mount("?detail=c1&action=status");
+    await screen.findByLabelText("변경 사유");
+    const save = screen.getByRole("button", { name: "상태 저장" });
+    expect(save).toHaveClass("primary");
+    await userEvent.selectOptions(screen.getByLabelText("상태"), "정상");
+    expect(save).toHaveClass("primary");
+    expect(customerApi.changeStatus).not.toHaveBeenCalled();
+  },
+);
 
 it("preserves dirty input when panel closing is cancelled", async () => {
   await edit();

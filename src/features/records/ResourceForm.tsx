@@ -11,7 +11,11 @@ import {
   employeeLookupNeedsScope,
 } from "../../shared/domain/lookup-employees";
 import type { Field } from "../../shared/domain/catalog";
-import { Button, FieldError } from "../../shared/ui/primitives";
+import {
+  Button,
+  FieldError,
+  type ButtonVariant,
+} from "../../shared/ui/primitives";
 
 const localDateTime = (v: unknown) =>
   typeof v === "string" && v.includes("T")
@@ -58,6 +62,7 @@ export function ResourceForm({
   lookups,
   onSubmit,
   label = "저장하기",
+  submitVariant = "primary",
   defaults = {},
 }: {
   fields: Field[];
@@ -69,6 +74,7 @@ export function ResourceForm({
     committed: () => void,
   ) => Promise<void>;
   label?: string;
+  submitVariant?: Extract<ButtonVariant, "primary" | "danger">;
   defaults?: Record<string, unknown>;
 }) {
   const id = useId(),
@@ -320,7 +326,7 @@ export function ResourceForm({
         <div className="sticky bottom-0 flex justify-end border-t border-line bg-surface pt-4">
           <Button
             type="submit"
-            variant="primary"
+            variant={submitVariant}
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? "처리 중…" : label}

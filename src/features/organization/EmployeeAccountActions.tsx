@@ -100,7 +100,11 @@ export function EmployeeAccountActions({ employee }: { employee: Employee }) {
   return (
     <div className="flex flex-wrap gap-2">
       {actor.id !== employee.id && employee.status === "활성" && (
-        <Button disabled={busy} onClick={() => void run("password-reset")}>
+        <Button
+          variant="danger"
+          disabled={busy}
+          onClick={() => void run("password-reset")}
+        >
           비밀번호 초기화
         </Button>
       )}

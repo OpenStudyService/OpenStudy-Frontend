@@ -68,6 +68,7 @@ export function FacilityTypeCreate({ onCreated }: { onCreated: () => void }) {
           />
         </Field>
         <Button
+          variant="primary"
           type="button"
           disabled={!name.trim()}
           onClick={() => void save()}

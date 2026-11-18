@@ -1195,7 +1195,7 @@ function History({
               <span>대화 {conversations.length}개</span>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-soft hover:text-red-700 disabled:opacity-50"
+                className="danger-action inline-flex items-center gap-1 rounded-md px-1.5 py-1 disabled:opacity-50"
                 aria-label="대화 기록 전체 삭제"
                 disabled={locked}
                 onClick={removeAll}
@@ -1292,7 +1292,7 @@ function History({
                       </button>
                       <button
                         type="button"
-                        className="rounded-md p-1.5 text-muted hover:bg-surface hover:text-red-700 disabled:opacity-50"
+                        className="danger-action rounded-md p-1.5 disabled:opacity-50"
                         aria-label={`${title} 삭제`}
                         title="삭제"
                         disabled={locked}

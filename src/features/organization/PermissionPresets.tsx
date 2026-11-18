@@ -41,7 +41,9 @@ export function PresetManagement({
           )}
         </div>
       ))}
-      <Button onClick={() => setSelected("new")}>프리셋 등록</Button>
+      <Button variant="primary" onClick={() => setSelected("new")}>
+        프리셋 등록
+      </Button>
       <Panel
         open={selected !== null}
         onClose={() => setSelected(null)}
@@ -182,7 +184,7 @@ function PresetForm({
             }
           }}
         />
-        <Button type="submit" disabled={busy}>
+        <Button variant="primary" type="submit" disabled={busy}>
           프리셋 저장
         </Button>
       </fieldset>
