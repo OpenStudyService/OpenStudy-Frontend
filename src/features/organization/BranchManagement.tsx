@@ -1,4 +1,5 @@
 import { useTableSort } from "../../shared/ui/table-sort";
+import { Icon } from "../../shared/ui/Icon";
 import { TimeInput } from "../../shared/ui/TimeInput";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
@@ -84,6 +85,7 @@ function BranchManagementContent() {
           actions={
             session.user.owner && (
               <Button variant="primary" onClick={() => setSelected("new")}>
+                <Icon name="plus" size={16} />
                 지점 등록
               </Button>
             )

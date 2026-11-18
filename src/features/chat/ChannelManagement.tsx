@@ -1,4 +1,5 @@
 import { ListColumnHeader } from "../../shared/ui/ListLayout";
+import { Icon } from "../../shared/ui/Icon";
 import { useLocalTableSort } from "../../shared/ui/table-sort";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { useState } from "react";
@@ -95,6 +96,7 @@ export function ChannelManagement({
   if (!allowed) return <State title="채널 관리 권한이 없어요" />;
   const create = (
     <Button variant="primary" onClick={() => show("new")}>
+      <Icon name="plus" size={16} />
       채널 등록
     </Button>
   );

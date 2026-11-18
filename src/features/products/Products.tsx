@@ -1,4 +1,5 @@
 import { readListPage } from "../../shared/api/read-sorted-pages";
+import { Icon } from "../../shared/ui/Icon";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { Tabs } from "radix-ui";
 import { hasBlockingReadError } from "../../shared/api/read-model";
@@ -153,6 +154,7 @@ export function ProductManagement() {
               actions={
                 writable.length > 0 && (
                   <Button variant="primary" onClick={() => setSelected("new")}>
+                    <Icon name="plus" size={16} />
                     상품 등록
                   </Button>
                 )

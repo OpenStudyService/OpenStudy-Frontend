@@ -1,4 +1,5 @@
 import { readFlatListPage } from "../../shared/api/read-sorted-pages";
+import { Icon } from "../../shared/ui/Icon";
 import { ListColumnHeader, ListFooter } from "../../shared/ui/ListLayout";
 import { useTableSort } from "../../shared/ui/table-sort";
 import { invalidateReads } from "../../shared/api/invalidateReads";
@@ -98,6 +99,7 @@ export function Shifts() {
         <Button onClick={() => filter("view", "list")}>목록 보기</Button>
         {admin(session.user, scope) && (
           <Button variant="primary" onClick={() => setCreate(true)}>
+            <Icon name="plus" size={16} />
             근무 등록
           </Button>
         )}
