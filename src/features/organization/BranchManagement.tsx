@@ -1,4 +1,5 @@
 import { useTableSort } from "../../shared/ui/table-sort";
+import { TimeInput } from "../../shared/ui/TimeInput";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
 import { useState, type FormEvent } from "react";
@@ -295,9 +296,12 @@ export function BranchForm({
     }
   }
   return (
-    <form onSubmit={(e) => void submit(e)} className="grid gap-4">
+    <form
+      onSubmit={(e) => void submit(e)}
+      className="grid min-w-0 grid-cols-1 gap-4"
+    >
       {leave.guard}
-      <fieldset className="contents" disabled={busy}>
+      <fieldset className="contents min-w-0" disabled={busy}>
         {error && profileSaved && (
           <p className="help" role="status">
             지점 기본 정보·운영시간은 저장되었지만 운영 상태는 저장하지
@@ -351,80 +355,110 @@ export function BranchForm({
             <option>운영 중지</option>
           </select>
         </Field>
-        <fieldset>
+        <fieldset className="min-w-0">
           <legend>요일별 운영시간</legend>
           <p className="help mb-3">
-            분 단위입니다. 00:00=0, 24:00=1440, 익일 02:00=1560. 휴무는
-            시작·종료를 저장하지 않습니다.
+            자정을 넘겨 종료하면 다음 날을 선택해 주세요. 24시간 운영은 00:00 ~
+            다음 날 00:00으로 설정합니다.
           </p>
-          {draft.weeklyHours.map((hours, index) => (
-            <div
-              key={hours.weekday}
-              className="mb-3 flex flex-wrap items-center gap-3"
+          <div className="min-w-0 max-w-full overflow-x-auto">
+            <table
+              aria-label="요일별 운영시간"
+              className="min-w-[33rem] w-full table-fixed text-sm"
             >
-              <b>{weekdays[hours.weekday - 1]}요일</b>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={hours.isClosed}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      weeklyHours: draft.weeklyHours.map((h, i) =>
-                        i !== index
-                          ? h
-                          : {
-                              ...h,
-                              isClosed: e.target.checked,
-                              opensMinute: e.target.checked ? null : 0,
-                              closesMinute: e.target.checked ? null : 1440,
-                            },
-                      ),
-                    })
-                  }
-                />{" "}
-                휴무
-              </label>
-              {!hours.isClosed &&
-                (
-                  [
-                    ["opensMinute", "시작"],
-                    ["closesMinute", "종료"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <Field
-                    key={key}
-                    label={`${weekdays[index]}요일 ${label}(분)`}
-                  >
-                    <input
-                      type="number"
-                      required
-                      min={key === "opensMinute" ? 0 : 1}
-                      max={key === "opensMinute" ? 1439 : 2880}
-                      value={hours[key] ?? ""}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          weeklyHours: draft.weeklyHours.map((h, i) =>
-                            i === index
-                              ? {
-                                  ...h,
-                                  [key]:
-                                    e.target.value === ""
-                                      ? null
-                                      : Number(e.target.value),
-                                }
-                              : h,
-                          ),
-                        })
-                      }
-                    />
-                  </Field>
+              <thead>
+                <tr>
+                  <th scope="col" className="w-12 py-2 text-left">
+                    요일
+                  </th>
+                  <th scope="col" className="w-40 px-2 py-2 text-left">
+                    시작
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-left">
+                    종료
+                  </th>
+                  <th scope="col" className="w-10 py-2 text-center">
+                    휴무
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {draft.weeklyHours.map((hours, index) => (
+                  <tr key={hours.weekday} className="border-t">
+                    <th
+                      scope="row"
+                      className="py-3 text-left align-top leading-10 font-medium"
+                    >
+                      {weekdays[hours.weekday - 1]}요일
+                    </th>
+                    {hours.isClosed ? (
+                      <td colSpan={2} className="help px-2 py-3 leading-10">
+                        운영하지 않아요
+                      </td>
+                    ) : (
+                      (
+                        [
+                          ["opensMinute", "시작"],
+                          ["closesMinute", "종료"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <td key={key} className="px-2 py-3 align-top">
+                          <TimeInput
+                            label={label}
+                            hideLabel
+                            accessibleLabel={`${weekdays[hours.weekday - 1]}요일 ${label}`}
+                            value={hours[key]}
+                            allowNextDay={key === "closesMinute"}
+                            onChange={(value) =>
+                              setDraft({
+                                ...draft,
+                                weeklyHours: draft.weeklyHours.map((h, i) =>
+                                  i === index
+                                    ? {
+                                        ...h,
+                                        [key]: value,
+                                      }
+                                    : h,
+                                ),
+                              })
+                            }
+                          />
+                        </td>
+                      ))
+                    )}
+                    <td className="py-3 text-center align-top">
+                      <label className="relative inline-flex h-10 items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={hours.isClosed}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              weeklyHours: draft.weeklyHours.map((h, i) =>
+                                i !== index
+                                  ? h
+                                  : {
+                                      ...h,
+                                      isClosed: e.target.checked,
+                                      opensMinute: e.target.checked ? null : 0,
+                                      closesMinute: e.target.checked
+                                        ? null
+                                        : 1440,
+                                    },
+                              ),
+                            })
+                          }
+                        />
+                        <span className="sr-only">휴무</span>
+                      </label>
+                    </td>
+                  </tr>
                 ))}
-            </div>
-          ))}
+              </tbody>
+            </table>
+          </div>
         </fieldset>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" variant="primary" disabled={busy}>
           {busy ? "저장 중" : "지점 저장"}
         </Button>
       </fieldset>

@@ -20,8 +20,41 @@ test("owner creates a branch with structured overnight hours", async ({
     .fill("구조화 운영시간 검증점");
   await dialog.getByLabel("주소", { exact: true }).fill("서울 테스트로 24");
   await dialog.getByLabel("연락처", { exact: true }).fill("02-123-4567");
-  await dialog.getByLabel("월요일 시작(분)", { exact: true }).fill("1200");
-  await dialog.getByLabel("월요일 종료(분)", { exact: true }).fill("1560");
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const start = await dialog
+      .getByLabel("월요일 시작", { exact: true })
+      .boundingBox();
+    const end = await dialog
+      .getByLabel("월요일 종료", { exact: true })
+      .boundingBox();
+    const day = await dialog
+      .getByLabel("월요일 종료 기준일", { exact: true })
+      .boundingBox();
+    expect(start).not.toBeNull();
+    expect(end).not.toBeNull();
+    expect(day).not.toBeNull();
+    expect(start!.width).toBeGreaterThanOrEqual(144);
+    expect(start!.width).toBe(end!.width);
+    expect(day!.y + day!.height / 2).toBeCloseTo(end!.y + end!.height / 2, 0);
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "test-results/branch-time-layout.png" });
+  await dialog.getByLabel("월요일 시작", { exact: true }).fill("20:00");
+  await dialog
+    .getByLabel("월요일 종료 기준일", { exact: true })
+    .selectOption("1");
+  await expect(
+    dialog
+      .getByLabel("월요일 종료 기준일", { exact: true })
+      .getByRole("option"),
+  ).toHaveText(["당일", "다음 날"]);
+  await dialog.getByLabel("월요일 종료", { exact: true }).fill("02:00");
   const request = page.waitForRequest(
     (r) =>
       r.method() === "POST" && new URL(r.url()).pathname === "/api/branches",
