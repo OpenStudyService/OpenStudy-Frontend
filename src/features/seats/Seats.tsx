@@ -1,4 +1,5 @@
 import { CustomerMergeErrorLink } from "../customers/CustomerMergeErrorLink";
+import { Icon } from "../../shared/ui/Icon";
 import { hasBlockingReadError } from "../../shared/api/read-model";
 import { invalidateReads } from "../../shared/api/invalidateReads";
 import { lazy, Suspense, useState } from "react";
@@ -197,6 +198,7 @@ function SeatsWorkspace({ embedded }: { embedded: boolean }) {
                   className="ml-auto"
                   onClick={() => update("detail", "new")}
                 >
+                  <Icon name="plus" size={16} />
                   좌석 등록
                 </Button>
               )}

@@ -1,4 +1,5 @@
 import { useDraftGuard } from "../../shared/ui/leaveGuard";
+import { Icon } from "../../shared/ui/Icon";
 import { useState } from "react";
 import { api } from "../../shared/api/client";
 import type { components } from "../../shared/api/foundation.generated";
@@ -42,6 +43,7 @@ export function PresetManagement({
         </div>
       ))}
       <Button variant="primary" onClick={() => setSelected("new")}>
+        <Icon name="plus" size={16} />
         프리셋 등록
       </Button>
       <Panel
