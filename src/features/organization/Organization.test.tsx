@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -515,6 +516,126 @@ it("preserves membership inputs on 409 and explicitly refreshes both versions be
     branchId: "2",
     version: 8,
   });
+});
+
+it("creates a branch with hour/minute inputs and overnight closing minutes", async () => {
+  const user = userEvent.setup();
+  vi.mocked(api).mockResolvedValue(branch);
+  render(<BranchForm scope="all" onSaved={vi.fn()} />);
+  await user.type(screen.getByLabelText("지점 이름"), "신규 지점");
+  await user.type(screen.getByLabelText("주소"), "서울");
+  expect(screen.getByLabelText("월요일 시작")).toHaveAttribute("type", "time");
+  expect(screen.getByLabelText("월요일 시작")).toHaveValue("00:00");
+  expect(screen.getByLabelText("월요일 종료")).toHaveValue("00:00");
+  expect(screen.getByLabelText("월요일 종료 기준일")).toHaveValue("1");
+  fireEvent.change(screen.getByLabelText("월요일 시작"), {
+    target: { value: "20:30" },
+  });
+  fireEvent.change(screen.getByLabelText("월요일 종료"), {
+    target: { value: "02:15" },
+  });
+  await user.click(screen.getByRole("button", { name: "지점 저장" }));
+  expect(api).toHaveBeenCalledWith(
+    "/branches",
+    expect.objectContaining({
+      method: "POST",
+      body: expect.objectContaining({
+        weeklyHours: expect.arrayContaining([
+          {
+            weekday: 1,
+            isClosed: false,
+            opensMinute: 1230,
+            closesMinute: 1575,
+          },
+          { weekday: 2, isClosed: false, opensMinute: 0, closesMinute: 1440 },
+        ]),
+      }),
+    }),
+  );
+});
+
+it.each([
+  [570, 1125, "09:30", "18:45", "0"],
+  [1200, 1560, "20:00", "02:00", "1"],
+  [0, 1440, "00:00", "00:00", "1"],
+  [0, 2879, "00:00", "23:59", "1"],
+])(
+  "preserves saved opening %i and closing %i on edit",
+  async (opensMinute, closesMinute, start, end, day) => {
+    const user = userEvent.setup();
+    const weeklyHours = defaultHours();
+    weeklyHours[0] = { ...weeklyHours[0], opensMinute, closesMinute };
+    vi.mocked(api).mockResolvedValue({ ...branch, weeklyHours, version: 2 });
+    render(
+      <BranchForm
+        branch={{ ...branch, weeklyHours }}
+        scope="1"
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("월요일 시작")).toHaveValue(start);
+    expect(screen.getByLabelText("월요일 종료")).toHaveValue(end);
+    expect(screen.getByLabelText("월요일 종료 기준일")).toHaveValue(day);
+    await user.click(screen.getByRole("button", { name: "지점 저장" }));
+    expect(api).toHaveBeenCalledWith(
+      "/branches/1?scope=1",
+      expect.objectContaining({
+        body: expect.objectContaining({ weeklyHours }),
+      }),
+    );
+  },
+);
+
+it("keeps the closing day through an empty time and rejects a closing before opening", async () => {
+  const user = userEvent.setup();
+  render(<BranchForm branch={branch} scope="1" onSaved={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("월요일 종료"), {
+    target: { value: "" },
+  });
+  fireEvent.change(screen.getByLabelText("월요일 종료"), {
+    target: { value: "08:00" },
+  });
+  expect(screen.getByLabelText("월요일 종료 기준일")).toHaveValue("1");
+  await user.selectOptions(screen.getByLabelText("월요일 종료 기준일"), "0");
+  fireEvent.change(screen.getByLabelText("월요일 시작"), {
+    target: { value: "09:00" },
+  });
+  await user.click(screen.getByRole("button", { name: "지점 저장" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "종료는 시작 이후",
+  );
+  expect(api).not.toHaveBeenCalled();
+  await user.selectOptions(screen.getByLabelText("월요일 종료 기준일"), "1");
+  expect(
+    within(screen.getByLabelText("월요일 종료 기준일"))
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["당일", "다음 날"]);
+});
+
+it("requires a new closing time for an existing next-day 24:00 value", async () => {
+  const user = userEvent.setup();
+  const weeklyHours = defaultHours();
+  weeklyHours[0].closesMinute = 2880;
+  render(
+    <BranchForm
+      branch={{ ...branch, weeklyHours }}
+      scope="1"
+      onSaved={vi.fn()}
+    />,
+  );
+  expect(screen.getByLabelText("월요일 종료 기준일")).toHaveValue("1");
+  expect(screen.getByLabelText("월요일 종료")).toHaveValue("");
+  expect(screen.getByText(/기존 종료 시간이 선택 범위를/)).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "지점 저장" }));
+  expect(api).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("월요일 종료"), {
+    target: { value: "02:00" },
+  });
+  expect(
+    screen.queryByText(/기존 종료 시간이 선택 범위를/),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("월요일 종료")).toHaveValue("02:00");
 });
 
 it("sends seven structured days including a closed day and separate status command", async () => {
