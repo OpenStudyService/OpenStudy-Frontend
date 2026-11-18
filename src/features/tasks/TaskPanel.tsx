@@ -20,6 +20,7 @@ import type { TaskAction } from "./model";
 import { taskApi } from "./api";
 import { useTaskDetail, useTaskWrite, useTaskLeaveGuard } from "./hooks";
 import { LatestTask, TaskForm } from "./TaskForm";
+import { Icon } from "../../shared/ui/Icon";
 
 export function TaskPanel(props: { id: string; onClose: () => void }) {
   const { session, scope } = useApp();
@@ -164,19 +165,31 @@ function TaskPanelSession({
                   <TaskHistory id={task.id} />
                 </section>
                 {editable && (
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    <Button variant="primary" onClick={() => mode("edit", "1")}>
+                  <div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-4">
+                    <Button variant="quiet" onClick={() => mode("edit", "1")}>
+                      <Icon name="edit" size={16} />
                       수정하기
                     </Button>
-                    {[...taskActions(task)].map((key) => (
-                      <Button
-                        variant="primary"
-                        key={key}
-                        onClick={() => mode("action", key)}
-                      >
-                        {actionLabels[key]}
-                      </Button>
-                    ))}
+                    <div
+                      role="group"
+                      aria-label="업무 상태 변경"
+                      className="flex flex-wrap justify-end gap-2"
+                    >
+                      {[...taskActions(task)].map((key) => (
+                        <Button
+                          variant={key === "complete" ? "primary" : ""}
+                          key={key}
+                          onClick={() => mode("action", key)}
+                        >
+                          <Icon
+                            name={key === "complete" ? "check" : "arrow"}
+                            size={16}
+                            className={key === "reopen" ? "rotate-180" : ""}
+                          />
+                          {actionLabels[key]}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </>
@@ -379,10 +392,15 @@ function TaskActionForm({
         </p>
       )}
       <Button
-        variant="primary"
+        variant={action === "complete" ? "primary" : ""}
         disabled={write.busy || !allowed || denied || (conflict && !latest)}
         onClick={() => void submit()}
       >
+        <Icon
+          name={action === "complete" ? "check" : "arrow"}
+          size={16}
+          className={action === "reopen" ? "rotate-180" : ""}
+        />
         {write.busy ? "처리 중…" : actionLabels[action]}
       </Button>
     </section>
@@ -496,16 +514,21 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
       {task.checklist.length ? (
         task.checklist.map((item) => (
           <div key={item.id} className="my-3 flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-[13px] font-normal">
+            <label
+              className={`flex items-center gap-2 text-[13px] font-normal ${editing === item.id ? "w-full" : "min-w-0 flex-1"}`}
+            >
               <input
                 type="checkbox"
                 checked={item.done}
                 disabled={blocked}
+                className="shrink-0"
                 onChange={() =>
                   void change("update", item.id, { done: !item.done })
                 }
               />
-              <span className={item.done ? "text-muted line-through" : ""}>
+              <span
+                className={`min-w-0 break-words ${item.done ? "text-muted line-through" : ""}`}
+              >
                 {item.body}
               </span>
             </label>
@@ -513,6 +536,7 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
               (editing === item.id ? (
                 <>
                   <input
+                    className="min-w-0 flex-1"
                     aria-label="체크 항목 내용 수정"
                     value={editBody}
                     disabled={blocked}
@@ -536,26 +560,31 @@ function TaskChecks({ task, enabled }: { task: Task; enabled: boolean }) {
                   </Button>
                 </>
               ) : (
-                <>
+                <span className="inline-flex shrink-0 items-center gap-1">
                   <Button
+                    variant="quiet"
+                    className="h-8 min-h-8 w-8 p-0"
                     disabled={blocked}
                     aria-label={`${item.body} 수정`}
+                    title="항목 수정"
                     onClick={() => {
                       setEditing(item.id);
                       setEditBody(item.body);
                     }}
                   >
-                    수정
+                    <Icon name="edit" size={16} />
                   </Button>
                   <Button
                     variant="danger"
+                    className="h-8 min-h-8 w-8 p-0"
                     disabled={blocked}
                     aria-label={`${item.body} 삭제`}
+                    title="항목 삭제"
                     onClick={() => void change("delete", item.id)}
                   >
-                    삭제
+                    <Icon name="trash" size={16} />
                   </Button>
-                </>
+                </span>
               ))}
           </div>
         ))
